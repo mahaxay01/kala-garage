@@ -681,12 +681,12 @@ cloud.logout = async function() {
 (function injectGateCSS() {
   const style = document.createElement('style');
   style.textContent = `
-    body.locked-no-cloud aside.side a:not([data-page="cloud"]):not([data-page="settings"]) {
+    body.locked-no-cloud aside.side a:not([data-page="cloud"]):not([data-page="cloud_users"]):not([data-page="settings"]) {
       opacity: 0.4 !important;
       pointer-events: none !important;
       cursor: not-allowed !important;
     }
-    body.locked-no-cloud aside.side a:not([data-page="cloud"]):not([data-page="settings"])::after {
+    body.locked-no-cloud aside.side a:not([data-page="cloud"]):not([data-page="cloud_users"]):not([data-page="settings"])::after {
       content: " 🔒";
       font-size: 11px;
     }
@@ -1664,6 +1664,7 @@ function renderNav() {
     <a data-page="ai_tools"><span>🛠</span><span class="label">AI Tools (20 ຄວາມສາມາດ)</span></a>
     <a data-page="data_storage"><span>💾</span><span class="label">Data Storage</span></a>
     <a data-page="cloud"><span>☁️</span><span class="label">Cloud Sync (BETA)</span></a>
+    <a data-page="cloud_users"><span>👥</span><span class="label">Cloud Users (Admin)</span></a>
     <a data-page="settings"><span>⚙️</span><span class="label">${t('nav_settings')}</span></a>
     <a data-page="about"><span>ℹ️</span><span class="label">${t('nav_about')}</span></a>
   `;
@@ -7804,6 +7805,211 @@ async function showVendorDetail(vendor_id) {
 // Load exchange rates from localStorage (or default)
 function getRates() { return JSON.parse(localStorage.getItem('kala_rates') || JSON.stringify(DEFAULT_RATES)); }
 function saveRates(rates) { localStorage.setItem('kala_rates', JSON.stringify(rates)); Object.assign(DEFAULT_RATES, rates); }
+
+// ===================== CLOUD USERS MANAGEMENT (Admin) =====================
+const ROLE_LABELS = {
+  owner: '👑 Owner', manager: '🛠 Manager', tech_l3: '🔧 Tech L3 (Senior)', tech_l2: '🔧 Tech L2',
+  tech_l1: '🔧 Tech L1 (Apprentice)', driver: '🚗 Driver', procurement: '📦 Procurement',
+  qc: '✅ QC', accounting: '💰 Accounting', it: '💻 IT',
+};
+const BRANCH_OPTIONS = ['ປາກເຊ','ປາກຊ່ອງ','ໂຂງ','ອັດຕະປື','ສາລະວັນ','ສະຫວັນນະເຂດ','ເຊໂນ','ວຽງຈັນ'];
+
+pages.cloud_users = async () => {
+  if (!cloud.user) {
+    $('#main').innerHTML = `<div class="alert warn">⚠️ ກະລຸນາ Login Cloud ກ່ອນ</div>`;
+    return;
+  }
+  if (!cloud.isAdmin() && !cloud.hasRole('owner','it','manager')) {
+    $('#main').innerHTML = `<div class="alert bad">❌ ບໍ່ມີສິດທິ — ສະເພາະ Owner / IT / Manager</div>`;
+    return;
+  }
+  // Fetch users from Supabase
+  let users = [];
+  let err = null;
+  try {
+    const { data, error } = await cloud.client
+      .from('user_profiles')
+      .select('id, email, username, name, role, branch, phone, active, last_login, created_at')
+      .order('role').order('branch').order('name');
+    if (error) err = error.message;
+    else users = data || [];
+  } catch(e) { err = e.message; }
+
+  // Stats
+  const stats = {};
+  Object.keys(ROLE_LABELS).forEach(r => stats[r] = users.filter(u => u.role === r).length);
+  const totalActive = users.filter(u => u.active !== false).length;
+
+  $('#main').innerHTML = `
+    <div class="crumbs">${t('nav_settings')} › 👥 Cloud Users</div>
+    <div class="page-title">👥 ການຈັດການຜູ້ໃຊ້ Cloud <small style="font-weight:400;color:var(--muted);font-size:13px">— ${users.length} ຄົນ (${totalActive} active)</small></div>
+
+    <div class="alert info" style="font-size:13px">
+      💡 ໜ້ານີ້ສຳລັບ <strong>Owner / IT</strong> ຄຸ້ມຄອງ User Cloud — ສ້າງ, ປ່ຽນ Role, Reset Password, ປິດ/ເປີດໃຊ້.
+      Manager ສາມາດເບິ່ງ User ໃນສາຂາຕົນເອງເທົ່ານັ້ນ.
+    </div>
+
+    ${err ? `<div class="alert bad">❌ ${err}</div>` : ''}
+
+    <div class="kpi-grid">
+      ${Object.entries(ROLE_LABELS).map(([k,v]) => `
+        <div class="kpi"><div class="label">${v}</div><div class="val">${stats[k]||0}</div></div>
+      `).join('')}
+    </div>
+
+    ${cloud.hasRole('owner','it') ? `
+    <div class="toolbar">
+      <button class="btn" onclick="openCloudUserForm()">+ ສ້າງ User ໃໝ່</button>
+      <button class="btn outline" onclick="pages.cloud_users()">🔄 Refresh</button>
+    </div>` : ''}
+
+    <div class="card" style="padding:0">
+      <table>
+        <tr>
+          <th>Email</th>
+          <th>ຊື່</th>
+          <th>Role</th>
+          <th>ສາຂາ</th>
+          <th>ສະຖານະ</th>
+          <th>Login ສຸດທ້າຍ</th>
+          ${cloud.hasRole('owner','it') ? '<th>ການເຮັດງານ</th>' : ''}
+        </tr>
+        ${users.map(u => `<tr style="${u.active===false?'opacity:.5':''}">
+          <td><strong>${escapeHtml(u.email||'-')}</strong><br><small class="muted">${u.username||''}</small></td>
+          <td>${escapeHtml(u.name||'-')}</td>
+          <td><span class="pill" style="background:${u.role==='owner'?'#DC2626':u.role==='it'?'#475569':u.role==='manager'?'#EA580C':u.role==='driver'?'#2563EB':'#16A34A'};color:#fff">${ROLE_LABELS[u.role]||u.role}</span></td>
+          <td>${u.branch||'-'}</td>
+          <td>${u.active!==false?'🟢 Active':'🔴 Disabled'}</td>
+          <td style="font-size:11px">${u.last_login ? new Date(u.last_login).toLocaleString('lo') : 'ບໍ່ເຄີຍ'}</td>
+          ${cloud.hasRole('owner','it') ? `<td class="actions">
+            <button class="btn sm outline" onclick="editCloudUser('${u.id}')">✏️ ແກ້ໄຂ</button>
+            <button class="btn sm outline" onclick="resetCloudPassword('${u.email}')">🔑 Reset Pwd</button>
+            ${u.active!==false ? `<button class="btn sm danger" onclick="toggleCloudUser('${u.id}',false)">⏸ ປິດ</button>` :
+              `<button class="btn sm ok" onclick="toggleCloudUser('${u.id}',true)">▶️ ເປີດ</button>`}
+          </td>` : ''}
+        </tr>`).join('')}
+      </table>
+    </div>
+  `;
+};
+
+// Open form to create/edit user
+async function openCloudUserForm(userId) {
+  let u = { email:'', name:'', username:'', role:'driver', branch:'ປາກເຊ', phone:'' };
+  let isEdit = false;
+  if (userId) {
+    isEdit = true;
+    const { data } = await cloud.client.from('user_profiles').select('*').eq('id', userId).single();
+    if (data) u = data;
+  }
+  const body = `
+    ${!isEdit ? `<div class="alert warn" style="font-size:12px">⚠️ ການສ້າງ User ໃໝ່ຈະສົ່ງ Email + Password ໃຫ້ Owner/IT — ບໍ່ສົ່ງ Email ໃຫ້ User ໂດຍຕົງ. ໃຫ້ແຈ້ງລະຫັດໃຫ້ User ດ້ວຍຕົນເອງ.</div>` : ''}
+    <div class="row">
+      <div class="fld"><label>📧 Email ${isEdit?'(ບໍ່ໃຫ້ປ່ຽນ)':''}</label>
+        <input id="cu_email" value="${u.email||''}" ${isEdit?'readonly style="background:#f1f5f9"':''} placeholder="user@kala.la" type="email"/>
+      </div>
+      <div class="fld"><label>📛 ຊື່ເຕັມ</label>
+        <input id="cu_name" value="${escapeHtml(u.name||'')}" placeholder="ທ້າວ/ນາງ ຊື່ ນາມສະກຸນ"/>
+      </div>
+    </div>
+    ${!isEdit ? `
+    <div class="row">
+      <div class="fld"><label>🔒 Password (8+ ຕົວ)</label>
+        <input id="cu_password" type="text" value="123456" placeholder="ລະຫັດເລີ່ມຕົ້ນ"/>
+        <small style="font-size:10px;color:var(--muted)">ບອກໃຫ້ User ປ່ຽນຫລັງ Login ຄັ້ງທຳອິດ</small>
+      </div>
+      <div class="fld"><label>📛 Username (ບໍ່ບັງຄັບ)</label>
+        <input id="cu_username" value="${u.username||''}" placeholder="ສະເພາະຕົວນ້ອຍ + ເລກ"/>
+      </div>
+    </div>` : `
+    <div class="row">
+      <div class="fld"><label>📛 Username</label>
+        <input id="cu_username" value="${u.username||''}" placeholder="ສະເພາະຕົວນ້ອຍ + ເລກ"/>
+      </div>
+      <div class="fld"><label>📞 ເບີໂທ</label>
+        <input id="cu_phone" value="${u.phone||''}" placeholder="020-xxxxxxx"/>
+      </div>
+    </div>`}
+    <div class="row">
+      <div class="fld"><label>👤 ບົດບາດ (Role)</label>
+        <select id="cu_role">
+          ${Object.entries(ROLE_LABELS).map(([k,v]) => `<option value="${k}" ${u.role===k?'selected':''}>${v}</option>`).join('')}
+        </select>
+      </div>
+      <div class="fld"><label>🏢 ສາຂາ</label>
+        <select id="cu_branch">
+          ${BRANCH_OPTIONS.map(b => `<option ${u.branch===b?'selected':''}>${b}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    ${isEdit ? `<div class="fld"><label>📞 ເບີໂທ</label><input id="cu_phone" value="${u.phone||''}" placeholder="020-xxxxxxx"/></div>` : ''}
+    <div id="cu_error" style="color:var(--bad);font-size:12px;margin-top:6px;display:none"></div>
+  `;
+  modal(isEdit?'✏️ ແກ້ໄຂ User Cloud':'+ ສ້າງ User Cloud ໃໝ່', body, `
+    <button class="btn outline" onclick="closeModal()">${t('cancel')}</button>
+    <button class="btn ok" onclick="saveCloudUser(${isEdit?`'${userId}'`:'null'})">${t('save')}</button>
+  `);
+}
+
+async function saveCloudUser(userId) {
+  const email = $('#cu_email').value.trim();
+  const name = $('#cu_name').value.trim();
+  const username = $('#cu_username')?.value?.trim() || '';
+  const role = $('#cu_role').value;
+  const branch = $('#cu_branch').value;
+  const phone = $('#cu_phone')?.value?.trim() || '';
+  const errEl = $('#cu_error');
+  if (errEl) errEl.style.display = 'none';
+  if (!email || !name) {
+    if (errEl) { errEl.textContent='ກະລຸນາໃສ່ Email + ຊື່'; errEl.style.display='block'; }
+    return;
+  }
+  try {
+    if (userId) {
+      // Update existing
+      const updates = { name, role, branch, phone };
+      if (username) updates.username = username;
+      const { error } = await cloud.client.from('user_profiles').update(updates).eq('id', userId);
+      if (error) throw error;
+      toast('✅ ບັນທຶກ User ສຳເລັດ');
+    } else {
+      // Create new — use RPC create_kala_user
+      const password = $('#cu_password').value || '123456';
+      const { error } = await cloud.client.rpc('create_kala_user', {
+        p_email: email, p_password: password, p_name: name,
+        p_role: role, p_branch: branch,
+        p_username: username || null,
+      });
+      if (error) throw error;
+      toast(`✅ ສ້າງ User ${email} ສຳເລັດ — ລະຫັດ: ${password}`);
+    }
+    closeModal();
+    pages.cloud_users();
+  } catch(e) {
+    if (errEl) { errEl.textContent='❌ '+(e.message||'ບໍ່ສຳເລັດ'); errEl.style.display='block'; }
+  }
+}
+
+async function editCloudUser(userId) {
+  await openCloudUserForm(userId);
+}
+
+async function resetCloudPassword(email) {
+  if (!confirm(`Reset password ສຳລັບ ${email} ເປັນ "123456"?\n\n⚠️ ການເຮັດງານນີ້ຕ້ອງໃຊ້ Supabase Dashboard:\n1. ໄປ Authentication → Users\n2. ກົດ ⋯ ຂ້າງ User → Send Recovery Link\nຫລື ໃຫ້ User ກົດ "Forgot Password" ໃນ Login`)) return;
+  toast('💡 ໄປ Supabase → Authentication → Users → Reset Password ໃຫ້ User', 'warn');
+}
+
+async function toggleCloudUser(userId, active) {
+  if (!confirm(active?'ເປີດໃຊ້ User ຄືນ?':'ປິດ User ນີ້? User ຈະບໍ່ສາມາດເຮັດງານໄດ້')) return;
+  try {
+    const { error } = await cloud.client.from('user_profiles').update({ active }).eq('id', userId);
+    if (error) throw error;
+    toast(active?'✅ ເປີດໃຊ້ User ຄືນ':'⏸ ປິດ User ສຳເລັດ');
+    pages.cloud_users();
+  } catch(e) {
+    toast('❌ '+e.message, 'bad');
+  }
+}
 
 // ===================== CLOUD SYNC PAGE (BETA) =====================
 pages.cloud = async () => {
