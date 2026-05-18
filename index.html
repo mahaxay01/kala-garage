@@ -451,6 +451,31 @@ const cloud = {
     return { counts, total };
   },
 
+  // Subscribe ໃສ່ user_profiles ຂອງຕົນເອງ — ກວດ Force Logout
+  subscribeProfileChanges() {
+    if (!this.client || !this.user) return;
+    this.client
+      .channel('my_profile_changes')
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'user_profiles',
+        filter: `id=eq.${this.user.id}`,
+      }, async (payload) => {
+        const newProfile = payload.new;
+        // ຖ້າ Admin ປ່ຽນ active=false → Force Logout
+        if (newProfile && newProfile.active === false) {
+          if (typeof toast === 'function') toast('🚪 ບັນຊີຂອງເຈົ້າຖືກປິດໂດຍ Admin — ກຳລັງ Logout...', 'bad');
+          setTimeout(async () => {
+            await cloud.logout();
+            if (typeof location !== 'undefined') location.reload();
+          }, 2000);
+        }
+        // Update local profile cache
+        this.profile = { ...this.profile, ...newProfile };
+        try { updateUserBadge(); } catch(e) {}
+      })
+      .subscribe();
+  },
+
   // Realtime Subscribe (ປ່ຽນແປງເຫັນທັນທີ)
   subscribeAll() {
     if (!this.client) return;
@@ -619,6 +644,7 @@ async function initCloudOnLoad() {
   if (cloud.user) {
     try { setupAutoSync(); } catch(e) { console.warn('[AutoSync] setup error:', e); }
     try { cloud.subscribeAll(); } catch(e) {}
+    try { cloud.subscribeProfileChanges(); } catch(e) {}
   }
 }
 
@@ -7933,8 +7959,9 @@ pages.cloud_users = async () => {
           <td style="font-size:11px">${u.last_login ? new Date(u.last_login).toLocaleString('lo') : 'ບໍ່ເຄີຍ'}</td>
           ${cloud.hasRole('owner','it') ? `<td class="actions">
             <button class="btn sm outline" onclick="editCloudUser('${u.id}')">✏️ ແກ້ໄຂ</button>
-            <button class="btn sm outline" onclick="resetCloudPassword('${u.email}')">🔑 Reset Pwd</button>
-            ${u.active!==false ? `<button class="btn sm danger" onclick="toggleCloudUser('${u.id}',false)">⏸ ປິດ</button>` :
+            <button class="btn sm outline" onclick="resetCloudPassword('${u.email}')" title="Reset Password">🔑</button>
+            ${u.id !== cloud.user.id ? `<button class="btn sm" style="background:#F59E0B;color:#fff" onclick="forceLogoutUser('${u.id}','${u.email}')" title="Force Logout — ບີບ User ອອກຈາກລະບົບ">🚪 Logout</button>` : ''}
+            ${u.active!==false ? `<button class="btn sm danger" onclick="toggleCloudUser('${u.id}',false)" title="ປິດ Account ຖາວອນ">⏸ ປິດ</button>` :
               `<button class="btn sm ok" onclick="toggleCloudUser('${u.id}',true)">▶️ ເປີດ</button>`}
           </td>` : ''}
         </tr>`).join('')}
@@ -8050,12 +8077,34 @@ async function resetCloudPassword(email) {
 }
 
 async function toggleCloudUser(userId, active) {
-  if (!confirm(active?'ເປີດໃຊ້ User ຄືນ?':'ປິດ User ນີ້? User ຈະບໍ່ສາມາດເຮັດງານໄດ້')) return;
+  const msg = active
+    ? 'ເປີດໃຊ້ User ຄືນ? User ສາມາດ Login ໄດ້ອີກ'
+    : 'ປິດ User ນີ້?\n\n⚠️ ຜົນທີ່ເກີດ:\n• User ຈະຖືກ Force Logout ທັນທີ\n• ບໍ່ສາມາດ Login ໄດ້ອີກ\n• ການເຮັດງານທີ່ກຳລັງເຮັດຢູ່ ຈະຖືກລົບ Session';
+  if (!confirm(msg)) return;
   try {
     const { error } = await cloud.client.from('user_profiles').update({ active }).eq('id', userId);
     if (error) throw error;
-    toast(active?'✅ ເປີດໃຊ້ User ຄືນ':'⏸ ປິດ User ສຳເລັດ');
+    toast(active?'✅ ເປີດໃຊ້ User ຄືນ':'⏸ ປິດ User ສຳເລັດ — User ຈະຖືກ Logout ໃນ 5 ວິນາທີ');
     pages.cloud_users();
+  } catch(e) {
+    toast('❌ '+e.message, 'bad');
+  }
+}
+
+// ບີບ Logout User ໂດຍຕົງ (ບໍ່ປິດ Account)
+async function forceLogoutUser(userId, email) {
+  if (!confirm(`Force Logout User ${email}?\n\nUser ຈະຖືກ Logout ໃນ 5-10 ວິນາທີ ແຕ່ສາມາດ Login ກັບເຂົ້າມາໄດ້.`)) return;
+  try {
+    // ໃຊ້ approach: ປ່ຽນ active=false ຊົ່ວຄາວ → User Logout → ປ່ຽນກັບເປັນ true ໃນ 3 ວິນາທີ
+    await cloud.client.from('user_profiles').update({ active: false }).eq('id', userId);
+    toast('🚪 Force Logout ສົ່ງສຳເລັດ — User ຈະ Logout ໃນ 5-10 ວິນາທີ', 'warn');
+    // Auto Re-activate ໃນ 5 ວິນາທີ ໃຫ້ User Login ກັບເຂົ້າມາໄດ້
+    setTimeout(async () => {
+      try {
+        await cloud.client.from('user_profiles').update({ active: true }).eq('id', userId);
+        pages.cloud_users();
+      } catch(e) {}
+    }, 5000);
   } catch(e) {
     toast('❌ '+e.message, 'bad');
   }
@@ -8284,6 +8333,7 @@ async function doCloudLogin() {
     // ເປີດ Auto-Sync ທັນທີຫລັງ Login
     try { setupAutoSync(); } catch(e) {}
     try { cloud.subscribeAll(); } catch(e) {}
+    try { cloud.subscribeProfileChanges(); } catch(e) {}
     setTimeout(() => pages.cloud(), 600);
   } catch(e) {
     errEl.textContent = '❌ ' + (e.message||'Login ບໍ່ສຳເລັດ');
