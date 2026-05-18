@@ -540,6 +540,68 @@ cloud.logout = async function() {
   return r;
 };
 
+// =====================================================
+// 🔄 AUTO-SYNC ENGINE
+// =====================================================
+// Hook ໃສ່ Dexie save methods → ສົ່ງໄປ Cloud ອັດຕະໂນມັດ
+const _autoSyncQueue = [];
+let _autoSyncBusy = false;
+
+async function _flushAutoSync() {
+  if (_autoSyncBusy || _autoSyncQueue.length === 0) return;
+  if (!cloud.client || !cloud.user) return;
+  _autoSyncBusy = true;
+  try {
+    while (_autoSyncQueue.length > 0) {
+      const job = _autoSyncQueue.shift();
+      try {
+        const remote = cloud.syncTables.find(t => cloud.localName(t) === job.table) || job.table;
+        if (job.action === 'delete') {
+          await cloud.client.from(remote).delete().eq('id', job.id);
+        } else {
+          const payload = cloud.prepareForCloud(remote, job.data);
+          await cloud.client.from(remote).upsert(payload, { onConflict: cloud.getPK(remote) });
+        }
+      } catch(e) { console.warn('[AutoSync]', job.table, e.message); }
+    }
+  } finally {
+    _autoSyncBusy = false;
+  }
+}
+
+// Hook Dexie hooks ໃສ່ທຸກ table
+function setupAutoSync() {
+  if (typeof db === 'undefined' || !db.tables) return;
+  const localTables = cloud.syncTables.map(t => cloud.localName(t));
+  for (const table of db.tables) {
+    if (!localTables.includes(table.name)) continue;
+    // Hook creating + updating + deleting
+    table.hook('creating', function(primKey, obj) {
+      setTimeout(() => {
+        if (cloud.enabled && cloud.user) {
+          _autoSyncQueue.push({ table: table.name, action: 'upsert', data: { ...obj, id: primKey || obj.id } });
+          _flushAutoSync();
+        }
+      }, 100);
+    });
+    table.hook('updating', function(mods, primKey, obj) {
+      setTimeout(() => {
+        if (cloud.enabled && cloud.user) {
+          _autoSyncQueue.push({ table: table.name, action: 'upsert', data: { ...obj, ...mods, id: primKey } });
+          _flushAutoSync();
+        }
+      }, 100);
+    });
+    table.hook('deleting', function(primKey, obj) {
+      if (cloud.enabled && cloud.user) {
+        _autoSyncQueue.push({ table: table.name, action: 'delete', id: primKey });
+        setTimeout(() => _flushAutoSync(), 100);
+      }
+    });
+  }
+  console.log('[AutoSync] Hooks installed on', localTables.length, 'tables');
+}
+
 // Auto-init Cloud + Check Session on app load
 async function initCloudOnLoad() {
   try {
@@ -553,6 +615,11 @@ async function initCloudOnLoad() {
   } catch(e) { console.warn('[Cloud] init error:', e); }
   updateUserBadge();
   enforceLoginGate();
+  // ເປີດ Auto-Sync ຖ້າ Login ສຳເລັດ
+  if (cloud.user) {
+    try { setupAutoSync(); } catch(e) { console.warn('[AutoSync] setup error:', e); }
+    try { cloud.subscribeAll(); } catch(e) {}
+  }
 }
 
 // ===================== LOGIN GATE =====================
@@ -7958,6 +8025,9 @@ async function doCloudLogin() {
   try {
     await cloud.login(email, pwd);
     toast('✅ Login ສຳເລັດ — ຍິນດີຕ້ອນຮັບ '+(cloud.profile?.name||email));
+    // ເປີດ Auto-Sync ທັນທີຫລັງ Login
+    try { setupAutoSync(); } catch(e) {}
+    try { cloud.subscribeAll(); } catch(e) {}
     setTimeout(() => pages.cloud(), 600);
   } catch(e) {
     errEl.textContent = '❌ ' + (e.message||'Login ບໍ່ສຳເລັດ');
