@@ -622,12 +622,15 @@ async function initCloudOnLoad() {
   }
 }
 
-// ===================== LOGIN GATE =====================
-// ບັງຄັບ Login Cloud ກ່ອນຈຶ່ງໃຊ້ App ໄດ້ — ປ້ອງກັນຄົນອື່ນສ້າງ User Local
+// ===================== PRODUCTION LOGIN GATE =====================
+// ບັງຄັບ Login Cloud — Production Mode (ບໍ່ມີ Local Mode ອີກ)
 function enforceLoginGate() {
-  // ຖ້າ Cloud Mode ບໍ່ໄດ້ເປີດ — ໃຊ້ App ປົກກະຕິໄດ້ (Local Only mode)
+  // Production: Cloud Mode ບັງຄັບ — ຖ້າຍັງບໍ່ Setup → ໄປໜ້າ Setup
   if (!cloud.enabled) {
-    document.body.classList.remove('locked-no-cloud');
+    document.body.classList.add('locked-no-cloud');
+    if (typeof go === 'function') {
+      try { (window.__origGo || go)('cloud'); } catch(e) {}
+    }
     return;
   }
   // ຖ້າ Cloud Mode ເປີດ + Login ສຳເລັດ → ປົກກະຕິ
@@ -635,15 +638,11 @@ function enforceLoginGate() {
     document.body.classList.remove('locked-no-cloud');
     return;
   }
-  // ຖ້າ Cloud Mode ເປີດ + ບໍ່ Login → ບັງຄັບ Login
+  // ຖ້າ Cloud Mode ເປີດ + ບໍ່ Login → ບັງຄັບ Login Splash
   document.body.classList.add('locked-no-cloud');
   // Force ໄປ Cloud Sync page
   if (typeof pages !== 'undefined' && pages.cloud && typeof go === 'function') {
-    try { go('cloud'); } catch(e) {}
-  }
-  // ສະແດງເຕືອນ
-  if (typeof toast === 'function') {
-    setTimeout(() => toast('🔐 ກະລຸນາ Login Cloud ກ່ອນໃຊ້ງານ', 'warn'), 1200);
+    try { (window.__origGo || go)('cloud'); } catch(e) {}
   }
 }
 
@@ -677,24 +676,75 @@ cloud.logout = async function() {
   return r;
 };
 
-// CSS — ບລ໋ອກ Sidebar ເມື່ອບໍ່ Login
+// CSS — Production Mode: Full-screen Login Splash ເມື່ອບໍ່ Login Cloud
 (function injectGateCSS() {
   const style = document.createElement('style');
   style.textContent = `
-    body.locked-no-cloud aside.side a:not([data-page="cloud"]):not([data-page="cloud_users"]):not([data-page="settings"]) {
-      opacity: 0.4 !important;
-      pointer-events: none !important;
-      cursor: not-allowed !important;
+    /* Production: Hide everything except Login when not authenticated */
+    body.locked-no-cloud .app > .logo,
+    body.locked-no-cloud .app > .topbar,
+    body.locked-no-cloud .app > aside.side {
+      display: none !important;
     }
-    body.locked-no-cloud aside.side a:not([data-page="cloud"]):not([data-page="cloud_users"]):not([data-page="settings"])::after {
-      content: " 🔒";
-      font-size: 11px;
+    body.locked-no-cloud .app {
+      grid-template-areas: "main" !important;
+      grid-template-columns: 1fr !important;
+      grid-template-rows: 1fr !important;
     }
     body.locked-no-cloud #main {
-      filter: none;
+      grid-area: main !important;
+      padding: 0 !important;
+      background: linear-gradient(135deg, #0F3D7A 0%, #1E40AF 100%) !important;
+      min-height: 100vh !important;
+    }
+    body.locked-no-cloud .crumbs,
+    body.locked-no-cloud .page-title {
+      display: none !important;
+    }
+    /* Center Login Card on splash */
+    body.locked-no-cloud #main .card {
+      max-width: 480px !important;
+      margin: 60px auto !important;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3) !important;
+    }
+    /* Hide non-Login UI within cloud page */
+    body.locked-no-cloud .alert,
+    body.locked-no-cloud > .modal-bg {
+      display: none !important;
+    }
+    /* Show splash logo at top */
+    body.locked-no-cloud #main::before {
+      content: '🛠 KALA Garage';
+      display: block;
+      text-align: center;
+      color: #fff;
+      font-size: 32px;
+      font-weight: 700;
+      padding: 40px 20px 10px;
+      letter-spacing: 1px;
+    }
+    body.locked-no-cloud #main::after {
+      content: 'ບໍລິສັດ ມຫາຊັຍ ເທຣດດິ້ງ ຈຳກັດ';
+      display: block;
+      text-align: center;
+      color: rgba(255,255,255,0.8);
+      font-size: 14px;
+      padding: 0 20px 30px;
     }
   `;
   document.head.appendChild(style);
+})();
+
+// Hide Local User Management menu (Legacy) — Production
+(function hideLegacyMenus() {
+  const observer = new MutationObserver(() => {
+    document.querySelectorAll('aside.side a[data-page="users"]').forEach(el => el.style.display = 'none');
+  });
+  setTimeout(() => {
+    document.querySelectorAll('aside.side a[data-page="users"]').forEach(el => el.style.display = 'none');
+    const aside = document.querySelector('aside.side');
+    if (aside) observer.observe(aside, { childList: true, subtree: true });
+  }, 1500);
 })();
 
 // Auto-update on init — ໃຊ້ wait ໃຫ້ supabase script ໂຫລດ
@@ -1663,8 +1713,8 @@ function renderNav() {
     <a data-page="bulk_import"><span>📥</span><span class="label">Bulk Import (ປະຫວັດເກົ່າ)</span></a>
     <a data-page="ai_tools"><span>🛠</span><span class="label">AI Tools (20 ຄວາມສາມາດ)</span></a>
     <a data-page="data_storage"><span>💾</span><span class="label">Data Storage</span></a>
-    <a data-page="cloud"><span>☁️</span><span class="label">Cloud Sync (BETA)</span></a>
-    <a data-page="cloud_users"><span>👥</span><span class="label">Cloud Users (Admin)</span></a>
+    <a data-page="cloud"><span>☁️</span><span class="label">Cloud Sync</span></a>
+    <a data-page="cloud_users"><span>👥</span><span class="label">ຄຸ້ມຄອງ User</span></a>
     <a data-page="settings"><span>⚙️</span><span class="label">${t('nav_settings')}</span></a>
     <a data-page="about"><span>ℹ️</span><span class="label">${t('nav_about')}</span></a>
   `;
@@ -10045,8 +10095,18 @@ const PRESET_ROLES = {
 };
 
 pages.users = async () => {
+  // Production: Redirect to Cloud Users Management
+  $('#main').innerHTML = `
+    <div class="alert info" style="font-size:14px;text-align:center;padding:20px">
+      <div style="font-size:32px;margin-bottom:8px">☁️</div>
+      <h3 style="margin:6px 0">ໜ້ານີ້ຖືກປ່ຽນເປັນ Cloud User Management</h3>
+      <p style="font-size:13px;color:var(--muted);margin:8px 0">ການຈັດການ User ໃນ Production ໃຊ້ Cloud — ກະລຸນາໄປ <strong>👥 ຄຸ້ມຄອງ User</strong> ໃນ Sidebar</p>
+      <button class="btn" style="margin-top:10px" onclick="go('cloud_users')">→ ໄປ ຄຸ້ມຄອງ User Cloud</button>
+    </div>
+  `;
+  return;
+  // Legacy code below — disabled
   const users = await db.users.toArray();
-  // Add default admin if no users exist
   if (users.length === 0) {
     const adm = {
       username: 'admin', name: 'Administrator', role: 'admin',
