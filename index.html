@@ -552,7 +552,83 @@ async function initCloudOnLoad() {
     }
   } catch(e) { console.warn('[Cloud] init error:', e); }
   updateUserBadge();
+  enforceLoginGate();
 }
+
+// ===================== LOGIN GATE =====================
+// ບັງຄັບ Login Cloud ກ່ອນຈຶ່ງໃຊ້ App ໄດ້ — ປ້ອງກັນຄົນອື່ນສ້າງ User Local
+function enforceLoginGate() {
+  // ຖ້າ Cloud Mode ບໍ່ໄດ້ເປີດ — ໃຊ້ App ປົກກະຕິໄດ້ (Local Only mode)
+  if (!cloud.enabled) {
+    document.body.classList.remove('locked-no-cloud');
+    return;
+  }
+  // ຖ້າ Cloud Mode ເປີດ + Login ສຳເລັດ → ປົກກະຕິ
+  if (cloud.user && cloud.profile) {
+    document.body.classList.remove('locked-no-cloud');
+    return;
+  }
+  // ຖ້າ Cloud Mode ເປີດ + ບໍ່ Login → ບັງຄັບ Login
+  document.body.classList.add('locked-no-cloud');
+  // Force ໄປ Cloud Sync page
+  if (typeof pages !== 'undefined' && pages.cloud && typeof go === 'function') {
+    try { go('cloud'); } catch(e) {}
+  }
+  // ສະແດງເຕືອນ
+  if (typeof toast === 'function') {
+    setTimeout(() => toast('🔐 ກະລຸນາ Login Cloud ກ່ອນໃຊ້ງານ', 'warn'), 1200);
+  }
+}
+
+// Re-enforce gate ເມື່ອພະຍາຍາມໄປໜ້າອື່ນ — Hook ໃສ່ go()
+window.__origGo = null;
+function hookGoFunction() {
+  if (typeof go !== 'function' || window.__origGo) return;
+  window.__origGo = go;
+  window.go = function(page) {
+    // ຖ້າ Cloud Mode ເປີດແຕ່ບໍ່ Login → ບໍ່ໃຫ້ໄປໜ້າອື່ນນອກຈາກ cloud
+    if (cloud.enabled && !cloud.user && page !== 'cloud') {
+      if (typeof toast === 'function') toast('🔐 ກະລຸນາ Login Cloud ກ່ອນ', 'warn');
+      return window.__origGo('cloud');
+    }
+    return window.__origGo(page);
+  };
+}
+setTimeout(hookGoFunction, 1500);
+
+// Update gate ເມື່ອ Login/Logout
+const _origLoadProfile2 = cloud.loadProfile;
+cloud.loadProfile = async function() {
+  const r = await _origLoadProfile2.call(cloud);
+  enforceLoginGate();
+  return r;
+};
+const _origLogout2 = cloud.logout;
+cloud.logout = async function() {
+  const r = await _origLogout2.call(cloud);
+  enforceLoginGate();
+  return r;
+};
+
+// CSS — ບລ໋ອກ Sidebar ເມື່ອບໍ່ Login
+(function injectGateCSS() {
+  const style = document.createElement('style');
+  style.textContent = `
+    body.locked-no-cloud aside.side a:not([data-page="cloud"]):not([data-page="settings"]) {
+      opacity: 0.4 !important;
+      pointer-events: none !important;
+      cursor: not-allowed !important;
+    }
+    body.locked-no-cloud aside.side a:not([data-page="cloud"]):not([data-page="settings"])::after {
+      content: " 🔒";
+      font-size: 11px;
+    }
+    body.locked-no-cloud #main {
+      filter: none;
+    }
+  `;
+  document.head.appendChild(style);
+})();
 
 // Auto-update on init — ໃຊ້ wait ໃຫ້ supabase script ໂຫລດ
 setTimeout(() => { initCloudOnLoad(); }, 800);
