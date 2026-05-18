@@ -1964,7 +1964,8 @@ pages.tires = async () => {
         ${vehicles.map(v => `<option value="${v.vehicle_id}" ${tireFilterVehicle===v.vehicle_id?'selected':''}>${v.vehicle_id} — ${v.type}</option>`).join('')}
       </select>
       <div style="flex:1"></div>
-      <button class="btn" onclick="openTireModal()">${t('add_tire')}</button>
+      <button class="btn" onclick="openTireWorkflow()" style="background:linear-gradient(135deg,#3B82F6,#8B5CF6);color:white;font-weight:700">🛞 ຈັດການຢາງ (Workflow)</button>
+      <button class="btn outline" onclick="openTireModal()">${t('add_tire')}</button>
     </div>
     ${selectedVehicle ? `
       <div class="card">
@@ -8795,24 +8796,50 @@ pages.forms_hub = async () => {
       </div>
     </div>
 
-    <!-- Workflow Group 4: Tire Operations -->
+    <!-- Workflow Group 4: Tire Operations (Unified Wizard) -->
     <div class="card" style="border-left:5px solid #8B5CF6;padding:14px;margin-bottom:12px">
       <h3 style="margin:0 0 6px;color:#5B21B6;display:flex;align-items:center;gap:6px">
         <span style="background:#8B5CF6;color:#fff;width:28px;height:28px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:14px">🛞</span>
-        ກຸ່ມ 4 — ການຈັດການຢາງ (Tire Operations)
+        ກຸ່ມ 4 — ການຈັດການຢາງ (Tire Workflow — ຮວມຊຸດດຽວ)
       </h3>
-      <small class="muted" style="font-size:11px;display:block;margin-bottom:8px">ບັນທຶກການເຄື່ອນໄຫວຢາງທຸກຢ່າງ — ສະຫຼັບຕຳແໜ່ງ, ຖອດອອກ, ປ່ຽນໃໝ່</small>
+      <small class="muted" style="font-size:11px;display:block;margin-bottom:8px">ຮວມການເຄື່ອນໄຫວຢາງທຸກຢ່າງເຂົ້າໄວ້ບ່ອນດຽວ — ເພີ່ມ, ຕິດຕັ້ງ, ສະຫຼັບ, ປ່ຽນ, ຖອດ</small>
+
+      <div style="background:linear-gradient(135deg,#EFF6FF,#F3E8FF);padding:14px;border-radius:10px;margin-bottom:10px;text-align:center">
+        <div style="font-size:34px;margin-bottom:4px">🛞</div>
+        <div style="font-size:14px;font-weight:700;color:#5B21B6;margin-bottom:6px">Tire Workflow Wizard</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:10px">ກົດປຸ່ມລຸ່ມນີ້ ແລ້ວເລືອກວຽກທີ່ຕ້ອງການເຮັດ — ລະບົບຈະພາທ່ານໄປຍັງຟອມທີ່ຖືກຕ້ອງອັດຕະໂນມັດ</div>
+        <button class="btn" onclick="openTireWorkflow()"
+                style="background:linear-gradient(135deg,#3B82F6,#8B5CF6);color:white;font-weight:700;padding:10px 20px;font-size:13px">
+          🛞 ເປີດ Tire Workflow Wizard
+        </button>
+      </div>
+
       <table>
-        <tr><th width="160">ລຳດັບ</th><th>ຄຳອະທິບາຍ</th><th style="width:310px">ການເຮັດງານ</th></tr>
+        <tr><th width="180">ທາງລັດ (Shortcuts)</th><th>ຄຳອະທິບາຍ</th><th style="width:230px">ການເຮັດງານ</th></tr>
         <tr>
-          <td><strong>1️⃣ 🔄 ສະຫຼັບຢາງ</strong></td>
-          <td class="muted" style="font-size:12px">ປ່ຽນຕຳແໜ່ງຢາງ (Rotation) — ຍືດອາຍຸໃຊ້ງານ — ບັນທຶກປະຫວັດແຕ່ລະລໍ້</td>
+          <td><strong>🆕 ເພີ່ມຢາງເຂົ້າຄັງ</strong></td>
+          <td class="muted" style="font-size:12px">ຮັບຢາງໃໝ່ຈາກຜູ້ຈຳໜ່າຍ — ບັນທຶກລະຫັດ, ຍີ່ຫໍ້, ຂະໜາດ, DOT</td>
+          <td><button class="btn sm" onclick="openTireStockAdd()">+ ບັນທຶກໃໝ່</button></td>
+        </tr>
+        <tr>
+          <td><strong>📥 ຕິດຕັ້ງເຂົ້າລົດ</strong></td>
+          <td class="muted" style="font-size:12px">ນຳຢາງຈາກໃນຄັງ/Spare ໄປຕິດເຂົ້າລົດ + ບັນທຶກຕຳແໜ່ງ</td>
+          <td><button class="btn sm" onclick="openTireInstall()">+ ບັນທຶກໃໝ່</button></td>
+        </tr>
+        <tr>
+          <td><strong>🔄 ສະຫຼັບຕຳແໜ່ງ</strong></td>
+          <td class="muted" style="font-size:12px">Rotation — ປ່ຽນຕຳແໜ່ງເພື່ອໃຫ້ດອກສຶກສະໝ່ຳສະເໝີ (ທຸກ 5,000–10,000 km)</td>
           <td><button class="btn sm" onclick="openTireRotation()">+ ບັນທຶກໃໝ່</button>
             <button class="btn sm outline" onclick="printBlankTireRotationForm()">🖨 ພິມເປົ່າ</button></td>
         </tr>
         <tr>
-          <td><strong>2️⃣ 🚫 ຖອດຢາງ</strong></td>
-          <td class="muted" style="font-size:12px">ບັນທຶກການຖອດຢາງອອກ — ເຫດຜົນ + ສະຖານະຕໍ່ໄປ (ກັບຄັງ/ຍົກເລີກ/ສ່ົງສ້ອມ)</td>
+          <td><strong>🔃 ປ່ຽນຢາງ</strong></td>
+          <td class="muted" style="font-size:12px">ຖອດຢາງເກົ່າ + ຕິດຢາງໃໝ່ໃນຂັ້ນຕອນດຽວ (ໃຊ້ເມື່ອດອກໝົດ/ເສຍຫາຍ)</td>
+          <td><button class="btn sm" onclick="openTireChange()">+ ບັນທຶກໃໝ່</button></td>
+        </tr>
+        <tr>
+          <td><strong>🚫 ຖອດຢາງອອກ</strong></td>
+          <td class="muted" style="font-size:12px">ຖອດອອກໂດຍບໍ່ປ່ຽນໃໝ່ — ໄປເປັນ Spare/ກັບຄັງ/ຍົກເລີກ/ສົ່ງສ້ອມ</td>
           <td><button class="btn sm" onclick="openTireRemoval()">+ ບັນທຶກໃໝ່</button>
             <button class="btn sm outline" onclick="printBlankTireRemovalForm()">🖨 ພິມເປົ່າ</button></td>
         </tr>
@@ -9662,6 +9689,293 @@ async function showTireHistory(tireId) {
     ${isAdmin()?`<button class="btn outline" onclick="closeModal();openTireRotation('${tire.tire_id}')">🔄 ສະຫຼັບຢາງ</button>
     <button class="btn outline" onclick="closeModal();openTireRemoval('${tire.tire_id}')">🚫 ຖອດອອກ</button>`:''}
     <button class="btn outline" onclick="closeModal()">ປິດ</button>`);
+}
+
+// ============================================================
+// 🛞 TIRE WORKFLOW WIZARD — ຮວມຟັງຊັ່ນຈັດການຢາງທັງໝົດໄວ້ບ່ອນດຽວ
+// ============================================================
+// ຊ່ວຍຜູ້ໃຊ້ເລືອກ workflow ທີ່ຖືກຕ້ອງລະຫວ່າງ:
+//   1. ເພີ່ມຢາງໃໝ່ເຂົ້າຄັງ (New stock)
+//   2. ຕິດຕັ້ງຢາງເຂົ້າລົດ (Install)
+//   3. ສະຫຼັບຕຳແໜ່ງຢາງ (Rotate)
+//   4. ປ່ຽນຢາງ (Change = remove + install)
+//   5. ຖອດຢາງອອກ (Remove only)
+async function openTireWorkflow() {
+  const tires = await db.tires.toArray();
+  const stockTires = tires.filter(t => t.status === 'new_stock' || t.status === 'spare').length;
+  const activeTires = tires.filter(t => t.status === 'active').length;
+  const retiredTires = tires.filter(t => t.status === 'retired').length;
+
+  const card = (icon, title, subtitle, desc, color, onClick) => `
+    <div onclick="${onClick}"
+         style="cursor:pointer;border:2px solid ${color};border-radius:14px;padding:16px;background:white;
+                transition:all .2s;display:flex;gap:14px;align-items:flex-start"
+         onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 8px 20px rgba(0,0,0,.1)'"
+         onmouseout="this.style.transform='';this.style.boxShadow=''">
+      <div style="font-size:38px;line-height:1">${icon}</div>
+      <div style="flex:1">
+        <div style="font-size:15px;font-weight:700;color:${color};margin-bottom:3px">${title}</div>
+        <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px">${subtitle}</div>
+        <div style="font-size:12px;color:var(--text);line-height:1.5">${desc}</div>
+      </div>
+      <div style="font-size:22px;color:${color}">→</div>
+    </div>`;
+
+  const body = `
+    <div class="alert info" style="margin-bottom:12px">
+      💡 <strong>ກະລຸນາເລືອກວຽກທີ່ຕ້ອງການເຮັດ</strong> — ແຕ່ລະຂັ້ນຕອນຈະພາທ່ານໄປຍັງຟອມທີ່ຖືກຕ້ອງ
+    </div>
+
+    <div style="background:linear-gradient(90deg,#EFF6FF,#FEF3C7);padding:10px 14px;border-radius:10px;margin-bottom:14px;
+                display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-size:12px">
+      <div><strong style="color:var(--accent)">📦 ໃນຄັງ:</strong> ${stockTires} ເສັ້ນ</div>
+      <div><strong style="color:var(--ok)">🟢 ໃຊ້ງານ:</strong> ${activeTires} ເສັ້ນ</div>
+      <div><strong style="color:var(--bad)">⚫ ຍົກເລີກ:</strong> ${retiredTires} ເສັ້ນ</div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:10px">
+
+      ${card('🆕', '1. ເພີ່ມຢາງໃໝ່ເຂົ້າຄັງ', '(New Tire — Add to Stock)',
+        'ຮັບຢາງໃໝ່ຈາກຜູ້ຈຳໜ່າຍ ບັນທຶກລະຫັດ, ຍີ່ຫໍ້, ຂະໜາດ, DOT, ລາຄາ — ຍັງບໍ່ໄດ້ຕິດເຂົ້າລົດ',
+        '#3B82F6',
+        `closeModal(); setTimeout(()=>openTireStockAdd(), 100)`)}
+
+      ${card('📥', '2. ຕິດຕັ້ງຢາງເຂົ້າລົດ', '(Install Tire to Vehicle)',
+        'ນຳຢາງຈາກໃນຄັງ ຫຼື Spare ໄປຕິດເຂົ້າລົດ — ບັນທຶກຕຳແໜ່ງ (FL/FR/RL/RR), km ຕິດຕັ້ງ ແລະ ຊ່າງຜູ້ເຮັດ',
+        '#10B981',
+        `closeModal(); setTimeout(()=>openTireInstall(), 100)`)}
+
+      ${card('🔄', '3. ສະຫຼັບຕຳແໜ່ງຢາງ', '(Tire Rotation)',
+        'ປ່ຽນຕຳແໜ່ງຢາງໃນລົດດຽວກັນ (FL↔RR, FR↔RL...) ເພື່ອໃຫ້ດອກສຶກສະໝ່ຳສະເໝີ — ຄວນເຮັດທຸກ 5,000–10,000 km',
+        '#F59E0B',
+        `closeModal(); setTimeout(()=>openTireRotation(), 100)`)}
+
+      ${card('🔃', '4. ປ່ຽນຢາງ (ຖອດເກົ່າ + ຕິດໃໝ່)', '(Tire Change — Remove + Install)',
+        'ຖອດຢາງເກົ່າອອກ ແລ້ວຕິດຢາງໃໝ່ໃນຕຳແໜ່ງດຽວກັນ — ໃຊ້ເມື່ອດອກສຶກໝົດ ຫຼື ເສຍຫາຍ ຕ້ອງປ່ຽນທັນທີ',
+        '#8B5CF6',
+        `closeModal(); setTimeout(()=>openTireChange(), 100)`)}
+
+      ${card('🚫', '5. ຖອດຢາງອອກ (ບໍ່ປ່ຽນໃໝ່)', '(Tire Removal Only)',
+        'ຖອດຢາງເກົ່າອອກຈາກລົດ ໂດຍບໍ່ໄດ້ຕິດໃໝ່ — ໄປເປັນ Spare, ກັບເຂົ້າຄັງ, ສົ່ງສ້ອມ, ຫຼື ກຳຈັດ',
+        '#EF4444',
+        `closeModal(); setTimeout(()=>openTireRemoval(), 100)`)}
+
+    </div>
+
+    <div style="margin-top:14px;padding:10px 12px;background:#F0FDF4;border-left:3px solid var(--ok);border-radius:6px;font-size:11px;color:var(--muted)">
+      <strong>📐 ຄຳແນະນຳ:</strong> ສຳລັບງານປະຈຳ ສ່ວນຫຼາຍຈະໃຊ້ #3 ສະຫຼັບ (ທຸກ PM ໃຫຍ່) ແລະ #4 ປ່ຽນ (ເມື່ອດອກໝົດ).
+      <br>ການເພີ່ມຢາງເຂົ້າຄັງ (#1) ໂດຍປົກກະຕິແມ່ນ <strong>ພະແນກຈັດຊື້</strong> ເປັນຜູ້ບັນທຶກໃນເບື້ອງຕົ້ນ.
+    </div>
+  `;
+  modal('🛞 ການຈັດການຢາງ — Tire Workflow Wizard', body, `
+    <button class="btn outline" onclick="closeModal()">${t('cancel')}</button>`);
+}
+
+// Helper: Add tire to stock only (no vehicle assignment)
+async function openTireStockAdd() {
+  // ໃຊ້ openTireModal ແບບ create mode (ບໍ່ມີ id) — ຜູ້ໃຊ້ສາມາດເລືອກບໍ່ໃສ່ລົດ
+  openTireModal();
+}
+
+// Helper: Install existing stock tire to vehicle
+async function openTireInstall() {
+  const tires = await db.tires.toArray();
+  const vehicles = await db.vehicles.toArray();
+  const availableTires = tires.filter(t => t.status === 'new_stock' || t.status === 'spare');
+
+  if (availableTires.length === 0) {
+    toast('⚠️ ບໍ່ມີຢາງໃນຄັງ ຫຼື Spare — ກະລຸນາເພີ່ມຢາງເຂົ້າຄັງກ່ອນ', 'warn');
+    return;
+  }
+  if (vehicles.length === 0) {
+    toast('⚠️ ບໍ່ມີຂໍ້ມູນລົດ', 'warn');
+    return;
+  }
+
+  const body = `
+    <div class="alert info">📥 ນຳຢາງຈາກຄັງ/Spare ໄປຕິດເຂົ້າລົດ</div>
+    <div class="row">
+      <div class="fld"><label>📅 ວັນທີຕິດຕັ້ງ</label><input id="tin_date" type="date" value="${todayISO()}"/></div>
+      <div class="fld"><label>🛞 ເລືອກຢາງ</label><select id="tin_tire">
+        ${availableTires.map(t => `<option value="${t.tire_id}">${t.tire_id} — ${t.brand} ${t.size} (${t.status==='new_stock'?'ໃໝ່':'Spare'}) ດອກ ${t.tread||0}mm</option>`).join('')}
+      </select></div>
+    </div>
+    <div class="row">
+      <div class="fld"><label>🚚 ລົດທີ່ຈະຕິດ</label><select id="tin_vehicle" onchange="updateTinKm()">
+        ${vehicles.map(v => `<option value="${v.vehicle_id}" data-km="${v.mileage||0}">${v.vehicle_id} — ${v.type}</option>`).join('')}
+      </select></div>
+      <div class="fld"><label>📍 ຕຳແໜ່ງ</label><select id="tin_pos">
+        <option value="FL">FL (ໜ້າຊ້າຍ)</option>
+        <option value="FR">FR (ໜ້າຂວາ)</option>
+        <option value="RL">RL (ຫຼັງຊ້າຍ)</option>
+        <option value="RR">RR (ຫຼັງຂວາ)</option>
+        <option value="RL-O">RL-O (ຫຼັງຊ້າຍນອກ)</option>
+        <option value="RL-I">RL-I (ຫຼັງຊ້າຍໃນ)</option>
+        <option value="RR-O">RR-O (ຫຼັງຂວານອກ)</option>
+        <option value="RR-I">RR-I (ຫຼັງຂວາໃນ)</option>
+        <option value="SPARE">SPARE (ຢາງສຳຮອງ)</option>
+      </select></div>
+    </div>
+    <div class="row">
+      <div class="fld"><label>km ຕິດຕັ້ງ</label><input id="tin_km" type="number" value="${vehicles[0]?.mileage||0}"/></div>
+      <div class="fld"><label>ຊ່າງຜູ້ຕິດ</label><input id="tin_tech" placeholder="ຊື່ຊ່າງ"/></div>
+    </div>
+    <div class="fld"><label>ໝາຍເຫດ</label><textarea id="tin_note" placeholder="ຫຼັງຈາກສະຫຼັບ, ປ່ຽນດອກໝົດ..."></textarea></div>
+  `;
+  modal('📥 ຕິດຕັ້ງຢາງເຂົ້າລົດ', body, `
+    <button class="btn outline" onclick="closeModal()">${t('cancel')}</button>
+    <button class="btn ok" onclick="saveTireInstall()">ບັນທຶກການຕິດຕັ້ງ</button>`);
+}
+
+function updateTinKm() {
+  const sel = $('#tin_vehicle');
+  const km = sel.options[sel.selectedIndex].getAttribute('data-km');
+  if ($('#tin_km')) $('#tin_km').value = km || 0;
+}
+
+async function saveTireInstall() {
+  const tire_id = $('#tin_tire').value;
+  const vehicle_id = $('#tin_vehicle').value;
+  const position = $('#tin_pos').value;
+  const km = +($('#tin_km').value) || 0;
+  const date = $('#tin_date').value;
+  const tech = $('#tin_tech').value;
+  const note = $('#tin_note').value;
+  const t = (await db.tires.where('tire_id').equals(tire_id).toArray())[0];
+  if (!t) { toast('ບໍ່ພົບຢາງ', 'bad'); return; }
+  await db.tires.update(t.id, {
+    current_vehicle: vehicle_id, position, install_km: km, current_km: km, status: 'active'
+  });
+  await db.tire_history.add({
+    tire_id, date, event_type: 'install', vehicle_id, position, km, tech, note,
+  });
+  if (typeof auditLog==='function') auditLog('install', 'tires', null, `${tire_id} → ${vehicle_id} ${position}`);
+  toast(`✅ ຕິດຕັ້ງ ${tire_id} ໃສ່ ${vehicle_id} ${position} ສຳເລັດ`);
+  closeModal(); pages.tires();
+}
+
+// Helper: Change tire = remove old + install new in same workflow
+async function openTireChange() {
+  const tires = await db.tires.toArray();
+  const vehicles = await db.vehicles.toArray();
+  const activeTires = tires.filter(t => t.status === 'active' && t.current_vehicle);
+  const stockTires = tires.filter(t => t.status === 'new_stock' || t.status === 'spare');
+
+  if (activeTires.length === 0) {
+    toast('⚠️ ບໍ່ມີຢາງທີ່ກຳລັງໃຊ້ງານໃນລົດ', 'warn');
+    return;
+  }
+  if (stockTires.length === 0) {
+    toast('⚠️ ບໍ່ມີຢາງໃໝ່ໃນຄັງ — ກະລຸນາເພີ່ມຢາງເຂົ້າຄັງກ່ອນ', 'warn');
+    return;
+  }
+
+  const body = `
+    <div class="alert warn">🔃 <strong>ປ່ຽນຢາງ</strong> = ຖອດເກົ່າອອກ + ຕິດໃໝ່ໃນຕຳແໜ່ງດຽວ — ໃນຂັ້ນຕອນດຽວ</div>
+
+    <div style="background:#FEF3C7;padding:10px 12px;border-radius:8px;margin:10px 0;font-size:12px;font-weight:600">
+      🚫 ຖອດຢາງເກົ່າ (Old Tire — Remove)
+    </div>
+    <div class="row">
+      <div class="fld"><label>🛞 ຢາງເກົ່າທີ່ຈະຖອດ</label><select id="tch_old" onchange="updateTchOldInfo()">
+        ${activeTires.map(t => {
+          const v = vehicles.find(x => x.vehicle_id === t.current_vehicle);
+          return `<option value="${t.tire_id}" data-veh="${t.current_vehicle}" data-pos="${t.position}" data-km="${v?.mileage||0}">${t.tire_id} — ${t.current_vehicle} ${t.position} (ດອກ ${t.tread||0}mm)</option>`;
+        }).join('')}
+      </select></div>
+      <div class="fld"><label>ເຫດຜົນຖອດ</label><select id="tch_reason">
+        <option value="worn">ດອກໝົດ / ສຶກໝົດ</option>
+        <option value="damage">ເສຍຫາຍ (ບາດ, ປຸ)</option>
+        <option value="age">ອາຍຸໃຊ້ງານໝົດ (DOT ເກ່າ)</option>
+        <option value="upgrade">Upgrade ເຄື່ອງດີຂຶ້ນ</option>
+        <option value="warranty">ປ່ຽນ Warranty</option>
+      </select></div>
+    </div>
+    <div class="row">
+      <div class="fld"><label>ສະຖານະຢາງເກົ່າ</label><select id="tch_oldnext">
+        <option value="disposed">🚮 ຍົກເລີກ (ກຳຈັດ)</option>
+        <option value="spare">📦 ໄປເປັນ Spare</option>
+        <option value="warehouse">🏭 ກັບເຂົ້າຄັງ</option>
+        <option value="repair">🔧 ສ່ົງສ້ອມ (ປະຄອບ)</option>
+        <option value="return_vendor">↩️ ສົ່ງຄືນ Vendor</option>
+      </select></div>
+      <div class="fld"><label>km ປະຈຸບັນ</label><input id="tch_km" type="number" value="${vehicles[0]?.mileage||0}"/></div>
+    </div>
+
+    <div style="background:#DCFCE7;padding:10px 12px;border-radius:8px;margin:10px 0;font-size:12px;font-weight:600">
+      🆕 ຕິດຢາງໃໝ່ (New Tire — Install)
+    </div>
+    <div class="row">
+      <div class="fld"><label>🛞 ຢາງໃໝ່ທີ່ຈະຕິດ</label><select id="tch_new">
+        ${stockTires.map(t => `<option value="${t.tire_id}">${t.tire_id} — ${t.brand} ${t.size} (${t.status==='new_stock'?'ໃໝ່':'Spare'}) ດອກ ${t.tread||0}mm</option>`).join('')}
+      </select></div>
+      <div class="fld"><label>📍 ຕຳແໜ່ງ (ດຽວກັນ)</label><input id="tch_pos" readonly value="${activeTires[0]?.position||'FL'}" style="background:var(--bg)"/></div>
+    </div>
+    <div class="row">
+      <div class="fld"><label>📅 ວັນທີ</label><input id="tch_date" type="date" value="${todayISO()}"/></div>
+      <div class="fld"><label>ຊ່າງຜູ້ປ່ຽນ</label><input id="tch_tech" placeholder="ຊື່ຊ່າງ"/></div>
+    </div>
+    <div class="fld"><label>ໝາຍເຫດ</label><textarea id="tch_note"></textarea></div>
+    ${initPhotoUploader('tch_photos')}
+  `;
+  modal('🔃 ປ່ຽນຢາງ — Tire Change (Remove + Install)', body, `
+    <button class="btn outline" onclick="closeModal()">${t('cancel')}</button>
+    <button class="btn ok" onclick="saveTireChange()">ບັນທຶກການປ່ຽນຢາງ</button>`);
+}
+
+function updateTchOldInfo() {
+  const sel = $('#tch_old');
+  const opt = sel.options[sel.selectedIndex];
+  const pos = opt.getAttribute('data-pos');
+  const km = opt.getAttribute('data-km');
+  if ($('#tch_pos')) $('#tch_pos').value = pos;
+  if ($('#tch_km')) $('#tch_km').value = km || 0;
+}
+
+async function saveTireChange() {
+  const oldId = $('#tch_old').value;
+  const newId = $('#tch_new').value;
+  const pos = $('#tch_pos').value;
+  const km = +($('#tch_km').value) || 0;
+  const date = $('#tch_date').value;
+  const tech = $('#tch_tech').value;
+  const reason = $('#tch_reason').value;
+  const oldNext = $('#tch_oldnext').value;
+  const note = $('#tch_note').value;
+
+  if (oldId === newId) { toast('ຢາງເກົ່າ ແລະ ຢາງໃໝ່ ບໍ່ສາມາດເປັນເສັ້ນດຽວກັນໄດ້', 'bad'); return; }
+
+  const oldT = (await db.tires.where('tire_id').equals(oldId).toArray())[0];
+  const newT = (await db.tires.where('tire_id').equals(newId).toArray())[0];
+  if (!oldT || !newT) { toast('ບໍ່ພົບຢາງ', 'bad'); return; }
+
+  const vehicle_id = oldT.current_vehicle;
+  const usedKm = Math.max(0, km - (oldT.install_km||0));
+
+  // 1. Remove old tire
+  await db.tires.update(oldT.id, {
+    current_vehicle: oldNext==='warehouse'||oldNext==='disposed'||oldNext==='return_vendor' ? '' : oldT.current_vehicle,
+    position: oldNext==='spare'?'SPARE':'',
+    status: oldNext==='disposed'?'retired':oldNext==='spare'?'spare':oldNext==='warehouse'?'new_stock':oldNext==='repair'?'retread':'retired',
+    current_km: km,
+  });
+  await db.tire_history.add({
+    tire_id: oldId, date, event_type: 'remove', vehicle_id, position: oldT.position,
+    km, used_km: usedKm, tech, reason, next_status: oldNext, note: `[ປ່ຽນຢາງ] ${note}`,
+  });
+
+  // 2. Install new tire
+  await db.tires.update(newT.id, {
+    current_vehicle: vehicle_id, position: pos, install_km: km, current_km: km, status: 'active'
+  });
+  await db.tire_history.add({
+    tire_id: newId, date, event_type: 'install', vehicle_id, position: pos, km, tech,
+    note: `[ປ່ຽນຢາງ ແທນ ${oldId}] ${note}`,
+  });
+
+  if (typeof auditLog==='function') auditLog('change', 'tires', null, `${oldId} → ${newId} @ ${vehicle_id} ${pos}`);
+  toast(`✅ ປ່ຽນຢາງສຳເລັດ: ${oldId} ➜ ${newId} (${vehicle_id} ${pos})`);
+  closeModal(); pages.tires();
 }
 
 // Tire Rotation Form
