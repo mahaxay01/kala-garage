@@ -474,6 +474,89 @@ const cloud = {
 // ໂຫລດ Config ເລີ່ມຕົ້ນ
 try { cloud.loadConfig(); } catch(e) {}
 
+// ===================== UPDATE USER BADGE (Header) =====================
+// ປ່ຽນຊື່ + Role + Avatar ໃນ Header ຕາມ Cloud User (ຖ້າ Login ແລ້ວ)
+function updateUserBadge() {
+  const nameEl = document.getElementById('userName');
+  const avEl = document.getElementById('userAvatar');
+  const roleEl = document.getElementById('roleBadge');
+  if (!nameEl) return;
+
+  if (cloud.user && cloud.profile) {
+    // Cloud Mode + Login ສຳເລັດ — ສະແດງ Cloud Profile
+    const p = cloud.profile;
+    nameEl.textContent = p.name || p.username || p.email || 'Cloud User';
+    // Avatar = ຕົວແທນຊື່
+    const initials = (p.name || p.username || 'U').slice(0, 2);
+    if (avEl) avEl.textContent = initials;
+    // Role badge
+    const roleLabels = {
+      owner: '👑 Owner', manager: '🛠 Manager', tech_l3: '🔧 L3', tech_l2: '🔧 L2',
+      tech_l1: '🔧 L1', driver: '🚗 Driver', procurement: '📦 ຈັດຊື້',
+      qc: '✅ QC', accounting: '💰 ບັນຊີ', it: '💻 IT',
+    };
+    const roleColors = {
+      owner: '#DC2626', manager: '#EA580C', tech_l3: '#CA8A04', tech_l2: '#16A34A',
+      tech_l1: '#0891B2', driver: '#2563EB', procurement: '#9333EA',
+      qc: '#0D9488', accounting: '#65A30D', it: '#475569',
+    };
+    if (roleEl) {
+      roleEl.textContent = (roleLabels[p.role] || p.role) + (p.branch ? ' • ' + p.branch : '');
+      roleEl.style.background = roleColors[p.role] || '#64748B';
+      roleEl.style.color = '#fff';
+    }
+  } else if (cloud.enabled) {
+    // Cloud Mode ເປີດແຕ່ຍັງບໍ່ Login
+    nameEl.textContent = 'ບໍ່ໄດ້ Login';
+    if (avEl) avEl.textContent = '?';
+    if (roleEl) {
+      roleEl.textContent = '⚠️ ກະລຸນາ Login Cloud';
+      roleEl.style.background = '#F59E0B';
+      roleEl.style.color = '#fff';
+    }
+  } else {
+    // Local Mode (ບໍ່ໄດ້ໃຊ້ Cloud)
+    nameEl.textContent = 'ສາຍຟ້າ';
+    if (avEl) avEl.textContent = 'ສຟ';
+    if (roleEl) {
+      roleEl.textContent = '💻 Local Mode';
+      roleEl.style.background = '#94A3B8';
+      roleEl.style.color = '#fff';
+    }
+  }
+}
+
+// Override cloud methods ໃຫ້ Update Badge ອັດຕະໂນມັດ
+const _origLoadProfile = cloud.loadProfile.bind(cloud);
+cloud.loadProfile = async function() {
+  const r = await _origLoadProfile();
+  try { updateUserBadge(); } catch(e) {}
+  return r;
+};
+const _origLogout = cloud.logout.bind(cloud);
+cloud.logout = async function() {
+  const r = await _origLogout();
+  try { updateUserBadge(); } catch(e) {}
+  return r;
+};
+
+// Auto-init Cloud + Check Session on app load
+async function initCloudOnLoad() {
+  try {
+    if (cloud.enabled) {
+      cloud.init();
+      const session = await cloud.checkSession();
+      if (session) {
+        console.log('[Cloud] Auto-restored session:', cloud.user?.email);
+      }
+    }
+  } catch(e) { console.warn('[Cloud] init error:', e); }
+  updateUserBadge();
+}
+
+// Auto-update on init — ໃຊ້ wait ໃຫ້ supabase script ໂຫລດ
+setTimeout(() => { initCloudOnLoad(); }, 800);
+
 // ===================== I18N =====================
 const I18N = {
   _th_disabled: {
