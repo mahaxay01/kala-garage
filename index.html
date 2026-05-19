@@ -1217,6 +1217,50 @@ db.version(2).stores({
   outsource: '++id, jo_id, vendor_id, status',
   settings: 'key',
 });
+db.version(16).stores({
+  vehicles: '++id, vehicle_id, plate, type, branch, status, category_id',
+  inspections: '++id, vehicle_id, date, status, frequency, driver',
+  joborders: '++id, jo_id, vehicle_id, priority, status, created',
+  parts: '++id, code, class, grade, category_id, warehouse, status',
+  partmovements: '++id, part_id, type, date',
+  drivers: '++id, driver_id, name, license_expiry, assigned_vehicle',
+  tires: '++id, tire_id, current_vehicle, position, status, install_km, install_date',
+  tire_history: '++id, tire_id, date, event_type, vehicle_id, position, km',
+  vendors: '++id, vendor_id, name, category_id, province',
+  vendorprices: '++id, vendor_id, part_code, currency, date',
+  tools: '++id, tool_id, name, calib_due, status',
+  outsource: '++id, jo_id, vendor_id, status',
+  fluids: '++id, vehicle_id, type, date, next_due_date',
+  mileage_log: '++id, vehicle_id, date, mileage',
+  categories: '++id, name, type, parent_id',
+  exchange_rates: '++id, currency, rate, valid_from',
+  pm_templates: '++id, vehicle_type, interval_type, interval_value',
+  pm_history: '++id, vehicle_id, template_id, date, mileage',
+  fuel_log: '++id, vehicle_id, date, driver, station',
+  documents: '++id, entity_type, entity_id, doc_type, expiry_date',
+  incidents: '++id, date, vehicle_id, driver_id, severity, status',
+  audit_log: '++id, timestamp, user, action, entity',
+  purchase_requests: '++id, pr_id, vendor_id, status, created, total_lak',
+  purchase_orders: '++id, po_id, vendor_id, status, created, urgency, total_lak',
+  vehicle_pm: '++id, vehicle_id, interval_type, interval_value, active',
+  gps_devices: '++id, vehicle_id, imei, model, platform, status, installed_date',
+  driver_reviews: '++id, driver_id, review_date, reviewer, period, total_score',
+  receipt_inspections: '++id, jo_id, vehicle_id, date, inspector',
+  predelivery_inspections: '++id, jo_id, vehicle_id, date, inspector, approved',
+  users: '++id, username, role, name, active, created',
+  depreciation: '++id, vehicle_id, year, month, value, accumulated',
+  parts_replacements: '++id, vehicle_id, part_type, date, km, cost, jo_id',
+  ai_chat_history: '++id, timestamp, role, content',
+  deleted_items: '++id, deleted_at, deleted_by, store, original_id, summary, restored',
+  price_change_audit: '++id, timestamp, user, entity_type, entity_id, field, old_value, new_value, summary',
+  service_rates: '++id, service_code, service_name, category, vehicle_group, base_charge, skill_required, active',
+  tech_profiles: '++id, tech_id, name, skill_level, commission_pct, walkin_commission_pct, active, branch',
+  labor_entries: '++id, entry_id, date, jo_id, vehicle_id, tech_id, service_code, charge_amount, commission_amount, status, approved_by, customer_type, intake_id',
+  customer_receipts: '++id, receipt_id, date, labor_entry_id, customer_name, customer_phone, vehicle_plate, total_amount, signed_at, signed_by_customer',
+  // ===== NEW v16: Vehicle Intake (ໃບຮັບລົດເຂົ້າ) =====
+  vehicle_intakes: '++id, intake_id, date, customer_phone, vehicle_plate, pickup_code, status, received_by_tech_id, linked_entry_id, delivered_at',
+  settings: 'key',
+});
 db.version(15).stores({
   vehicles: '++id, vehicle_id, plate, type, branch, status, category_id',
   inspections: '++id, vehicle_id, date, status, frequency, driver',
@@ -1837,6 +1881,8 @@ function renderNav() {
     <a data-page="defects"><span>🔧</span><span class="label">ຄວາມບົກພ່ອງຂະນະໃຊ້</span></a>
     <a data-page="documents"><span>📜</span><span class="label">${t('nav_docs')}</span></a>
     <a data-page="jo"><span>📋</span><span class="label">${t('nav_jo')}</span></a>
+    <a data-page="intakes"><span>🛡️</span><span class="label">ໃບຮັບລົດເຂົ້າສ້ອມ (Walk-in)</span></a>
+    <a data-page="daily_reconciliation"><span>📊</span><span class="label">Daily Reconciliation</span></a>
     <a data-page="labor_entries"><span>💼</span><span class="label">ບັນທຶກວຽກ + ຄ່າແຮງ</span></a>
     <a data-page="tech_performance"><span>📊</span><span class="label">ຜົນງານຊ່າງ (Daily)</span></a>
     <a data-page="commission"><span>💰</span><span class="label">ສະຫຼຸບຄອມມິສຊັ່ນ</span></a>
@@ -12984,9 +13030,14 @@ async function openLaborEntryModal(id, opts) {
   if (techs.length === 0) { toast('⚠️ ກະລຸນາສ້າງໂປຣໄຟລ໌ຊ່າງກ່ອນ', 'warn'); go('tech_profiles'); return; }
   if (services.length === 0) { toast('⚠️ ກະລຸນາໂຫຼດຄ່າແຮງມາດຕະຖານກ່ອນ', 'warn'); go('service_rates'); return; }
 
+  // ດຶງ Intake ທີ່ຍັງເປີດ (ສຳລັບ Walk-in)
+  const openIntakes = (await db.vehicle_intakes.toArray()).filter(v => v.status !== 'delivered' && v.status !== 'cancelled');
+  window._leIntakes = openIntakes;
+
   let e = {
     entry_id: '', date: todayISO(),
     customer_type: 'internal',  // internal | walkin
+    intake_id: opts.intake_id||'',  // 🛡️ Link to vehicle_intakes
     customer_name:'', customer_phone:'', customer_address:'',
     ext_vehicle_plate:'', ext_vehicle_model:'',
     jo_id: opts.jo_id||'', vehicle_id: opts.vehicle_id||'',
@@ -13041,6 +13092,22 @@ async function openLaborEntryModal(id, opts) {
     <!-- Walk-in Customer Fields (hidden when internal) -->
     <div id="le_walkin_box" style="display:${e.customer_type==='walkin'?'block':'none'};background:#FAF5FF;border:1px solid #DDD6FE;border-radius:10px;padding:12px;margin-bottom:12px">
       <div style="font-size:11px;font-weight:700;color:#5B21B6;margin-bottom:8px;text-transform:uppercase">🚪 ຂໍ້ມູນລູກຄ້າ Walk-in</div>
+
+      <!-- 🛡️ Anti-Fraud: ບັງຄັບໃຫ້ເລືອກ Intake -->
+      <div style="background:linear-gradient(135deg,#FEE2E2,#FECACA);border:2px solid #DC2626;border-radius:8px;padding:10px;margin-bottom:10px">
+        <label style="font-size:11px;font-weight:700;color:#991B1B;display:block;margin-bottom:6px">
+          🛡️ <strong>ໃບຮັບລົດເຂົ້າ * (ບັງຄັບ — Anti-Fraud)</strong>
+        </label>
+        <select id="le_intake_id" onchange="autofillFromIntake()" style="width:100%;padding:8px;border:2px solid #DC2626;border-radius:6px;font-size:13px;font-weight:600">
+          <option value="">⚠️ — ກະລຸນາເລືອກໃບຮັບລົດ —</option>
+          ${openIntakes.map(v => `<option value="${v.intake_id}" data-name="${escapeHtml(v.customer_name)}" data-phone="${escapeHtml(v.customer_phone)}" data-plate="${escapeHtml(v.vehicle_plate)}" data-model="${escapeHtml(v.vehicle_model)}" data-addr="${escapeHtml(v.customer_address||'')}" ${e.intake_id===v.intake_id?'selected':''}>${v.intake_id} — ${escapeHtml(v.customer_name)} (${escapeHtml(v.vehicle_plate)})</option>`).join('')}
+        </select>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
+          <small style="font-size:10px;color:#991B1B">⚠️ ບໍ່ມີ Intake = ບໍ່ມີ Pickup Code = ບໍ່ສາມາດປ່ອຍລົດໄດ້</small>
+          <button class="btn sm" style="background:#DC2626;color:#fff;padding:4px 10px;font-size:11px" onclick="closeModal();openIntakeModal()">+ ສ້າງ Intake ໃໝ່</button>
+        </div>
+      </div>
+
       <div class="row">
         <div class="fld"><label>👤 ຊື່ລູກຄ້າ</label><input id="le_cust_name" value="${escapeHtml(e.customer_name||'')}" placeholder="ທ້າວ ສົມສັກ"/></div>
         <div class="fld"><label>📞 ເບີໂທ</label><input id="le_cust_phone" value="${escapeHtml(e.customer_phone||'')}" placeholder="020-555-xxxx"/></div>
@@ -13147,6 +13214,18 @@ async function openLaborEntryModal(id, opts) {
 
   // Render dynamic lists
   setTimeout(() => { renderTeamList(); renderPartsList(); recalcLaborCommission(); }, 100);
+}
+
+// Auto-fill customer fields when intake is selected
+function autofillFromIntake() {
+  const sel = $('#le_intake_id'); if (!sel) return;
+  const opt = sel.options[sel.selectedIndex];
+  if (!sel.value) return;
+  if ($('#le_cust_name')) $('#le_cust_name').value = opt.getAttribute('data-name') || '';
+  if ($('#le_cust_phone')) $('#le_cust_phone').value = opt.getAttribute('data-phone') || '';
+  if ($('#le_cust_addr')) $('#le_cust_addr').value = opt.getAttribute('data-addr') || '';
+  if ($('#le_ext_plate')) $('#le_ext_plate').value = opt.getAttribute('data-plate') || '';
+  if ($('#le_ext_model')) $('#le_ext_model').value = opt.getAttribute('data-model') || '';
 }
 
 // Toggle customer type
@@ -13354,6 +13433,11 @@ async function saveLaborEntry(id, andPrint) {
 
   // ກວດສອບຂໍ້ມູນ
   if (customer_type === 'walkin') {
+    // 🛡️ ANTI-FRAUD: ບັງຄັບໃຫ້ມີ Intake ID
+    if (!$('#le_intake_id')?.value) {
+      toast('🛡️ ບັງຄັບ! ກະລຸນາສ້າງ ໃບຮັບລົດເຂົ້າ (Intake) ກ່ອນ — ປ້ອງກັນການລັກເຮັດ', 'bad');
+      return;
+    }
     if (!$('#le_cust_name').value.trim()) { toast('ກະລຸນາໃສ່ຊື່ລູກຄ້າ', 'bad'); return; }
     if (!$('#le_ext_plate').value.trim()) { toast('ກະລຸນາໃສ່ປ້າຍລົດ', 'bad'); return; }
   } else {
@@ -13381,6 +13465,7 @@ async function saveLaborEntry(id, andPrint) {
     entry_id: existing ? existing.entry_id : await nextLaborEntryId(),
     date: $('#le_date').value,
     customer_type,
+    intake_id: customer_type==='walkin' ? ($('#le_intake_id')?.value || null) : null,
     customer_name: customer_type==='walkin' ? $('#le_cust_name').value.trim() : '',
     customer_phone: customer_type==='walkin' ? $('#le_cust_phone').value.trim() : '',
     customer_address: customer_type==='walkin' ? $('#le_cust_addr').value.trim() : '',
@@ -13414,6 +13499,14 @@ async function saveLaborEntry(id, andPrint) {
   if (id) { await db.labor_entries.update(id, data); savedId = id; }
   else { savedId = await db.labor_entries.add(data); }
 
+  // 🛡️ ອັບເດດ Intake → in_progress + ເຊື່ອມໂຍງ entry
+  if (customer_type === 'walkin' && data.intake_id) {
+    const intake = (await db.vehicle_intakes.where('intake_id').equals(data.intake_id).toArray())[0];
+    if (intake && intake.status === 'open') {
+      await db.vehicle_intakes.update(intake.id, { status: 'in_progress', linked_entry_id: savedId });
+    }
+  }
+
   if (typeof auditLog==='function') auditLog(id?'update':'create', 'labor_entries', savedId,
     `${data.entry_id} — ${customer_type==='walkin'?'Walk-in: '+data.customer_name:'Internal'} — ${fmt(commTotal)} ກີບ`);
   toast(`✅ ບັນທຶກ ${data.entry_id} — ຄອມມິສຊັ່ນ ${fmt(commTotal)} ກີບ`);
@@ -13432,6 +13525,647 @@ async function saveLaborEntry(id, andPrint) {
   else if (currentPage === 'tech_performance') pages.tech_performance();
   else if (currentPage === 'commission') pages.commission();
 }
+
+// ============================================================================
+// 🛡️ VEHICLE INTAKE SYSTEM — ໃບຮັບລົດເຂົ້າສ້ອມ + Pickup Code (Anti-Fraud)
+// ============================================================================
+// ກົນລະຍຸດປ້ອງກັນຊ່າງລັກເຮັດເກັບເງິນນອກລະບົບ:
+//   1. ລົດເຂົ້າ → ສ້າງ Intake Receipt ໃນລະບົບ (ມີເລກລຳດັບ + ລະຫັດ 4 ຫລັກ)
+//   2. ລູກຄ້າເຊັນຮັບໃບ + ເກັບໃບໄວ້
+//   3. ຍາມບໍ່ປ່ອຍລົດອອກໂດຍບໍ່ມີລະຫັດທີ່ກົງກັບລະບົບ
+//   4. Manager ກວດ Reconciliation ທຸກວັນ
+
+const INTAKE_STATUS = {
+  open: { label:'🆕 ຮັບເຂົ້າແລ້ວ', color:'#3B82F6', bg:'#DBEAFE' },
+  in_progress: { label:'🔧 ກຳລັງສ້ອມ', color:'#F59E0B', bg:'#FEF3C7' },
+  completed: { label:'✅ ສ້ອມສຳເລັດ', color:'#10B981', bg:'#D1FAE5' },
+  delivered: { label:'🚪 ສົ່ງລົດແລ້ວ', color:'#64748B', bg:'#F1F5F9' },
+  cancelled: { label:'❌ ຍົກເລີກ', color:'#EF4444', bg:'#FEE2E2' },
+};
+
+// ສ້າງລະຫັດ Pickup Code 4 ຫລັກ (0000-9999)
+function generatePickupCode() {
+  return String(Math.floor(1000 + Math.random() * 9000));
+}
+
+// ສ້າງລະຫັດ Intake — IN-YYYYMM-NNNN
+async function nextIntakeId() {
+  const d = new Date(); const yymm = d.getFullYear() + String(d.getMonth()+1).padStart(2,'0');
+  const all = await db.vehicle_intakes.toArray();
+  const month = all.filter(x => (x.intake_id||'').includes('IN-'+yymm));
+  const nums = month.map(x => parseInt((x.intake_id||'').split('-').pop())||0);
+  const n = (nums.length ? Math.max(...nums) : 0) + 1;
+  return `IN-${yymm}-${String(n).padStart(4,'0')}`;
+}
+
+// Modal: ສ້າງ/ແກ້ໄຂ Intake
+async function openIntakeModal(id) {
+  const techs = (await db.tech_profiles.toArray()).filter(t => t.active!==false);
+  let v = {
+    intake_id: '', date: todayISO(), time: new Date().toTimeString().slice(0,5),
+    customer_name:'', customer_phone:'', customer_id_no:'', customer_address:'',
+    vehicle_plate:'', vehicle_model:'', vehicle_color:'', vehicle_year:'',
+    mileage_in: 0, fuel_level: 'full',
+    complaint:'', est_cost: 0, est_completion: '',
+    pickup_code: '', received_by_tech_id: techs[0]?.tech_id||'', received_by_name:'',
+    status:'open', notes:'',
+  };
+  if (id) v = Object.assign(v, await db.vehicle_intakes.get(id));
+  if (!v.intake_id) v.intake_id = await nextIntakeId();
+  if (!v.pickup_code) v.pickup_code = generatePickupCode();
+  if (!v.est_completion) {
+    const d2 = new Date(); d2.setDate(d2.getDate() + 1);
+    v.est_completion = d2.toISOString().slice(0,10);
+  }
+
+  const body = `
+    <div class="alert info" style="font-size:12px">
+      🛡️ <strong>${v.intake_id}</strong> — ໃບຮັບລົດເຂົ້າສ້ອມ (Vehicle Intake Receipt)
+      <br>💡 ລະຫັດ Pickup Code ນີ້ <strong>ສຳຄັນຫລາຍ</strong> — ລູກຄ້າຕ້ອງເອົາມາສະແດງເພື່ອເອົາລົດກັບ.
+    </div>
+
+    <div style="background:linear-gradient(135deg,#DC2626,#991B1B);color:#fff;padding:14px;border-radius:10px;margin-bottom:12px;text-align:center">
+      <div style="font-size:11px;font-weight:600;opacity:.9">🔐 PICKUP CODE — ລະຫັດຮັບລົດ</div>
+      <div id="ik_pickup_display" style="font-size:42px;font-weight:800;letter-spacing:8px;font-family:'Courier New',monospace;margin:6px 0">${v.pickup_code}</div>
+      <div style="font-size:10px;opacity:.9">⚠️ ບໍ່ມີລະຫັດນີ້ → ບໍ່ໄດ້ລົດກັບ — ປ່ອນອັນບໍ່ໃຫ້ຄົນອື່ນ</div>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:6px;margin:14px 0 6px;font-size:11px;font-weight:600;color:var(--primary-2);text-transform:uppercase;letter-spacing:.5px">
+      <span>👤</span>ຂໍ້ມູນລູກຄ້າ<div style="flex:1;height:1px;background:var(--line)"></div>
+    </div>
+    <div class="row">
+      <div class="fld"><label>ຊື່ ແລະ ນາມສະກຸນ *</label><input id="ik_name" value="${escapeHtml(v.customer_name)}" placeholder="ທ້າວ ສົມສັກ"/></div>
+      <div class="fld"><label>ເບີໂທ *</label><input id="ik_phone" value="${escapeHtml(v.customer_phone)}" placeholder="020-555-xxxx"/></div>
+    </div>
+    <div class="row">
+      <div class="fld"><label>ເລກບັດປະຈຳຕົວ (ບໍ່ບັງຄັບ)</label><input id="ik_idno" value="${escapeHtml(v.customer_id_no||'')}" placeholder="123-456-789"/></div>
+      <div class="fld"><label>ທີ່ຢູ່</label><input id="ik_addr" value="${escapeHtml(v.customer_address||'')}"/></div>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:6px;margin:14px 0 6px;font-size:11px;font-weight:600;color:var(--primary-2);text-transform:uppercase;letter-spacing:.5px">
+      <span>🚗</span>ຂໍ້ມູນລົດ<div style="flex:1;height:1px;background:var(--line)"></div>
+    </div>
+    <div class="row">
+      <div class="fld"><label>ປ້າຍລົດ *</label><input id="ik_plate" value="${escapeHtml(v.vehicle_plate)}" placeholder="ປຂ 1234" style="text-transform:uppercase;font-weight:600"/></div>
+      <div class="fld"><label>ຍີ່ຫໍ້ / ລຸ້ນ *</label><input id="ik_model" value="${escapeHtml(v.vehicle_model)}" placeholder="Toyota Hilux 2018"/></div>
+    </div>
+    <div class="row">
+      <div class="fld"><label>ສີ</label><input id="ik_color" value="${escapeHtml(v.vehicle_color||'')}" placeholder="ຂາວ"/></div>
+      <div class="fld"><label>ປີ</label><input id="ik_year" value="${escapeHtml(v.vehicle_year||'')}" placeholder="2018"/></div>
+    </div>
+    <div class="row">
+      <div class="fld"><label>ໄມຍ໌ ຕອນເຂົ້າ (km)</label><input id="ik_mileage" type="number" value="${v.mileage_in||0}"/></div>
+      <div class="fld"><label>ລະດັບນ້ຳມັນ</label><select id="ik_fuel">
+        <option value="empty" ${v.fuel_level==='empty'?'selected':''}>E - ຫມົດ</option>
+        <option value="quarter" ${v.fuel_level==='quarter'?'selected':''}>¼ - ໜ້ອຍ</option>
+        <option value="half" ${v.fuel_level==='half'?'selected':''}>½ - ກາງ</option>
+        <option value="three_quarter" ${v.fuel_level==='three_quarter'?'selected':''}>¾ - ຫຼາຍ</option>
+        <option value="full" ${v.fuel_level==='full'?'selected':''}>F - ເຕັມ</option>
+      </select></div>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:6px;margin:14px 0 6px;font-size:11px;font-weight:600;color:var(--primary-2);text-transform:uppercase;letter-spacing:.5px">
+      <span>🔧</span>ບັນຫາທີ່ແຈ້ງ<div style="flex:1;height:1px;background:var(--line)"></div>
+    </div>
+    <div class="fld"><label>ບັນຫາທີ່ລູກຄ້າແຈ້ງ *</label><textarea id="ik_complaint" placeholder="ເບຣກບໍ່ດີ, ເຄື່ອງດັງ, ໄຟແອບໍ່ເຢັນ...">${escapeHtml(v.complaint||'')}</textarea></div>
+    <div class="row">
+      <div class="fld"><label>ປະມານການຄ່າສ້ອມ (ກີບ)</label><input id="ik_est_cost" type="number" value="${v.est_cost||0}"/></div>
+      <div class="fld"><label>ກຳນົດສຳເລັດ</label><input id="ik_est_done" type="date" value="${v.est_completion}"/></div>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:6px;margin:14px 0 6px;font-size:11px;font-weight:600;color:var(--primary-2);text-transform:uppercase;letter-spacing:.5px">
+      <span>👨‍🔧</span>ຜູ້ຮັບລົດ<div style="flex:1;height:1px;background:var(--line)"></div>
+    </div>
+    <div class="fld"><label>ຊ່າງ/ພະນັກງານຜູ້ຮັບລົດ *</label><select id="ik_received_by">
+      ${techs.map(tc => `<option value="${tc.tech_id}" data-name="${escapeHtml(tc.name)}" ${v.received_by_tech_id===tc.tech_id?'selected':''}>${tc.tech_id} — ${escapeHtml(tc.name)}</option>`).join('')}
+    </select></div>
+
+    <div class="fld"><label>ໝາຍເຫດ</label><textarea id="ik_notes" placeholder="ສະພາບລົດ, ສິ່ງຂອງໃນລົດ, ຄຳແນະນຳ...">${escapeHtml(v.notes||'')}</textarea></div>
+  `;
+
+  modal(id?'✏️ ແກ້ໄຂໃບຮັບລົດ':'🛡️ ໃບຮັບລົດເຂົ້າສ້ອມ ໃໝ່', body, `
+    <button class="btn outline" onclick="closeModal()">${t('cancel')}</button>
+    <button class="btn outline" onclick="regenPickupCode()">🔄 ສ້າງລະຫັດໃໝ່</button>
+    <button class="btn ok" onclick="saveIntake(${id||'null'}, true)">💾 ບັນທຶກ + 🖨 ພິມ</button>`);
+}
+
+function regenPickupCode() {
+  const code = generatePickupCode();
+  if ($('#ik_pickup_display')) $('#ik_pickup_display').textContent = code;
+  window._ikNewCode = code;
+}
+
+async function saveIntake(id, andPrint) {
+  const tcSel = $('#ik_received_by');
+  const tcOpt = tcSel.options[tcSel.selectedIndex];
+  const code = window._ikNewCode || ($('#ik_pickup_display')?.textContent || generatePickupCode());
+
+  const existing = id ? await db.vehicle_intakes.get(id) : null;
+  const data = {
+    intake_id: existing ? existing.intake_id : await nextIntakeId(),
+    date: $('#ik_complaint') ? todayISO() : (existing?.date || todayISO()),
+    time: existing?.time || new Date().toTimeString().slice(0,5),
+    customer_name: $('#ik_name').value.trim(),
+    customer_phone: $('#ik_phone').value.trim(),
+    customer_id_no: $('#ik_idno').value.trim(),
+    customer_address: $('#ik_addr').value.trim(),
+    vehicle_plate: $('#ik_plate').value.trim().toUpperCase(),
+    vehicle_model: $('#ik_model').value.trim(),
+    vehicle_color: $('#ik_color').value.trim(),
+    vehicle_year: $('#ik_year').value.trim(),
+    mileage_in: +($('#ik_mileage').value)||0,
+    fuel_level: $('#ik_fuel').value,
+    complaint: $('#ik_complaint').value.trim(),
+    est_cost: +($('#ik_est_cost').value)||0,
+    est_completion: $('#ik_est_done').value,
+    pickup_code: code,
+    received_by_tech_id: tcSel.value,
+    received_by_name: tcOpt.getAttribute('data-name'),
+    received_at: existing?.received_at || new Date().toISOString(),
+    notes: $('#ik_notes').value,
+    status: existing?.status || 'open',
+    created_by: (typeof cloud!=='undefined' && cloud.profile?.username) || 'local',
+    created_at: existing?.created_at || new Date().toISOString(),
+  };
+
+  if (!data.customer_name || !data.customer_phone || !data.vehicle_plate || !data.vehicle_model || !data.complaint) {
+    toast('ກະລຸນາໃສ່ຂໍ້ມູນທີ່ ມີ * ໃຫ້ຄົບ', 'bad'); return;
+  }
+
+  let savedId;
+  if (id) { await db.vehicle_intakes.update(id, data); savedId = id; }
+  else { savedId = await db.vehicle_intakes.add(data); }
+
+  if (typeof auditLog==='function') auditLog(id?'update':'create', 'vehicle_intakes', savedId,
+    `${data.intake_id} — ${data.customer_name} ${data.vehicle_plate} — Code:${data.pickup_code}`);
+
+  toast(`✅ ${id?'ບັນທຶກ':'ສ້າງໃບຮັບລົດ'} ${data.intake_id} — Code: ${data.pickup_code}`);
+  window._ikNewCode = null;
+  closeModal();
+
+  if (andPrint) setTimeout(() => printIntakeReceipt(savedId), 300);
+  if (currentPage === 'intakes') pages.intakes();
+}
+
+// ============================================================================
+// 🖨 ພິມໃບຮັບລົດເຂົ້າ A4 — Carbon Copy Style (2 ສຳເນົາ: ບໍລິສັດ + ລູກຄ້າ)
+// ============================================================================
+async function printIntakeReceipt(id) {
+  const v = await db.vehicle_intakes.get(id);
+  if (!v) { toast('ບໍ່ພົບໃບຮັບລົດ', 'bad'); return; }
+  const dateStr = new Date(v.date).toLocaleDateString('lo-LA');
+  const now = new Date().toLocaleString('lo-LA');
+  const fuelLabel = { empty:'E - ຫມົດ', quarter:'¼', half:'½', three_quarter:'¾', full:'F - ເຕັມ' }[v.fuel_level] || v.fuel_level;
+
+  // ສ້າງສຳເນົາ 2 ໃບ: ບໍລິສັດ + ລູກຄ້າ
+  const copySection = (label, color) => `
+<div class="copy" style="page-break-after:always">
+  <div class="copy-tag" style="background:${color}">${label}</div>
+
+  <div class="header">
+    <div class="badge">🛡️ ໃບຮັບລົດເຂົ້າສ້ອມ — VEHICLE INTAKE RECEIPT</div>
+    <h1>🛠 KALA Garage</h1>
+    <div class="co">ບໍລິສັດ ມະຫາໄຊ ເທຣດດິ້ງ ຈຳກັດ — Mahasai Trading Co., Ltd.</div>
+    <div class="addr">ສຳນັກງານໃຫຍ່: ເມືອງປາກເຊ ແຂວງຈຳປາສັກ ສປປ. ລາວ</div>
+  </div>
+
+  <div class="meta">
+    <div><strong>📄 ເລກທີ:</strong> <span style="font-family:monospace;color:#0F3D7A;font-size:14px;font-weight:700">${v.intake_id}</span></div>
+    <div><strong>📅 ວັນທີ:</strong> ${dateStr} <strong style="margin-left:8px">🕒 ເວລາ:</strong> ${v.time||'-'}</div>
+  </div>
+
+  <div class="pickup-box">
+    <div style="font-size:10px;font-weight:600;opacity:.9">🔐 PICKUP CODE — ລະຫັດຮັບລົດ</div>
+    <div class="code">${v.pickup_code}</div>
+    <div style="font-size:10px;opacity:.95">⚠️ ກະລຸນາເກັບຮັກສາໃບເຈ້ຍນີ້ — ຕ້ອງມາສະແດງເພື່ອເອົາລົດກັບ</div>
+  </div>
+
+  <h2>👤 ຂໍ້ມູນລູກຄ້າ</h2>
+  <table class="info">
+    <tr><td>ຊື່ ແລະ ນາມສະກຸນ</td><td><strong>${escapeHtml(v.customer_name)}</strong></td>
+        <td>ເບີໂທ</td><td><strong>${escapeHtml(v.customer_phone)}</strong></td></tr>
+    ${v.customer_id_no?`<tr><td>ບັດປະຈຳຕົວ</td><td colspan="3">${escapeHtml(v.customer_id_no)}</td></tr>`:''}
+    ${v.customer_address?`<tr><td>ທີ່ຢູ່</td><td colspan="3">${escapeHtml(v.customer_address)}</td></tr>`:''}
+  </table>
+
+  <h2>🚗 ຂໍ້ມູນລົດ</h2>
+  <table class="info">
+    <tr><td>ປ້າຍລົດ</td><td><strong style="font-size:14px">${escapeHtml(v.vehicle_plate)}</strong></td>
+        <td>ຍີ່ຫໍ້ / ລຸ້ນ</td><td>${escapeHtml(v.vehicle_model)}</td></tr>
+    <tr><td>ສີ</td><td>${escapeHtml(v.vehicle_color||'-')}</td>
+        <td>ປີ</td><td>${escapeHtml(v.vehicle_year||'-')}</td></tr>
+    <tr><td>ໄມຍ໌ຕອນເຂົ້າ</td><td>${fmt(v.mileage_in||0)} km</td>
+        <td>ນ້ຳມັນ</td><td>${fuelLabel}</td></tr>
+  </table>
+
+  <h2>🔧 ບັນຫາທີ່ແຈ້ງ</h2>
+  <div class="complaint">${escapeHtml(v.complaint)}</div>
+  ${v.est_cost > 0 ? `
+  <table class="info" style="margin-top:6px">
+    <tr><td>ປະມານການຄ່າສ້ອມ</td><td><strong>${fmt(v.est_cost)} ກີບ</strong></td>
+        <td>ກຳນົດສຳເລັດ</td><td><strong>${v.est_completion||'-'}</strong></td></tr>
+  </table>` : ''}
+  ${v.notes ? `<div class="note">📝 <strong>ໝາຍເຫດ:</strong> ${escapeHtml(v.notes)}</div>` : ''}
+
+  <div class="warn-box">
+    ⚠️ <strong>ຂໍ້ປະຕິບັດ:</strong>
+    <ol>
+      <li>ກະລຸນາ <strong>ເກັບໃບເຈ້ຍນີ້ໄວ້</strong> — ຕ້ອງມາສະແດງເພື່ອເອົາລົດກັບ</li>
+      <li>ລະຫັດ 4 ຫລັກ <strong>ບໍ່ຄວນບອກໃຜ</strong> — ໃຊ້ສະເພາະຕອນຮັບລົດ</li>
+      <li>ຍາມ/ພະນັກງານຈະ <strong>ບໍ່ປ່ອຍລົດ</strong> ໂດຍບໍ່ມີໃບເຈ້ຍ + ລະຫັດ</li>
+      <li>ສຳລັບການຊຳລະ — ຈ່າຍຕາມໃບເຈ້ຍ <strong>ໃບສຸດທ້າຍຂອງບໍລິສັດເທົ່ານັ້ນ</strong></li>
+    </ol>
+  </div>
+
+  <div class="sigs">
+    <div class="sig">
+      <div class="role">ຊ່າງ/ພະນັກງານຜູ້ຮັບລົດ</div>
+      <div class="name">${escapeHtml(v.received_by_name||v.received_by_tech_id||'-')}</div>
+    </div>
+    <div class="sig">
+      <div class="role">ລູກຄ້າຮັບລົງທະບຽນ</div>
+      <div class="name">${escapeHtml(v.customer_name)}</div>
+      <div style="font-size:9px;color:#94A3B8;margin-top:2px">ວັນທີ: ${dateStr}</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    ໃບຮັບລົດເຂົ້າສ້ອມນີ້ອອກໂດຍລະບົບ KALA Garage Manager · ພິມ ${now}<br>
+    📞 ສຳລັບສອບຖາມ: ໂທ. 020-XXX-XXXX · Email: info@kala.la
+  </div>
+</div>`;
+
+  const html = `<!DOCTYPE html>
+<html lang="lo"><head><meta charset="UTF-8">
+<title>ໃບຮັບລົດ ${v.intake_id}</title>
+<style>
+  @page { size: A4; margin: 10mm 14mm; }
+  body { font-family: 'Noto Sans Lao', 'Phetsarath OT', Arial, sans-serif; color:#1F2937; font-size:12px; line-height:1.45; margin:0 }
+  .copy { padding:0 0 8mm; position:relative; min-height:90vh }
+  .copy-tag { position:absolute; top:0; right:0; color:#fff; padding:4px 14px; border-radius:0 0 0 8px; font-size:10px; font-weight:700 }
+  .header { text-align:center; border-bottom:3px double #0F3D7A; padding-bottom:10px; margin-bottom:12px }
+  .header h1 { color:#0F3D7A; font-size:20px; margin:2px 0; letter-spacing:1px }
+  .header .co { color:#475569; font-size:12px }
+  .header .addr { color:#94A3B8; font-size:10px; margin-top:2px }
+  .badge { display:inline-block; background:#0F3D7A; color:#fff; padding:3px 12px; border-radius:14px; font-size:10px; font-weight:700; margin-bottom:6px }
+  .meta { display:flex; justify-content:space-between; font-size:11px; margin:6px 0 }
+  .pickup-box { background:linear-gradient(135deg,#DC2626,#991B1B); color:#fff; padding:10px 14px; border-radius:8px; text-align:center; margin:10px 0; border:2px dashed #fff }
+  .pickup-box .code { font-size:38px; font-weight:800; letter-spacing:10px; font-family:'Courier New',monospace; margin:4px 0; text-shadow:1px 1px 2px rgba(0,0,0,.3) }
+  h2 { color:#0F3D7A; font-size:13px; border-bottom:1.5px solid #0F3D7A; padding-bottom:2px; margin:10px 0 6px }
+  table.info { width:100%; border-collapse:collapse; font-size:11px }
+  table.info td { padding:4px 6px; border:1px solid #E5E7EB }
+  table.info td:nth-child(odd) { background:#F8FAFC; font-weight:600; color:#475569; width:18% }
+  .complaint { background:#FEF3C7; border-left:3px solid #F59E0B; padding:8px 10px; border-radius:4px; min-height:30px; font-size:11px }
+  .note { background:#EFF6FF; border-left:3px solid #3B82F6; padding:6px 10px; border-radius:4px; margin-top:6px; font-size:11px }
+  .warn-box { background:#FEE2E2; border:1px solid #DC2626; border-radius:6px; padding:8px 10px; margin-top:10px; font-size:10px }
+  .warn-box ol { margin:4px 0 0 18px; padding:0; line-height:1.6 }
+  .sigs { display:grid; grid-template-columns:1fr 1fr; gap:30px; margin-top:20px; padding-top:8px }
+  .sig { text-align:center; border-top:1.5px solid #475569; padding-top:4px }
+  .sig .role { font-size:10px; color:#475569 }
+  .sig .name { font-size:11px; color:#1F2937; margin-top:1px; min-height:14px; font-weight:600 }
+  .footer { margin-top:8px; padding-top:6px; border-top:1px dashed #94A3B8; font-size:9px; color:#94A3B8; text-align:center }
+  @media print { body { -webkit-print-color-adjust:exact; print-color-adjust:exact } .no-print{display:none} }
+</style></head><body>
+
+${copySection('📋 ສຳເນົາບໍລິສັດ', '#0F3D7A')}
+${copySection('👤 ສຳເນົາລູກຄ້າ', '#DC2626')}
+
+<div class="no-print" style="text-align:center;margin:20px 0;padding:14px;background:#F8FAFC;border-radius:8px">
+  <button onclick="window.print()" style="background:#0F3D7A;color:#fff;border:none;padding:10px 24px;border-radius:8px;font-size:14px;cursor:pointer;font-weight:600">🖨 ພິມໃບຮັບລົດ (2 ສຳເນົາ)</button>
+  <button onclick="window.close()" style="background:#64748B;color:#fff;border:none;padding:10px 24px;border-radius:8px;font-size:14px;cursor:pointer;margin-left:8px">✕ ປິດ</button>
+</div>
+
+</body></html>`;
+
+  const w = window.open('', '_blank');
+  if (!w) { toast('ກະລຸນາອະນຸຍາດ Pop-up', 'warn'); return; }
+  w.document.write(html); w.document.close();
+
+  if (typeof auditLog==='function') auditLog('print', 'vehicle_intakes', id, `${v.intake_id} — Pickup:${v.pickup_code}`);
+}
+
+// ============================================================================
+// 🚪 ສົ່ງລົດກັບ — Verify Pickup Code + Mark Delivered
+// ============================================================================
+async function openDeliveryVerification(intakeId) {
+  const v = await db.vehicle_intakes.get(intakeId);
+  if (!v) { toast('ບໍ່ພົບໃບຮັບລົດ', 'bad'); return; }
+  if (v.status === 'delivered') { toast('ລົດນີ້ສົ່ງກັບແລ້ວ', 'warn'); return; }
+
+  // ກວດເບິ່ງວ່າມີ Labor Entry ເຊື່ອມໂຍງບໍ
+  const allEntries = await db.labor_entries.toArray();
+  const linkedEntries = allEntries.filter(e => e.intake_id === v.intake_id);
+  const totalCharge = linkedEntries.reduce((a,e) => a + (e.grand_total || e.charge_amount || 0), 0);
+
+  const body = `
+    <div class="alert warn" style="font-size:12px">
+      🚪 <strong>ກວດສອບລະຫັດກ່ອນປ່ອຍລົດ</strong> — ໃບ ${v.intake_id}
+    </div>
+
+    <div style="background:#FEF3C7;padding:10px;border-radius:8px;margin-bottom:10px;font-size:12px">
+      <div><strong>👤 ລູກຄ້າ:</strong> ${escapeHtml(v.customer_name)} (${escapeHtml(v.customer_phone)})</div>
+      <div><strong>🚗 ປ້າຍ:</strong> ${escapeHtml(v.vehicle_plate)} — ${escapeHtml(v.vehicle_model)}</div>
+      <div><strong>📅 ຮັບເຂົ້າ:</strong> ${v.date} ${v.time}</div>
+      <div><strong>🔧 ບັນຫາ:</strong> ${escapeHtml(v.complaint)}</div>
+    </div>
+
+    ${linkedEntries.length === 0 ? `
+      <div class="alert bad" style="font-size:12px">
+        ⚠️ <strong>ບໍ່ມີລາຍການວຽກສ້ອມເຊື່ອມໂຍງ!</strong> — ກ່ອນປ່ອຍລົດ ຕ້ອງສ້າງ Labor Entry ກ່ອນ.
+        <br>👉 ໄປ "ບັນທຶກວຽກ + ຄ່າແຮງ" → ສ້າງລາຍການ Walk-in → ເລືອກ Intake ${v.intake_id}
+      </div>
+    ` : `
+      <div style="background:#D1FAE5;padding:10px;border-radius:8px;margin-bottom:10px;font-size:12px">
+        ✅ <strong>ມີ ${linkedEntries.length} ລາຍການວຽກ</strong> — ຄ່າຮວມ: <strong>${fmt(totalCharge)} ກີບ</strong>
+        ${linkedEntries.map(e => `<div style="margin-top:4px;padding:4px 8px;background:white;border-radius:4px">• ${escapeHtml(e.service_name)} — ${fmt(e.grand_total||e.charge_amount||0)} ກີບ <small style="color:var(--muted)">(${LABOR_STATUS[e.status]?.label||e.status})</small></div>`).join('')}
+      </div>
+    `}
+
+    <div class="fld" style="margin-top:14px">
+      <label style="font-weight:700">🔐 ໃສ່ລະຫັດ Pickup Code 4 ຫລັກ ທີ່ລູກຄ້າເອົາມາ</label>
+      <input id="dv_code" maxlength="4" pattern="[0-9]*" inputmode="numeric"
+        placeholder="****" autocomplete="off"
+        style="font-family:'Courier New',monospace;font-size:32px;text-align:center;letter-spacing:8px;padding:14px;width:200px;display:block;margin:8px auto;border:2px solid var(--accent);border-radius:8px"/>
+    </div>
+
+    <div class="fld">
+      <label>💵 ຈຳນວນເງິນທີ່ຮັບ (ກີບ)</label>
+      <input id="dv_amount" type="number" value="${totalCharge}"/>
+    </div>
+
+    <div class="fld">
+      <label>ໝາຍເຫດ (ບໍ່ບັງຄັບ)</label>
+      <textarea id="dv_notes" placeholder="ສະພາບລົດຕອນສົ່ງ, ການຮ້ອງຮຽນ..."></textarea>
+    </div>
+
+    <div id="dv_error" style="color:var(--bad);font-size:12px;display:none;margin-top:6px"></div>
+  `;
+  modal(`🚪 ສົ່ງລົດກັບ — ${v.intake_id}`, body, `
+    <button class="btn outline" onclick="closeModal()">${t('cancel')}</button>
+    <button class="btn ok" onclick="verifyAndDeliver(${intakeId})">🔓 ກວດລະຫັດ + ປ່ອຍລົດ</button>`);
+}
+
+async function verifyAndDeliver(intakeId) {
+  const v = await db.vehicle_intakes.get(intakeId);
+  const inputCode = ($('#dv_code').value||'').trim();
+  const errEl = $('#dv_error');
+  errEl.style.display = 'none';
+
+  if (inputCode !== v.pickup_code) {
+    errEl.textContent = '❌ ລະຫັດບໍ່ຖືກຕ້ອງ! ບໍ່ປ່ອຍລົດ — ກວດສອບໃບເຈ້ຍຂອງລູກຄ້າອີກຄັ້ງ';
+    errEl.style.display = 'block';
+    // Audit failed attempt
+    if (typeof auditLog==='function') auditLog('failed_pickup', 'vehicle_intakes', intakeId, `Wrong code: ${inputCode} (expected ${v.pickup_code})`);
+    return;
+  }
+
+  // ບັນທຶກການສົ່ງລົດ
+  const amount = +($('#dv_amount').value)||0;
+  const notes = $('#dv_notes').value;
+  await db.vehicle_intakes.update(intakeId, {
+    status: 'delivered',
+    delivered_at: new Date().toISOString(),
+    delivered_by: (typeof cloud!=='undefined' && cloud.profile?.username) || 'local',
+    delivered_amount: amount,
+    delivery_notes: notes,
+  });
+  if (typeof auditLog==='function') auditLog('deliver', 'vehicle_intakes', intakeId, `${v.intake_id} — ${v.customer_name} — ${fmt(amount)} ກີບ`);
+  toast(`✅ ສົ່ງລົດກັບສຳເລັດ — ${v.customer_name} — ${fmt(amount)} ກີບ`);
+  closeModal();
+  if (currentPage === 'intakes') pages.intakes();
+  if (currentPage === 'daily_reconciliation') pages.daily_reconciliation();
+}
+
+async function delIntake(id) {
+  if (!confirm('ລົບໃບຮັບລົດນີ້? ການລົບຈະບໍ່ສາມາດກູ້ຄືນໄດ້')) return;
+  await db.vehicle_intakes.delete(id);
+  toast('🗑 ລົບສຳເລັດ');
+  pages.intakes();
+}
+
+// ============================================================================
+// 📋 PAGE: Vehicle Intakes (ໃບຮັບລົດທັງໝົດ)
+// ============================================================================
+let ikFilterStatus = ''; let ikFilterDate = '';
+pages.intakes = async () => {
+  let intakes = await db.vehicle_intakes.toArray();
+  intakes.sort((a,b) => (b.intake_id||'').localeCompare(a.intake_id||''));
+
+  if (ikFilterStatus) intakes = intakes.filter(x => x.status === ikFilterStatus);
+  if (ikFilterDate) intakes = intakes.filter(x => (x.date||'').startsWith(ikFilterDate));
+
+  const today = todayISO();
+  const stats = { open:0, in_progress:0, completed:0, delivered:0 };
+  intakes.forEach(x => { stats[x.status] = (stats[x.status]||0)+1; });
+  const todayIntakes = intakes.filter(x => x.date === today).length;
+  const todayDelivered = intakes.filter(x => x.delivered_at && x.delivered_at.startsWith(today)).length;
+
+  $('#main').innerHTML = `
+    <div class="crumbs">${t('nav_operations')} › 🛡️ ໃບຮັບລົດເຂົ້າສ້ອມ</div>
+    <div class="page-title">🛡️ ໃບຮັບລົດເຂົ້າສ້ອມ <small style="font-weight:400;color:var(--muted);font-size:13px">— ${intakes.length} ໃບ</small></div>
+
+    <div class="alert info" style="font-size:12px">
+      🛡️ <strong>ລະບົບປ້ອງກັນຊ່າງລັກເຮັດ:</strong> ທຸກລົດ Walk-in ຕ້ອງມີໃບຮັບລົດທີ່ມີ Pickup Code 4 ຫລັກ — ບໍ່ມີລະຫັດ = ບໍ່ປ່ອຍລົດ.
+      Manager ກວດ <a onclick="go('daily_reconciliation')" style="color:var(--accent);cursor:pointer;font-weight:600">Daily Reconciliation</a> ທຸກວັນເພື່ອຄວາມຖືກຕ້ອງ.
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi"><div class="label">📅 ມື້ນີ້: ຮັບເຂົ້າ</div><div class="val" style="color:var(--accent)">${todayIntakes}</div></div>
+      <div class="kpi"><div class="label">📅 ມື້ນີ້: ສົ່ງກັບ</div><div class="val" style="color:var(--ok)">${todayDelivered}</div></div>
+      <div class="kpi"><div class="label">🆕 ຍັງເປີດ (ໃນອູ່)</div><div class="val" style="color:var(--warn)">${(stats.open||0)+(stats.in_progress||0)+(stats.completed||0)}</div></div>
+      <div class="kpi"><div class="label">🚪 ສົ່ງກັບແລ້ວ</div><div class="val">${stats.delivered||0}</div></div>
+    </div>
+
+    <div class="toolbar" style="flex-wrap:wrap;gap:8px">
+      <select onchange="ikFilterStatus=this.value;pages.intakes()" style="padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px">
+        <option value="">⚪ ທຸກສະຖານະ</option>
+        ${Object.entries(INTAKE_STATUS).map(([k,v]) => `<option value="${k}" ${ikFilterStatus===k?'selected':''}>${v.label}</option>`).join('')}
+      </select>
+      <input type="month" value="${ikFilterDate}" onchange="ikFilterDate=this.value;pages.intakes()" style="padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px"/>
+      <button class="btn outline" onclick="ikFilterStatus='';ikFilterDate='';pages.intakes()">🔄 ລ້າງ Filter</button>
+      <div style="flex:1"></div>
+      <button class="btn" style="background:linear-gradient(135deg,#DC2626,#991B1B);font-weight:700" onclick="openIntakeModal()">+ ໃບຮັບລົດໃໝ່</button>
+      <button class="btn outline" onclick="go('daily_reconciliation')">📊 Daily Reconciliation</button>
+    </div>
+
+    <div class="card" style="padding:0">
+      ${intakes.length === 0 ? `<div class="empty" style="padding:30px"><div class="icon">🛡️</div><p>ບໍ່ມີໃບຮັບລົດ — ກົດປຸ່ມເທິງເພື່ອສ້າງໃໝ່</p></div>` : `
+      <table style="font-size:12px">
+        <tr>
+          <th>ເລກທີ</th>
+          <th>ວັນທີ/ເວລາ</th>
+          <th>ລູກຄ້າ</th>
+          <th>ລົດ</th>
+          <th style="text-align:center">🔐 ລະຫັດ</th>
+          <th>ບັນຫາ</th>
+          <th>ສະຖານະ</th>
+          <th></th>
+        </tr>
+        ${intakes.map(v => {
+          const st = INTAKE_STATUS[v.status] || INTAKE_STATUS.open;
+          return `<tr>
+            <td><strong style="font-family:monospace;font-size:11px">${v.intake_id}</strong></td>
+            <td>${v.date}<br><small style="color:var(--muted)">${v.time||''}</small></td>
+            <td><strong>${escapeHtml(v.customer_name||'-')}</strong><br><small style="color:var(--muted)">${escapeHtml(v.customer_phone||'')}</small></td>
+            <td><strong>${escapeHtml(v.vehicle_plate||'-')}</strong><br><small style="color:var(--muted)">${escapeHtml(v.vehicle_model||'')}</small></td>
+            <td style="text-align:center;font-family:'Courier New',monospace;font-size:16px;font-weight:800;color:#DC2626;letter-spacing:2px">${v.pickup_code||'-'}</td>
+            <td style="font-size:11px;max-width:180px;overflow:hidden;text-overflow:ellipsis" title="${escapeHtml(v.complaint||'')}">${escapeHtml((v.complaint||'').slice(0,40))}${(v.complaint||'').length>40?'...':''}</td>
+            <td><span class="pill" style="background:${st.bg};color:${st.color}">${st.label}</span></td>
+            <td class="actions compact">
+              <button class="btn sm icon" style="background:#0F3D7A;color:#fff" onclick="printIntakeReceipt(${v.id})" title="ພິມໃບຮັບລົດ">🖨</button>
+              ${v.status !== 'delivered' ? `
+                <button class="btn sm icon" style="background:#10B981;color:#fff" onclick="openDeliveryVerification(${v.id})" title="ສົ່ງລົດກັບ">🚪</button>
+              ` : ''}
+              <button class="btn sm icon outline" onclick="openIntakeModal(${v.id})" title="ແກ້ໄຂ">✏️</button>
+              <button class="btn sm icon danger" onclick="delIntake(${v.id})" title="ລົບ">🗑</button>
+            </td>
+          </tr>`;
+        }).join('')}
+      </table>`}
+    </div>
+  `;
+};
+
+// ============================================================================
+// 📊 PAGE: Daily Reconciliation — Anti-Fraud Manager Dashboard
+// ============================================================================
+let drDate = '';
+pages.daily_reconciliation = async () => {
+  const today = drDate || todayISO();
+  const intakes = await db.vehicle_intakes.toArray();
+  const entries = await db.labor_entries.toArray();
+  const todayIntakes = intakes.filter(x => x.date === today);
+  const todayDelivered = intakes.filter(x => x.delivered_at && x.delivered_at.startsWith(today));
+  const todayWalkin = entries.filter(e => e.customer_type === 'walkin' && e.date === today);
+
+  // Reconciliation: ໃບຮັບລົດ vs Labor Entry
+  const orphanIntakes = todayIntakes.filter(x => !entries.some(e => e.intake_id === x.intake_id));
+  const orphanEntries = todayWalkin.filter(e => !e.intake_id);
+  const matched = todayIntakes.filter(x => entries.some(e => e.intake_id === x.intake_id));
+
+  // ເງິນທີ່ຄາດໝາຍ vs ເງິນທີ່ຮັບແທ້
+  const expectedRevenue = todayDelivered.reduce((a,x) => {
+    const linked = entries.filter(e => e.intake_id === x.intake_id);
+    return a + linked.reduce((b,e) => b + (e.grand_total || e.charge_amount || 0), 0);
+  }, 0);
+  const collectedAmount = todayDelivered.reduce((a,x) => a + (x.delivered_amount || 0), 0);
+  const discrepancy = collectedAmount - expectedRevenue;
+
+  $('#main').innerHTML = `
+    <div class="crumbs">${t('nav_operations')} › 📊 Daily Reconciliation</div>
+    <div class="page-title">📊 Daily Reconciliation <small style="font-weight:400;color:var(--muted);font-size:13px">— ${today}</small></div>
+
+    <div class="alert ${orphanIntakes.length+orphanEntries.length>0?'bad':'info'}" style="font-size:13px">
+      🛡️ <strong>ການກວດສອບປ້ອງກັນຊ່າງລັກເຮັດ — Daily Manager Check</strong>
+      <br>${orphanIntakes.length+orphanEntries.length===0 ? '✅ ບໍ່ມີຄວາມຜິດປົກກະຕິ — ໃບຮັບລົດ ແລະ Labor Entry ກົງກັນທັງໝົດ' :
+        `⚠️ ພົບ ${orphanIntakes.length+orphanEntries.length} ລາຍການທີ່ບໍ່ກົງກັນ — ກວດສອບດ່ວນ!`}
+    </div>
+
+    <div class="toolbar">
+      <label style="font-size:13px;font-weight:500">ວັນທີ:</label>
+      <input type="date" value="${today}" onchange="drDate=this.value;pages.daily_reconciliation()" style="padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px"/>
+      <button class="btn sm outline" onclick="drDate='';pages.daily_reconciliation()">📅 ມື້ນີ້</button>
+      <div style="flex:1"></div>
+      <button class="btn outline" onclick="window.print()">🖨 ພິມ Reconciliation</button>
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi" style="border-left:4px solid #3B82F6"><div class="label">🛡️ ໃບຮັບລົດ</div><div class="val">${todayIntakes.length}</div></div>
+      <div class="kpi" style="border-left:4px solid #10B981"><div class="label">🔧 Labor Entry (Walk-in)</div><div class="val">${todayWalkin.length}</div></div>
+      <div class="kpi" style="border-left:4px solid #64748B"><div class="label">🚪 ສົ່ງລົດກັບ</div><div class="val">${todayDelivered.length}</div></div>
+      <div class="kpi" style="border-left:4px solid ${orphanIntakes.length+orphanEntries.length>0?'#EF4444':'#10B981'}"><div class="label">⚠️ ບໍ່ກົງກັນ</div><div class="val" style="color:${orphanIntakes.length+orphanEntries.length>0?'var(--bad)':'var(--ok)'}">${orphanIntakes.length+orphanEntries.length}</div></div>
+    </div>
+
+    <!-- Money Reconciliation -->
+    <div class="card" style="background:linear-gradient(135deg,#FEF3C7,#FDE68A);border:1px solid #F59E0B">
+      <h3 style="color:#92400E">💰 ການກວດສອບເງິນ</h3>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;text-align:center;margin-top:10px">
+        <div style="background:white;padding:14px;border-radius:8px">
+          <div style="font-size:11px;color:var(--muted);font-weight:600">📋 ຍອດຄາດໝາຍ (ຈາກລະບົບ)</div>
+          <div style="font-size:22px;font-weight:800;color:var(--accent);margin-top:4px">${fmt(expectedRevenue)}</div>
+          <div style="font-size:10px;color:var(--muted)">ກີບ</div>
+        </div>
+        <div style="background:white;padding:14px;border-radius:8px">
+          <div style="font-size:11px;color:var(--muted);font-weight:600">💵 ຍອດທີ່ຮັບແທ້</div>
+          <div style="font-size:22px;font-weight:800;color:var(--ok);margin-top:4px">${fmt(collectedAmount)}</div>
+          <div style="font-size:10px;color:var(--muted)">ກີບ</div>
+        </div>
+        <div style="background:white;padding:14px;border-radius:8px;border:2px solid ${discrepancy===0?'#10B981':'#EF4444'}">
+          <div style="font-size:11px;color:var(--muted);font-weight:600">${discrepancy===0?'✅ ກົງກັນ':discrepancy>0?'⬆ ເກີນ':'⬇ ຂາດ'}</div>
+          <div style="font-size:22px;font-weight:800;color:${discrepancy===0?'var(--ok)':'var(--bad)'};margin-top:4px">${fmt(Math.abs(discrepancy))}</div>
+          <div style="font-size:10px;color:var(--muted)">ກີບ ${discrepancy!==0?'⚠️ ກວດສອບດ່ວນ':''}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Orphan Intakes (ໃບຮັບລົດທີ່ບໍ່ມີ Labor Entry) -->
+    ${orphanIntakes.length > 0 ? `
+    <div class="card" style="border:2px solid #EF4444">
+      <h3 style="color:#DC2626">⚠️ ໃບຮັບລົດທີ່ບໍ່ມີ Labor Entry (${orphanIntakes.length} ໃບ)</h3>
+      <p style="font-size:12px;color:var(--muted)">ລົດເຂົ້າແລ້ວ ແຕ່ຊ່າງຍັງບໍ່ໄດ້ບັນທຶກວຽກສ້ອມ — ຄວາມສ່ຽງສູງ ກວດສອບໂດຍດ່ວນ!</p>
+      <table style="font-size:12px">
+        <tr><th>ເລກທີ</th><th>ລູກຄ້າ</th><th>ລົດ</th><th>ຮັບໂດຍ</th><th>ບັນຫາ</th><th>ສະຖານະ</th></tr>
+        ${orphanIntakes.map(v => `<tr style="background:#FEE2E2">
+          <td><strong style="font-family:monospace">${v.intake_id}</strong></td>
+          <td>${escapeHtml(v.customer_name)}<br><small>${escapeHtml(v.customer_phone)}</small></td>
+          <td><strong>${escapeHtml(v.vehicle_plate)}</strong> ${escapeHtml(v.vehicle_model||'')}</td>
+          <td>${escapeHtml(v.received_by_name||v.received_by_tech_id||'-')}</td>
+          <td style="font-size:11px;max-width:180px">${escapeHtml((v.complaint||'').slice(0,50))}</td>
+          <td><span class="pill" style="background:${INTAKE_STATUS[v.status]?.bg};color:${INTAKE_STATUS[v.status]?.color}">${INTAKE_STATUS[v.status]?.label}</span></td>
+        </tr>`).join('')}
+      </table>
+    </div>` : ''}
+
+    <!-- Orphan Labor Entries (Walk-in ໂດຍບໍ່ມີ Intake) -->
+    ${orphanEntries.length > 0 ? `
+    <div class="card" style="border:2px solid #EF4444">
+      <h3 style="color:#DC2626">🚨 Labor Entry (Walk-in) ໂດຍບໍ່ມີໃບຮັບລົດ (${orphanEntries.length} ລາຍການ)</h3>
+      <p style="font-size:12px;color:var(--muted)"><strong style="color:var(--bad)">ສ່ຽງສຸດ!</strong> ມີວຽກ Walk-in ໂດຍບໍ່ມີໃບຮັບລົດ — ອາດເປັນການລັກເຮັດ!</p>
+      <table style="font-size:12px">
+        <tr><th>ເລກທີ</th><th>ຊ່າງ</th><th>ບໍລິການ</th><th>ລູກຄ້າ</th><th>ລົດ</th><th style="text-align:right">ຄ່າແຮງ</th></tr>
+        ${orphanEntries.map(e => `<tr style="background:#FEE2E2">
+          <td><strong style="font-family:monospace">${e.entry_id}</strong></td>
+          <td><strong>${escapeHtml(e.tech_name||'-')}</strong></td>
+          <td>${escapeHtml(e.service_name||'-')}</td>
+          <td>${escapeHtml(e.customer_name||'-')}<br><small>${escapeHtml(e.customer_phone||'')}</small></td>
+          <td>${escapeHtml(e.ext_vehicle_plate||'-')}</td>
+          <td style="text-align:right;font-weight:700">${fmt(e.charge_amount||0)}</td>
+        </tr>`).join('')}
+      </table>
+    </div>` : ''}
+
+    <!-- Matched (OK) -->
+    <div class="card">
+      <h3 style="color:var(--ok)">✅ ໃບຮັບລົດ + Labor Entry ກົງກັນ (${matched.length} ໃບ)</h3>
+      ${matched.length === 0 ? '<p style="color:var(--muted);font-size:12px">ບໍ່ມີລາຍການກົງກັນໃນມື້ນີ້</p>' : `
+      <table style="font-size:12px">
+        <tr><th>ໃບຮັບລົດ</th><th>🔐 Code</th><th>ລູກຄ້າ</th><th>ລົດ</th><th>ສະຖານະ</th><th style="text-align:right">ຄ່າແຮງ</th></tr>
+        ${matched.map(v => {
+          const linked = entries.filter(e => e.intake_id === v.intake_id);
+          const total = linked.reduce((a,e) => a + (e.grand_total || e.charge_amount || 0), 0);
+          return `<tr>
+            <td><strong style="font-family:monospace">${v.intake_id}</strong></td>
+            <td style="text-align:center;font-family:'Courier New',monospace;font-weight:700;color:#DC2626">${v.pickup_code}</td>
+            <td>${escapeHtml(v.customer_name)}</td>
+            <td><strong>${escapeHtml(v.vehicle_plate)}</strong></td>
+            <td><span class="pill" style="background:${INTAKE_STATUS[v.status]?.bg};color:${INTAKE_STATUS[v.status]?.color};font-size:10px">${INTAKE_STATUS[v.status]?.label}</span></td>
+            <td style="text-align:right;font-weight:700">${fmt(total)}</td>
+          </tr>`;
+        }).join('')}
+      </table>`}
+    </div>
+
+    <div style="margin-top:14px;padding:12px 16px;background:#EFF6FF;border-left:4px solid var(--accent);border-radius:6px;font-size:12px;line-height:1.7">
+      💡 <strong>ຄຳແນະນຳສຳລັບ Manager:</strong>
+      <ol style="margin:6px 0 0 18px;padding:0">
+        <li>ກວດໜ້ານີ້ <strong>ທຸກວັນ</strong> ກ່ອນປິດອູ່</li>
+        <li>ຖ້າມີ Orphan ⚠️ — ສອບຖາມຊ່າງທີ່ກ່ຽວຂ້ອງທັນທີ</li>
+        <li>ຖ້າຍອດເງິນ <strong>ບໍ່ກົງກັນ</strong> — ກວດສອບ CCTV + ສະໜຸດຍາມ</li>
+        <li>ສຳລັບລົດທີ່ສົ່ງກັບແລ້ວ ໃຫ້ <strong>ໂທຕາມລູກຄ້າ 7 ມື້ຫຼັງ</strong> ເພື່ອຍືນຍັນຄວາມພໍໃຈ + ໄດ້ໃບເຈ້ຍບໍ</li>
+      </ol>
+    </div>
+  `;
+};
 
 // ============================================================================
 // 🖨 ໃບຮັບລົດ Walk-in — A4 Printable Receipt + Customer Signature
