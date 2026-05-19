@@ -1217,6 +1217,52 @@ db.version(2).stores({
   outsource: '++id, jo_id, vendor_id, status',
   settings: 'key',
 });
+db.version(17).stores({
+  vehicles: '++id, vehicle_id, plate, type, branch, status, category_id',
+  inspections: '++id, vehicle_id, date, status, frequency, driver',
+  joborders: '++id, jo_id, vehicle_id, priority, status, created',
+  parts: '++id, code, class, grade, category_id, warehouse, status',
+  partmovements: '++id, part_id, type, date',
+  drivers: '++id, driver_id, name, license_expiry, assigned_vehicle',
+  tires: '++id, tire_id, current_vehicle, position, status, install_km, install_date',
+  tire_history: '++id, tire_id, date, event_type, vehicle_id, position, km',
+  vendors: '++id, vendor_id, name, category_id, province',
+  vendorprices: '++id, vendor_id, part_code, currency, date',
+  tools: '++id, tool_id, name, calib_due, status',
+  outsource: '++id, jo_id, vendor_id, status',
+  fluids: '++id, vehicle_id, type, date, next_due_date',
+  mileage_log: '++id, vehicle_id, date, mileage',
+  categories: '++id, name, type, parent_id',
+  exchange_rates: '++id, currency, rate, valid_from',
+  pm_templates: '++id, vehicle_type, interval_type, interval_value',
+  pm_history: '++id, vehicle_id, template_id, date, mileage',
+  fuel_log: '++id, vehicle_id, date, driver, station',
+  documents: '++id, entity_type, entity_id, doc_type, expiry_date',
+  incidents: '++id, date, vehicle_id, driver_id, severity, status',
+  audit_log: '++id, timestamp, user, action, entity',
+  purchase_requests: '++id, pr_id, vendor_id, status, created, total_lak',
+  purchase_orders: '++id, po_id, vendor_id, status, created, urgency, total_lak',
+  vehicle_pm: '++id, vehicle_id, interval_type, interval_value, active',
+  gps_devices: '++id, vehicle_id, imei, model, platform, status, installed_date',
+  driver_reviews: '++id, driver_id, review_date, reviewer, period, total_score',
+  receipt_inspections: '++id, jo_id, vehicle_id, date, inspector',
+  predelivery_inspections: '++id, jo_id, vehicle_id, date, inspector, approved',
+  users: '++id, username, role, name, active, created',
+  depreciation: '++id, vehicle_id, year, month, value, accumulated',
+  parts_replacements: '++id, vehicle_id, part_type, date, km, cost, jo_id',
+  ai_chat_history: '++id, timestamp, role, content',
+  deleted_items: '++id, deleted_at, deleted_by, store, original_id, summary, restored',
+  price_change_audit: '++id, timestamp, user, entity_type, entity_id, field, old_value, new_value, summary',
+  service_rates: '++id, service_code, service_name, category, vehicle_group, base_charge, skill_required, active',
+  tech_profiles: '++id, tech_id, name, skill_level, commission_pct, walkin_commission_pct, active, branch',
+  labor_entries: '++id, entry_id, date, jo_id, vehicle_id, tech_id, service_code, charge_amount, commission_amount, status, approved_by, customer_type, intake_id',
+  customer_receipts: '++id, receipt_id, date, labor_entry_id, customer_name, customer_phone, vehicle_plate, total_amount, signed_at, signed_by_customer',
+  vehicle_intakes: '++id, intake_id, date, customer_phone, vehicle_plate, pickup_code, status, received_by_tech_id, linked_entry_id, delivered_at',
+  // ===== NEW v17: Camera Count + Customer Audit =====
+  camera_counts: '++id, date, vehicles_in, vehicles_out, recorded_by',
+  customer_audits: '++id, audit_id, labor_entry_id, customer_phone, audit_date, called_at, response, satisfaction, received_receipt, called_by, notes',
+  settings: 'key',
+});
 db.version(16).stores({
   vehicles: '++id, vehicle_id, plate, type, branch, status, category_id',
   inspections: '++id, vehicle_id, date, status, frequency, driver',
@@ -1881,9 +1927,10 @@ function renderNav() {
     <a data-page="defects"><span>🔧</span><span class="label">ຄວາມບົກພ່ອງຂະນະໃຊ້</span></a>
     <a data-page="documents"><span>📜</span><span class="label">${t('nav_docs')}</span></a>
     <a data-page="jo"><span>📋</span><span class="label">${t('nav_jo')}</span></a>
-    <a data-page="intakes"><span>🛡️</span><span class="label">ໃບຮັບລົດເຂົ້າສ້ອມ (Walk-in)</span></a>
-    <a data-page="daily_reconciliation"><span>📊</span><span class="label">Daily Reconciliation</span></a>
     <a data-page="labor_entries"><span>💼</span><span class="label">ບັນທຶກວຽກ + ຄ່າແຮງ</span></a>
+    <a data-page="camera_reconciliation"><span>📷</span><span class="label">Camera Reconciliation 🛡️</span></a>
+    <a data-page="customer_audit"><span>📞</span><span class="label">Customer Audit (ສຸ່ມໂທ)</span></a>
+    <a data-page="intakes"><span>🛡️</span><span class="label">ໃບຮັບລົດເຂົ້າ (ງານໃຫຍ່)</span></a>
     <a data-page="tech_performance"><span>📊</span><span class="label">ຜົນງານຊ່າງ (Daily)</span></a>
     <a data-page="commission"><span>💰</span><span class="label">ສະຫຼຸບຄອມມິສຊັ່ນ</span></a>
     <a data-page="tech_profiles"><span>🔧</span><span class="label">ໂປຣໄຟລ໌ຊ່າງ</span></a>
@@ -13093,18 +13140,18 @@ async function openLaborEntryModal(id, opts) {
     <div id="le_walkin_box" style="display:${e.customer_type==='walkin'?'block':'none'};background:#FAF5FF;border:1px solid #DDD6FE;border-radius:10px;padding:12px;margin-bottom:12px">
       <div style="font-size:11px;font-weight:700;color:#5B21B6;margin-bottom:8px;text-transform:uppercase">🚪 ຂໍ້ມູນລູກຄ້າ Walk-in</div>
 
-      <!-- 🛡️ Anti-Fraud: ບັງຄັບໃຫ້ເລືອກ Intake -->
-      <div style="background:linear-gradient(135deg,#FEE2E2,#FECACA);border:2px solid #DC2626;border-radius:8px;padding:10px;margin-bottom:10px">
-        <label style="font-size:11px;font-weight:700;color:#991B1B;display:block;margin-bottom:6px">
-          🛡️ <strong>ໃບຮັບລົດເຂົ້າ * (ບັງຄັບ — Anti-Fraud)</strong>
+      <!-- 🛡️ Anti-Fraud: Intake (Optional — ສະເພາະງານໃຫຍ່) -->
+      <div style="background:#F0F9FF;border:1px solid #BFDBFE;border-radius:8px;padding:10px;margin-bottom:10px">
+        <label style="font-size:11px;font-weight:600;color:#1E40AF;display:block;margin-bottom:6px">
+          🛡️ <strong>ໃບຮັບລົດເຂົ້າ (Intake)</strong> — <span style="color:var(--muted);font-weight:500">Optional ສຳລັບງານໃຫຍ່ (Overhaul, ຄ້າງຄືນ, > 500,000 ກີບ)</span>
         </label>
-        <select id="le_intake_id" onchange="autofillFromIntake()" style="width:100%;padding:8px;border:2px solid #DC2626;border-radius:6px;font-size:13px;font-weight:600">
-          <option value="">⚠️ — ກະລຸນາເລືອກໃບຮັບລົດ —</option>
+        <select id="le_intake_id" onchange="autofillFromIntake()" style="width:100%;padding:7px;border:1px solid var(--line);border-radius:6px;font-size:13px">
+          <option value="">— ບໍ່ມີ Intake (ງານນ້ອຍ/ໄວ) —</option>
           ${openIntakes.map(v => `<option value="${v.intake_id}" data-name="${escapeHtml(v.customer_name)}" data-phone="${escapeHtml(v.customer_phone)}" data-plate="${escapeHtml(v.vehicle_plate)}" data-model="${escapeHtml(v.vehicle_model)}" data-addr="${escapeHtml(v.customer_address||'')}" ${e.intake_id===v.intake_id?'selected':''}>${v.intake_id} — ${escapeHtml(v.customer_name)} (${escapeHtml(v.vehicle_plate)})</option>`).join('')}
         </select>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
-          <small style="font-size:10px;color:#991B1B">⚠️ ບໍ່ມີ Intake = ບໍ່ມີ Pickup Code = ບໍ່ສາມາດປ່ອຍລົດໄດ້</small>
-          <button class="btn sm" style="background:#DC2626;color:#fff;padding:4px 10px;font-size:11px" onclick="closeModal();openIntakeModal()">+ ສ້າງ Intake ໃໝ່</button>
+          <small style="font-size:10px;color:var(--muted)">💡 ໃຊ້ Intake ສຳລັບງານໃຫຍ່ເພື່ອປົກປ້ອງລູກຄ້າ + ບໍລິສັດ</small>
+          <button class="btn sm outline" style="padding:4px 10px;font-size:11px" onclick="closeModal();openIntakeModal()">+ ສ້າງ Intake</button>
         </div>
       </div>
 
@@ -13433,13 +13480,9 @@ async function saveLaborEntry(id, andPrint) {
 
   // ກວດສອບຂໍ້ມູນ
   if (customer_type === 'walkin') {
-    // 🛡️ ANTI-FRAUD: ບັງຄັບໃຫ້ມີ Intake ID
-    if (!$('#le_intake_id')?.value) {
-      toast('🛡️ ບັງຄັບ! ກະລຸນາສ້າງ ໃບຮັບລົດເຂົ້າ (Intake) ກ່ອນ — ປ້ອງກັນການລັກເຮັດ', 'bad');
-      return;
-    }
     if (!$('#le_cust_name').value.trim()) { toast('ກະລຸນາໃສ່ຊື່ລູກຄ້າ', 'bad'); return; }
     if (!$('#le_ext_plate').value.trim()) { toast('ກະລຸນາໃສ່ປ້າຍລົດ', 'bad'); return; }
+    if (!$('#le_cust_phone').value.trim()) { toast('🛡️ ກະລຸນາໃສ່ເບີໂທ — ສຳຄັນສຳລັບການກວດສອບ Audit', 'bad'); return; }
   } else {
     if (!$('#le_vehicle').value) { toast('ກະລຸນາເລືອກລົດ', 'bad'); return; }
   }
@@ -14027,7 +14070,412 @@ pages.intakes = async () => {
 };
 
 // ============================================================================
-// 📊 PAGE: Daily Reconciliation — Anti-Fraud Manager Dashboard
+// 📷 PAGE: Camera Count Reconciliation — Lightweight Anti-Fraud
+// ============================================================================
+// ໃຊ້ກ້ອງເປັນຫຼັກ — Manager ປ້ອນຈຳນວນລົດເຂົ້າ-ອອກ → ປຽບກັບ Labor Entry
+let camRecDate = '';
+pages.camera_reconciliation = async () => {
+  const today = camRecDate || todayISO();
+  const allCounts = await db.camera_counts.toArray();
+  const todayCount = allCounts.find(c => c.date === today);
+  const entries = await db.labor_entries.toArray();
+  const todayEntries = entries.filter(e => e.date === today);
+  const todayWalkin = todayEntries.filter(e => e.customer_type === 'walkin');
+  const todayInternal = todayEntries.filter(e => e.customer_type === 'internal');
+
+  // ການກວດສອບເງິນ
+  const expectedRevenue = todayWalkin.reduce((a,e) => a + (e.grand_total || e.charge_amount || 0), 0);
+
+  // ການກວດສອບ — ປ້ອນກ້ອງແລ້ວບໍ?
+  const camIn = todayCount?.vehicles_in || 0;
+  const camOut = todayCount?.vehicles_out || 0;
+  const expectedFromCam = camIn; // ລົດເຂົ້າທີ່ກ້ອງເຫັນ
+  const recordedInSystem = todayEntries.length;
+  const discrepancy = expectedFromCam - recordedInSystem;
+
+  // Last 7 days trend
+  const trend = [];
+  for (let i=6; i>=0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const iso = d.toISOString().slice(0,10);
+    const cc = allCounts.find(c => c.date === iso);
+    const ents = entries.filter(e => e.date === iso);
+    trend.push({
+      date: iso.slice(5),
+      cam_in: cc?.vehicles_in||0,
+      entries: ents.length,
+      walkin: ents.filter(e=>e.customer_type==='walkin').length,
+      diff: (cc?.vehicles_in||0) - ents.length,
+    });
+  }
+
+  $('#main').innerHTML = `
+    <div class="crumbs">${t('nav_operations')} › 📷 Camera Reconciliation</div>
+    <div class="page-title">📷 ການກວດສອບປະຈຳວັນ <small style="font-weight:400;color:var(--muted);font-size:13px">— ${today}</small></div>
+
+    <div class="alert info" style="font-size:13px">
+      🛡️ <strong>ກວດສອບປະຈຳວັນ — Lightweight Anti-Fraud System</strong>
+      <br>💡 Manager ປ້ອນຈຳນວນລົດເຂົ້າ-ອອກຈາກກ້ອງ ທຸກວັນ → ລະບົບປຽບກັບ Labor Entry → ກວດຈັບຄວາມຜິດປົກກະຕິ
+    </div>
+
+    <div class="toolbar">
+      <label style="font-size:13px;font-weight:500">ວັນທີ:</label>
+      <input type="date" value="${today}" onchange="camRecDate=this.value;pages.camera_reconciliation()" style="padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px"/>
+      <button class="btn sm outline" onclick="camRecDate='';pages.camera_reconciliation()">📅 ມື້ນີ້</button>
+      <div style="flex:1"></div>
+      <button class="btn outline" onclick="go('customer_audit')">📞 Random Audit ລູກຄ້າ</button>
+      <button class="btn outline" onclick="window.print()">🖨 ພິມ</button>
+    </div>
+
+    <!-- Camera Count Entry Form -->
+    <div class="card" style="background:linear-gradient(135deg,#FEF3C7,#FDE68A);border:1px solid #F59E0B">
+      <h3 style="color:#92400E;display:flex;align-items:center;gap:8px">
+        📷 ປ້ອນຈຳນວນລົດຈາກກ້ອງ
+        ${todayCount ? '<span class="pill" style="background:#10B981;color:#fff">✅ ປ້ອນແລ້ວ</span>' : '<span class="pill" style="background:#EF4444;color:#fff">⚠️ ຍັງບໍ່ໄດ້ປ້ອນ</span>'}
+      </h3>
+      <p style="font-size:12px;color:#78350F;margin-bottom:10px">💡 ໃຫ້ Manager ປ້ອນຈຳນວນທີ່ກວດໄດ້ຈາກກ້ອງ CCTV ສຳລັບວັນທີ ${today}</p>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px">
+        <div>
+          <label style="font-size:11px;font-weight:600;color:#92400E">🚪 ລົດເຂົ້າອູ່ (ກ້ອງເຫັນ)</label>
+          <input id="cam_in" type="number" min="0" value="${camIn}" style="width:100%;padding:14px;font-size:24px;font-weight:800;text-align:center;border:2px solid #F59E0B;border-radius:8px;background:white"/>
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:600;color:#92400E">🚗 ລົດອອກອູ່ (ກ້ອງເຫັນ)</label>
+          <input id="cam_out" type="number" min="0" value="${camOut}" style="width:100%;padding:14px;font-size:24px;font-weight:800;text-align:center;border:2px solid #F59E0B;border-radius:8px;background:white"/>
+        </div>
+        <div style="display:flex;align-items:flex-end">
+          <button class="btn ok" style="width:100%;padding:14px;font-size:14px;font-weight:700" onclick="saveCameraCount('${today}')">💾 ບັນທຶກ</button>
+        </div>
+      </div>
+      ${todayCount ? `<div style="margin-top:8px;font-size:11px;color:#78350F">📝 ບັນທຶກໂດຍ: <strong>${escapeHtml(todayCount.recorded_by||'-')}</strong> ໃນ ${todayCount.recorded_at?new Date(todayCount.recorded_at).toLocaleString('lo'):'-'}</div>` : ''}
+    </div>
+
+    <!-- Daily Comparison Dashboard -->
+    <div class="card">
+      <h3>📊 ການປຽບທຽບ ກ້ອງ vs ລະບົບ</h3>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:10px">
+        <div style="background:#EFF6FF;padding:14px;border-radius:8px;text-align:center;border:2px solid #3B82F6">
+          <div style="font-size:11px;color:var(--muted);font-weight:600">📷 ກ້ອງເຫັນລົດເຂົ້າ</div>
+          <div style="font-size:32px;font-weight:800;color:#3B82F6">${camIn}</div>
+          <div style="font-size:10px;color:var(--muted)">ຄັນ</div>
+        </div>
+        <div style="background:#F0FDF4;padding:14px;border-radius:8px;text-align:center;border:2px solid #10B981">
+          <div style="font-size:11px;color:var(--muted);font-weight:600">📋 Labor Entry ໃນລະບົບ</div>
+          <div style="font-size:32px;font-weight:800;color:#10B981">${recordedInSystem}</div>
+          <div style="font-size:10px;color:var(--muted)">ລາຍການ (${todayWalkin.length} Walk-in + ${todayInternal.length} ບໍລິສັດ)</div>
+        </div>
+        <div style="background:${discrepancy>0?'#FEE2E2':discrepancy<0?'#FEF3C7':'#D1FAE5'};padding:14px;border-radius:8px;text-align:center;border:2px solid ${discrepancy>0?'#EF4444':discrepancy<0?'#F59E0B':'#10B981'}">
+          <div style="font-size:11px;color:var(--muted);font-weight:600">⚠️ ຄວາມຜິດປົກກະຕິ</div>
+          <div style="font-size:32px;font-weight:800;color:${discrepancy>0?'#DC2626':discrepancy<0?'#92400E':'#047857'}">
+            ${discrepancy===0?'✅ 0':discrepancy>0?'+'+discrepancy:discrepancy}
+          </div>
+          <div style="font-size:10px;color:var(--muted)">${discrepancy===0?'ກົງກັນ':discrepancy>0?'ກ້ອງເຫັນຫຼາຍກວ່າ ← ສ່ຽງ!':'ລະບົບເຫັນຫຼາຍກວ່າ'}</div>
+        </div>
+        <div style="background:#FAF5FF;padding:14px;border-radius:8px;text-align:center;border:2px solid #8B5CF6">
+          <div style="font-size:11px;color:var(--muted);font-weight:600">💵 Walk-in ຄາດໝາຍ</div>
+          <div style="font-size:22px;font-weight:800;color:#7C3AED">${fmt(expectedRevenue)}</div>
+          <div style="font-size:10px;color:var(--muted)">ກີບ</div>
+        </div>
+      </div>
+
+      ${discrepancy > 0 ? `
+        <div class="alert bad" style="margin-top:12px;font-size:13px">
+          🚨 <strong>ກວດສອບດ່ວນ!</strong> ກ້ອງເຫັນລົດເຂົ້າ <strong>${camIn} ຄັນ</strong> ແຕ່ລະບົບມີ Labor Entry ພຽງ <strong>${recordedInSystem} ລາຍການ</strong>
+          <br>💡 <strong>ສາເຫດທີ່ເປັນໄປໄດ້:</strong>
+          <ul style="margin:6px 0 0 18px">
+            <li>ລົດເຂົ້າມາໃຫ້ກວດ ແຕ່ບໍ່ໄດ້ສ້ອມ → ບໍ່ມີ Entry (ປົກກະຕິ)</li>
+            <li>ລົດເຂົ້າມາ Drop-off → ສ້ອມຍັງບໍ່ສຳເລັດ (ປົກກະຕິ)</li>
+            <li><strong style="color:var(--bad)">⚠️ ຊ່າງເຮັດໂດຍບໍ່ບັນທຶກ → ສ່ຽງ! ກວດສອບ CCTV + ສອບຖາມຊ່າງ</strong></li>
+          </ul>
+        </div>
+      ` : discrepancy === 0 && todayCount ? `
+        <div class="alert" style="background:#D1FAE5;color:#047857;margin-top:12px;font-size:13px">
+          ✅ <strong>ກົງກັນທຸກລາຍການ</strong> — ບໍ່ມີຄວາມຜິດປົກກະຕິໃນວັນທີ ${today}
+        </div>
+      ` : ''}
+    </div>
+
+    <!-- 7-Day Trend Table -->
+    <div class="card">
+      <h3>📈 ແນວໂນ້ມ 7 ມື້</h3>
+      <table style="font-size:12px">
+        <tr>
+          <th>ວັນທີ</th>
+          <th style="text-align:center">📷 ກ້ອງເຂົ້າ</th>
+          <th style="text-align:center">📋 Entry</th>
+          <th style="text-align:center">🚪 Walk-in</th>
+          <th style="text-align:center">⚠️ ຜິດປົກກະຕິ</th>
+          <th></th>
+        </tr>
+        ${trend.map(d => `<tr style="${d.diff>0?'background:#FEE2E2':d.diff===0&&d.cam_in>0?'background:#F0FDF4':''}">
+          <td><strong>${d.date}</strong></td>
+          <td style="text-align:center">${d.cam_in||'<span style="color:#CBD5E1">—</span>'}</td>
+          <td style="text-align:center">${d.entries}</td>
+          <td style="text-align:center">${d.walkin}</td>
+          <td style="text-align:center;font-weight:700;color:${d.diff>0?'var(--bad)':d.diff===0?'var(--ok)':'var(--warn)'}">
+            ${d.cam_in===0 && !allCounts.find(c=>c.date===new Date(Date.now()-(7-trend.indexOf(d))*86400000).toISOString().slice(0,10)) ? '<span style="color:#CBD5E1">ບໍ່ໄດ້ປ້ອນ</span>' : (d.diff>0?'+'+d.diff:d.diff===0?'✅':d.diff)}
+          </td>
+          <td></td>
+        </tr>`).join('')}
+      </table>
+      <small style="display:block;margin-top:10px;color:var(--muted);font-size:11px">💡 ປ້ອນກ້ອງທຸກວັນ — ຍ້ອນວ່າຍິ່ງປ້ອນສະໝ່ຳສະເໝີ ຍິ່ງເຫັນແນວໂນ້ມ + ດັກພົບຄວາມຜິດປົກກະຕິໄວ</small>
+    </div>
+
+    <!-- Walk-in Entries Today (with Audit eligibility) -->
+    <div class="card">
+      <h3>🚪 Walk-in Entries ມື້ນີ້ (${todayWalkin.length}) — ສຳລັບ Random Audit</h3>
+      ${todayWalkin.length === 0 ? '<p style="color:var(--muted);font-size:12px">ບໍ່ມີ Walk-in ມື້ນີ້</p>' : `
+        <table style="font-size:12px">
+          <tr><th>ເລກທີ</th><th>ລູກຄ້າ</th><th>ເບີໂທ</th><th>ບໍລິການ</th><th>ລາຄາ</th><th>ສະຖານະ</th><th></th></tr>
+          ${todayWalkin.map(e => `<tr>
+            <td><strong style="font-family:monospace;font-size:11px">${e.entry_id}</strong></td>
+            <td>${escapeHtml(e.customer_name||'-')}</td>
+            <td><strong>${escapeHtml(e.customer_phone||'-')}</strong></td>
+            <td>${escapeHtml(e.service_name||'-')}</td>
+            <td style="text-align:right;font-weight:700">${fmt(e.grand_total||e.charge_amount||0)}</td>
+            <td><span class="pill" style="background:${LABOR_STATUS[e.status]?.bg};color:${LABOR_STATUS[e.status]?.color};font-size:10px">${LABOR_STATUS[e.status]?.label}</span></td>
+            <td><button class="btn sm icon" style="background:#3B82F6;color:#fff" onclick="logCustomerAudit(${e.id})" title="ບັນທຶກການກວດສອບ">📞</button></td>
+          </tr>`).join('')}
+        </table>
+      `}
+    </div>
+
+    <div style="margin-top:14px;padding:12px 16px;background:#EFF6FF;border-left:4px solid var(--accent);border-radius:6px;font-size:12px;line-height:1.7">
+      🛡️ <strong>ຄຳແນະນຳ Manager:</strong>
+      <ol style="margin:6px 0 0 18px;padding:0">
+        <li>ປ້ອນຈຳນວນກ້ອງ <strong>ທຸກວັນກ່ອນປິດອູ່</strong> — ໃຊ້ເວລາ 1 ນາທີ</li>
+        <li>ຖ້າ ⚠️ ຄວາມຜິດປົກກະຕິ > 0 → ກວດ CCTV + ສອບຖາມຊ່າງ</li>
+        <li>ສຸ່ມໂທຫາ <strong>3-5 ລູກຄ້າ Walk-in/ອາທິດ</strong> ໃນ "Random Audit" → ກວດສອບໃບເຈ້ຍ + ຄວາມພໍໃຈ</li>
+        <li>ຄອມມິສຊັ່ນຈ່າຍສະເພາະຫຼັງ Mark Paid → ບໍ່ມີແຮງຈູງໃຈລັກເຮັດ</li>
+      </ol>
+    </div>
+  `;
+};
+
+async function saveCameraCount(date) {
+  const camIn = +($('#cam_in').value)||0;
+  const camOut = +($('#cam_out').value)||0;
+  const user = (typeof cloud!=='undefined' && cloud.profile?.username) || 'local';
+  const existing = await db.camera_counts.where('date').equals(date).toArray();
+  const data = {
+    date, vehicles_in: camIn, vehicles_out: camOut,
+    recorded_by: user, recorded_at: new Date().toISOString(),
+  };
+  if (existing.length > 0) await db.camera_counts.update(existing[0].id, data);
+  else await db.camera_counts.add(data);
+  if (typeof auditLog==='function') auditLog('camera_count', 'camera_counts', null, `${date} — In:${camIn} Out:${camOut}`);
+  toast(`✅ ບັນທຶກກ້ອງ ${date}: ເຂົ້າ ${camIn} / ອອກ ${camOut}`);
+  pages.camera_reconciliation();
+}
+
+// ============================================================================
+// 📞 PAGE: Customer Audit — Random Verification via Phone
+// ============================================================================
+let auditMonth = '';
+pages.customer_audit = async () => {
+  const yymm = auditMonth || new Date().toISOString().slice(0,7);
+  const allEntries = await db.labor_entries.toArray();
+  const allAudits = await db.customer_audits.toArray();
+  const monthWalkin = allEntries.filter(e => e.customer_type === 'walkin' && (e.date||'').startsWith(yymm) && e.customer_phone);
+  const auditedIds = new Set(allAudits.map(a => a.labor_entry_id));
+  const notYetAudited = monthWalkin.filter(e => !auditedIds.has(e.id));
+  const audited = monthWalkin.filter(e => auditedIds.has(e.id));
+
+  // Stats
+  const monthAudits = allAudits.filter(a => (a.audit_date||'').startsWith(yymm));
+  const reachedCount = monthAudits.filter(a => a.response === 'reached').length;
+  const confirmedReceiptCount = monthAudits.filter(a => a.received_receipt === 'yes').length;
+  const noReceiptCount = monthAudits.filter(a => a.received_receipt === 'no').length;
+
+  $('#main').innerHTML = `
+    <div class="crumbs">${t('nav_operations')} › 📞 Customer Audit</div>
+    <div class="page-title">📞 Random Customer Audit <small style="font-weight:400;color:var(--muted);font-size:13px">— ${yymm}</small></div>
+
+    <div class="alert info" style="font-size:13px">
+      🛡️ <strong>ກວດສອບລູກຄ້າ Walk-in ສຸ່ມ</strong> — ໂທສຸ່ມລູກຄ້າເພື່ອຢືນຢັນ:
+      <br>(1) ໄດ້ຮັບໃບເຈ້ຍບໍ? &nbsp;(2) ຈ່າຍຄ່າຫຍັງ? &nbsp;(3) ພໍໃຈບໍລິການບໍ? — ກວດຈັບການລັກເຮັດໂດຍຕົງ
+    </div>
+
+    <div class="toolbar">
+      <label style="font-size:13px;font-weight:500">ເດືອນ:</label>
+      <input type="month" value="${yymm}" onchange="auditMonth=this.value;pages.customer_audit()" style="padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px"/>
+      <button class="btn" style="background:#8B5CF6" onclick="pickRandomForAudit()">🎲 ສຸ່ມ 3 ລູກຄ້າ</button>
+      <div style="flex:1"></div>
+      <button class="btn outline" onclick="go('camera_reconciliation')">📷 Camera Reconciliation</button>
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi"><div class="label">📋 Walk-in ໃນເດືອນ</div><div class="val">${monthWalkin.length}</div></div>
+      <div class="kpi"><div class="label">📞 ກວດສອບແລ້ວ</div><div class="val" style="color:var(--accent)">${audited.length}</div><div class="muted">${monthWalkin.length>0?Math.round(audited.length/monthWalkin.length*100):0}%</div></div>
+      <div class="kpi"><div class="label">✅ ໄດ້ຮັບໃບເຈ້ຍ</div><div class="val" style="color:var(--ok)">${confirmedReceiptCount}</div></div>
+      <div class="kpi" style="${noReceiptCount>0?'border-left:4px solid #EF4444':''}"><div class="label">⚠️ ບໍ່ໄດ້ໃບເຈ້ຍ</div><div class="val" style="color:${noReceiptCount>0?'var(--bad)':'var(--muted)'}">${noReceiptCount}</div><div class="muted">${noReceiptCount>0?'🚨 ສ່ຽງ!':'ດີ'}</div></div>
+    </div>
+
+    ${noReceiptCount > 0 ? `
+      <div class="alert bad" style="font-size:13px">
+        🚨 <strong>ພົບ ${noReceiptCount} ລູກຄ້າທີ່ບໍ່ໄດ້ຮັບໃບເຈ້ຍ!</strong> — ກວດສອບລາຍລະອຽດໃນຕາຕະລາງລຸ່ມ
+      </div>
+    ` : ''}
+
+    <!-- Random Pick Box -->
+    <div id="audit_random_box"></div>
+
+    <!-- Pending Audits -->
+    <div class="card">
+      <h3>📋 ລາຍການ Walk-in ທີ່ຍັງບໍ່ໄດ້ Audit (${notYetAudited.length})</h3>
+      ${notYetAudited.length === 0 ? '<p style="color:var(--muted);font-size:12px">ກວດສອບໝົດແລ້ວ ຫລື ບໍ່ມີ Walk-in</p>' : `
+        <table style="font-size:12px">
+          <tr><th>ວັນທີ</th><th>ເລກທີ</th><th>ລູກຄ້າ</th><th>ເບີໂທ</th><th>ບໍລິການ</th><th>ລາຄາ</th><th></th></tr>
+          ${notYetAudited.slice(0,20).map(e => `<tr>
+            <td>${e.date}</td>
+            <td><strong style="font-family:monospace;font-size:11px">${e.entry_id}</strong></td>
+            <td>${escapeHtml(e.customer_name||'-')}</td>
+            <td><strong>${escapeHtml(e.customer_phone||'-')}</strong></td>
+            <td>${escapeHtml(e.service_name||'-')}</td>
+            <td style="text-align:right;font-weight:700">${fmt(e.grand_total||e.charge_amount||0)}</td>
+            <td><button class="btn sm" style="background:#8B5CF6;color:#fff" onclick="logCustomerAudit(${e.id})">📞 ບັນທຶກ</button></td>
+          </tr>`).join('')}
+        </table>
+        ${notYetAudited.length>20 ? `<p style="font-size:11px;color:var(--muted);margin-top:6px">ສະແດງ 20/${notYetAudited.length} — ໃຊ້ "ສຸ່ມ 3 ລູກຄ້າ" ເພື່ອເລືອກ</p>`:''}
+      `}
+    </div>
+
+    <!-- Completed Audits -->
+    <div class="card">
+      <h3>✅ ການກວດສອບທີ່ສຳເລັດແລ້ວ (${monthAudits.length})</h3>
+      ${monthAudits.length === 0 ? '<p style="color:var(--muted);font-size:12px">ບໍ່ມີ Audit ໃນເດືອນນີ້</p>' : `
+        <table style="font-size:12px">
+          <tr><th>ວັນທີ</th><th>ລູກຄ້າ</th><th>ໄດ້ໃບເຈ້ຍ?</th><th>ພໍໃຈ?</th><th>ໂທໂດຍ</th><th>ໝາຍເຫດ</th></tr>
+          ${monthAudits.map(a => {
+            const entry = allEntries.find(e => e.id === a.labor_entry_id);
+            return `<tr style="${a.received_receipt==='no'?'background:#FEE2E2':''}">
+              <td>${a.audit_date}</td>
+              <td>${escapeHtml(entry?.customer_name||a.customer_phone||'-')}</td>
+              <td>${a.received_receipt==='yes'?'<span style="color:var(--ok);font-weight:700">✅ ໄດ້</span>':a.received_receipt==='no'?'<span style="color:var(--bad);font-weight:700">❌ ບໍ່ໄດ້</span>':a.response==='no_answer'?'📵 ບໍ່ຕອບ':'❓'}</td>
+              <td>${a.satisfaction||'-'}</td>
+              <td><small>${escapeHtml(a.called_by||'-')}</small></td>
+              <td style="font-size:11px">${escapeHtml(a.notes||'')}</td>
+            </tr>`;
+          }).join('')}
+        </table>
+      `}
+    </div>
+  `;
+};
+
+function pickRandomForAudit() {
+  const yymm = auditMonth || new Date().toISOString().slice(0,7);
+  db.labor_entries.toArray().then(async entries => {
+    const audits = await db.customer_audits.toArray();
+    const auditedIds = new Set(audits.map(a => a.labor_entry_id));
+    const monthWalkin = entries.filter(e => e.customer_type === 'walkin' && (e.date||'').startsWith(yymm) && e.customer_phone && !auditedIds.has(e.id));
+    if (monthWalkin.length === 0) { toast('ບໍ່ມີລາຍການທີ່ຍັງບໍ່ໄດ້ Audit', 'warn'); return; }
+    // Shuffle ແລະຖັນ 3
+    const shuffled = monthWalkin.sort(() => Math.random() - 0.5).slice(0, 3);
+    const box = $('#audit_random_box');
+    box.innerHTML = `
+      <div class="card" style="background:linear-gradient(135deg,#FAF5FF,#EDE9FE);border:2px solid #8B5CF6">
+        <h3 style="color:#5B21B6">🎲 ສຸ່ມໄດ້ ${shuffled.length} ລູກຄ້າ — ໂທສອບຖາມຄວາມພໍໃຈ</h3>
+        <table style="font-size:13px">
+          <tr><th>ລູກຄ້າ</th><th>ເບີໂທ</th><th>ບໍລິການ</th><th>ວັນທີ</th><th>ລາຄາ</th><th></th></tr>
+          ${shuffled.map(e => `<tr>
+            <td><strong>${escapeHtml(e.customer_name||'-')}</strong></td>
+            <td><a href="tel:${escapeHtml(e.customer_phone||'')}" style="color:#8B5CF6;font-weight:700">${escapeHtml(e.customer_phone||'-')}</a></td>
+            <td>${escapeHtml(e.service_name||'-')}</td>
+            <td>${e.date}</td>
+            <td style="text-align:right;font-weight:700">${fmt(e.grand_total||e.charge_amount||0)}</td>
+            <td><button class="btn sm" style="background:#8B5CF6;color:#fff" onclick="logCustomerAudit(${e.id})">📞 ບັນທຶກຜົນ</button></td>
+          </tr>`).join('')}
+        </table>
+        <div style="margin-top:10px;padding:10px;background:white;border-radius:8px;font-size:12px">
+          📞 <strong>ຄຳຖາມມາດຕະຖານ:</strong>
+          <ol style="margin:6px 0 0 18px">
+            <li>"ສະບາຍດີ ຂ້ອຍຊື່ [ຊື່] ໂທມາຈາກ KALA Garage ບໍ່ຮູ້ວ່າທ່ານໄດ້ມາສ້ອມລົດທີ່ອູ່ພວກເຮົາ ມື້ [ວັນທີ] ບໍ?"</li>
+            <li>"ໄດ້ສ້ອມຫຍັງ? ຄ່າຫຍັງ?"</li>
+            <li><strong style="color:#DC2626">"ໄດ້ຮັບໃບເຈ້ຍບໍ?"</strong> ← ສຳຄັນທີ່ສຸດ!</li>
+            <li>"ພໍໃຈບໍລິການບໍ? ມີຫຍັງຈະຮ້ອງຮຽນບໍ?"</li>
+          </ol>
+        </div>
+      </div>
+    `;
+    box.scrollIntoView({ behavior:'smooth', block:'start' });
+  });
+}
+
+async function logCustomerAudit(entryId) {
+  const e = await db.labor_entries.get(entryId);
+  if (!e) { toast('ບໍ່ພົບ Entry', 'bad'); return; }
+  const body = `
+    <div style="background:#FAF5FF;padding:10px;border-radius:8px;margin-bottom:10px;font-size:12px">
+      <strong>📋 ລາຍລະອຽດວຽກ:</strong><br>
+      <strong>${escapeHtml(e.customer_name||'-')}</strong> · ${escapeHtml(e.customer_phone||'-')}<br>
+      ${escapeHtml(e.service_name||'-')} (${e.date}) — <strong>${fmt(e.grand_total||e.charge_amount||0)} ກີບ</strong>
+    </div>
+
+    <div class="fld"><label>📞 ສະຖານະການໂທ</label>
+      <select id="aud_response">
+        <option value="reached">✅ ຕິດຕໍ່ໄດ້</option>
+        <option value="no_answer">📵 ບໍ່ຮັບສາຍ</option>
+        <option value="wrong_number">❌ ເບີໂທຜິດ</option>
+        <option value="not_customer">⚠️ ບໍ່ແມ່ນລູກຄ້າ (ປະຕິເສດ)</option>
+      </select>
+    </div>
+
+    <div class="fld"><label>🧾 ໄດ້ຮັບໃບເຈ້ຍບໍ?</label>
+      <select id="aud_receipt">
+        <option value="">— ບໍ່ໄດ້ຖາມ —</option>
+        <option value="yes">✅ ໄດ້ຮັບແລ້ວ</option>
+        <option value="no">❌ ບໍ່ໄດ້ຮັບ — ⚠️ ສ່ຽງລັກເຮັດ!</option>
+        <option value="unsure">❓ ບໍ່ແນ່ໃຈ</option>
+      </select>
+    </div>
+
+    <div class="fld"><label>😊 ຄວາມພໍໃຈ</label>
+      <select id="aud_sat">
+        <option value="">— ບໍ່ໄດ້ຖາມ —</option>
+        <option value="excellent">⭐⭐⭐⭐⭐ ດີຫຼາຍ</option>
+        <option value="good">⭐⭐⭐⭐ ດີ</option>
+        <option value="ok">⭐⭐⭐ ປົກກະຕິ</option>
+        <option value="poor">⭐⭐ ບໍ່ດີ</option>
+        <option value="bad">⭐ ບໍ່ພໍໃຈ</option>
+      </select>
+    </div>
+
+    <div class="fld"><label>ໝາຍເຫດ / ການຮ້ອງຮຽນ</label>
+      <textarea id="aud_notes" placeholder="ຍົກຕົວຢ່າງ ລູກຄ້າບອກວ່າຍັງເຫັນອາການເກົ່າ..."></textarea>
+    </div>
+  `;
+  modal('📞 ບັນທຶກການກວດສອບລູກຄ້າ', body, `
+    <button class="btn outline" onclick="closeModal()">${t('cancel')}</button>
+    <button class="btn ok" onclick="saveCustomerAudit(${entryId})">💾 ບັນທຶກ</button>`);
+}
+
+async function saveCustomerAudit(entryId) {
+  const e = await db.labor_entries.get(entryId);
+  const data = {
+    audit_id: 'AUD-' + Date.now(),
+    labor_entry_id: entryId,
+    customer_phone: e.customer_phone,
+    audit_date: todayISO(),
+    called_at: new Date().toISOString(),
+    response: $('#aud_response').value,
+    received_receipt: $('#aud_receipt').value,
+    satisfaction: $('#aud_sat').value,
+    called_by: (typeof cloud!=='undefined' && cloud.profile?.username) || 'local',
+    notes: $('#aud_notes').value,
+  };
+  await db.customer_audits.add(data);
+  if (typeof auditLog==='function') auditLog('audit', 'customer_audits', null,
+    `${e.entry_id} — ${e.customer_name} — ໃບເຈ້ຍ:${data.received_receipt} ພໍໃຈ:${data.satisfaction}`);
+  toast(`✅ ບັນທຶກ Audit ສຳເລັດ${data.received_receipt==='no'?' — 🚨 ບໍ່ໄດ້ໃບເຈ້ຍ ກວດສອບດ່ວນ!':''}`);
+  closeModal();
+  if (currentPage === 'customer_audit') pages.customer_audit();
+  else if (currentPage === 'camera_reconciliation') pages.camera_reconciliation();
+}
+
+// ============================================================================
+// 📊 PAGE: Daily Reconciliation — DEPRECATED (replaced by camera_reconciliation)
 // ============================================================================
 let drDate = '';
 pages.daily_reconciliation = async () => {
