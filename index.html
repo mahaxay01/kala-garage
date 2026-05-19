@@ -2008,18 +2008,62 @@ pages.tires = async () => {
     <div class="card">
       ${tires.length === 0 ? `<div class="empty"><div class="icon">⚙️</div><p>${t('no_data')}</p></div>` : `
       <table>
-        <tr><th>${t('fld_tire_id')}</th><th>${t('fld_brand_tire')}</th><th>${t('fld_size')}</th>
-          <th>${t('fld_dot')}</th><th>${t('nav_vehicles')}</th><th>${t('fld_position')}</th>
-          <th>${t('fld_install_km')}</th><th>${t('fld_tread')}</th><th>${t('fld_status')}</th><th></th></tr>
-        ${tires.map(tr => `<tr>
-          <td><strong style="cursor:pointer;color:var(--accent);text-decoration:underline" onclick="showTireDetail(${tr.id})">${tr.tire_id}</strong></td><td>${tr.brand}</td><td>${tr.size}</td>
-          <td>${tr.dot||'-'}</td><td>${tr.current_vehicle||'-'}</td><td>${tr.position||'-'}</td>
-          <td>${fmt(tr.install_km||0)}</td>
-          <td style="color:${tireColor(tr.tread)};font-weight:600">${tr.tread||0} mm</td>
-          <td><span class="pill ${tr.status==='active'?'ok':tr.status==='retired'?'bad':tr.status==='new_stock'?'info':'warn'}">${t('tire_'+tr.status)}</span></td>
-          <td class="actions"><button class="btn sm outline" onclick="openTireModal(${tr.id})">${t('edit')}</button>
-            <button class="btn sm danger" onclick="delTire(${tr.id})">${t('delete')}</button></td>
-        </tr>`).join('')}
+        <tr>
+          <th>${t('fld_tire_id')}</th>
+          <th>${t('fld_brand_tire')} / ${t('fld_size')}</th>
+          <th>${t('nav_vehicles')} / ${t('fld_position')}</th>
+          <th style="width:200px">📊 ການໃຊ້ງານ (km)</th>
+          <th>${t('fld_tread')}</th>
+          <th>${t('fld_status')}</th>
+          <th></th>
+        </tr>
+        ${tires.map(tr => {
+          const v = vehicles.find(x => x.vehicle_id === tr.current_vehicle);
+          const curKm = v ? (v.mileage || tr.current_km || 0) : (tr.current_km || 0);
+          const installKm = tr.install_km || 0;
+          const lifeKm = tr.expected_life_km || 50000;
+          const usedKm = Math.max(0, curKm - installKm);
+          const remainKm = Math.max(0, lifeKm - usedKm);
+          const pct = lifeKm > 0 ? Math.min(100, Math.round(usedKm / lifeKm * 100)) : 0;
+          // ສີຕາມ % ການໃຊ້: ຂຽວ < 60% / ສົ້ມ 60-85% / ແດງ > 85%
+          const barColor = pct < 60 ? '#10B981' : pct < 85 ? '#F59E0B' : '#EF4444';
+          const labelColor = pct < 60 ? 'var(--ok)' : pct < 85 ? 'var(--warn)' : 'var(--bad)';
+          const isInstalled = tr.status === 'active' && tr.current_vehicle;
+
+          return `<tr>
+            <td>
+              <strong style="cursor:pointer;color:var(--accent);text-decoration:underline" onclick="showTireDetail(${tr.id})">${tr.tire_id}</strong>
+              ${tr.dot ? `<br><small class="muted" style="font-size:10px">DOT ${tr.dot}</small>` : ''}
+            </td>
+            <td>
+              <div style="font-weight:600">${tr.brand||'-'}</div>
+              <small class="muted" style="font-size:11px">${tr.size||''}</small>
+            </td>
+            <td>
+              ${tr.current_vehicle ? `<strong>${tr.current_vehicle}</strong><br><small class="muted">${tr.position||'-'}</small>` : '<span style="color:#CBD5E1">— ບໍ່ໄດ້ຕິດ —</span>'}
+            </td>
+            <td>
+              ${isInstalled ? `
+                <div style="display:flex;justify-content:space-between;font-size:11px;font-weight:600;margin-bottom:3px">
+                  <span style="color:${labelColor}">${fmt(usedKm)} / ${fmt(lifeKm)}</span>
+                  <span style="color:${labelColor}">${pct}%</span>
+                </div>
+                <div style="background:#F1F5F9;height:6px;border-radius:3px;overflow:hidden">
+                  <div style="background:${barColor};height:100%;width:${pct}%;transition:width .3s"></div>
+                </div>
+                <div style="font-size:10px;color:var(--muted);margin-top:2px">
+                  ${pct >= 85 ? '🚨 ໃກ້ໝົດ — ຄວນປ່ຽນ' : pct >= 60 ? '⚠️ ກວດເຊັກ' : `🟢 ຍັງເຫຼືອ ${fmt(remainKm)} km`}
+                </div>
+              ` : `<span style="color:#CBD5E1;font-size:11px">— ບໍ່ມີຂໍ້ມູນການໃຊ້ —</span>`}
+            </td>
+            <td style="color:${tireColor(tr.tread)};font-weight:700;font-size:14px">${tr.tread||0} mm</td>
+            <td><span class="pill ${tr.status==='active'?'ok':tr.status==='retired'?'bad':tr.status==='new_stock'?'info':'warn'}">${t('tire_'+tr.status)}</span></td>
+            <td class="actions">
+              <button class="btn sm outline" onclick="openTireModal(${tr.id})">${t('edit')}</button>
+              <button class="btn sm danger" onclick="delTire(${tr.id})">${t('delete')}</button>
+            </td>
+          </tr>`;
+        }).join('')}
       </table>`}
     </div>
   `;
