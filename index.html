@@ -7917,56 +7917,157 @@ pages.cloud_users = async () => {
   Object.keys(ROLE_LABELS).forEach(r => stats[r] = users.filter(u => u.role === r).length);
   const totalActive = users.filter(u => u.active !== false).length;
 
-  $('#main').innerHTML = `
-    <div class="crumbs">${t('nav_settings')} › 👥 Cloud Users</div>
-    <div class="page-title">👥 ການຈັດການຜູ້ໃຊ້ Cloud <small style="font-weight:400;color:var(--muted);font-size:13px">— ${users.length} ຄົນ (${totalActive} active)</small></div>
+  // Helper: relative time (ນາທີທີ່ຜ່ານມາ, ມື້ນີ້, ມື້ວານ, X ມື້ກ່ອນ)
+  const relTime = (iso) => {
+    if (!iso) return '<span style="color:#94A3B8">—</span>';
+    const d = new Date(iso);
+    const diff = (Date.now() - d.getTime()) / 1000;
+    if (diff < 60) return 'ດຽວນີ້';
+    if (diff < 3600) return Math.floor(diff/60) + ' ນທ';
+    if (diff < 86400) return Math.floor(diff/3600) + ' ຊມ';
+    if (diff < 86400*2) return 'ມື້ວານ';
+    if (diff < 86400*30) return Math.floor(diff/86400) + ' ມື້';
+    return d.toLocaleDateString('lo');
+  };
 
-    <div class="alert info" style="font-size:13px">
-      💡 ໜ້ານີ້ສຳລັບ <strong>Owner / IT</strong> ຄຸ້ມຄອງ User Cloud — ສ້າງ, ປ່ຽນ Role, Reset Password, ປິດ/ເປີດໃຊ້.
-      Manager ສາມາດເບິ່ງ User ໃນສາຂາຕົນເອງເທົ່ານັ້ນ.
-    </div>
+  // Helper: role color
+  const roleColor = (r) => ({
+    owner:'#DC2626', it:'#475569', manager:'#EA580C', driver:'#2563EB',
+    procurement:'#7C3AED', qc:'#0891B2', accounting:'#16A34A',
+    tech_l3:'#0F766E', tech_l2:'#14B8A6', tech_l1:'#5EEAD4'
+  }[r] || '#64748B');
+
+  // Helper: initials avatar
+  const avatar = (name, email) => {
+    const txt = (name||email||'?').trim();
+    const initial = txt.charAt(0).toUpperCase();
+    const colors = ['#3B82F6','#8B5CF6','#EC4899','#F59E0B','#10B981','#06B6D4','#EF4444'];
+    const hash = txt.split('').reduce((a,c)=>a+c.charCodeAt(0),0);
+    const bg = colors[hash % colors.length];
+    return `<div style="width:36px;height:36px;border-radius:50%;background:${bg};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0">${initial}</div>`;
+  };
+
+  // Filter state
+  window._uFilter = window._uFilter || { role:'', branch:'', status:'', q:'' };
+  const f = window._uFilter;
+  const branches = [...new Set(users.map(u => u.branch).filter(Boolean))];
+  let filtered = users;
+  if (f.role) filtered = filtered.filter(u => u.role === f.role);
+  if (f.branch) filtered = filtered.filter(u => u.branch === f.branch);
+  if (f.status === 'active') filtered = filtered.filter(u => u.active !== false);
+  if (f.status === 'disabled') filtered = filtered.filter(u => u.active === false);
+  if (f.q) {
+    const q = f.q.toLowerCase();
+    filtered = filtered.filter(u =>
+      (u.name||'').toLowerCase().includes(q) ||
+      (u.email||'').toLowerCase().includes(q) ||
+      (u.username||'').toLowerCase().includes(q)
+    );
+  }
+
+  $('#main').innerHTML = `
+    <div class="crumbs">${t('nav_settings')} › 👥 ຄຸ້ມຄອງ User</div>
+    <div class="page-title">👥 ຄຸ້ມຄອງ User <small style="font-weight:400;color:var(--muted);font-size:13px">— ${filtered.length}/${users.length} ຄົນ · ${totalActive} active</small></div>
 
     ${err ? `<div class="alert bad">❌ ${err}</div>` : ''}
 
-    <div class="kpi-grid">
-      ${Object.entries(ROLE_LABELS).map(([k,v]) => `
-        <div class="kpi"><div class="label">${v}</div><div class="val">${stats[k]||0}</div></div>
+    <!-- Compact stats row -->
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+      <div onclick="window._uFilter.role='';pages.cloud_users()"
+        style="cursor:pointer;background:white;border:2px solid ${!f.role?'var(--accent)':'var(--line)'};padding:6px 12px;border-radius:8px;font-size:12px;font-weight:600">
+        🌐 ທັງໝົດ <span style="background:#1F2937;color:#fff;padding:1px 6px;border-radius:10px;margin-left:4px">${users.length}</span>
+      </div>
+      ${Object.entries(ROLE_LABELS).filter(([k,v]) => stats[k]>0).map(([k,v]) => `
+        <div onclick="window._uFilter.role='${k}';pages.cloud_users()"
+          style="cursor:pointer;background:white;border:2px solid ${f.role===k?roleColor(k):'var(--line)'};padding:6px 12px;border-radius:8px;font-size:12px;font-weight:600;color:${roleColor(k)}">
+          ${v} <span style="background:${roleColor(k)};color:#fff;padding:1px 6px;border-radius:10px;margin-left:4px">${stats[k]}</span>
+        </div>
       `).join('')}
     </div>
 
-    ${cloud.hasRole('owner','it') ? `
-    <div class="toolbar">
-      <button class="btn" onclick="openCloudUserForm()">+ ສ້າງ User ໃໝ່</button>
-      <button class="btn outline" onclick="pages.cloud_users()">🔄 Refresh</button>
-    </div>` : ''}
+    <!-- Search + Actions toolbar -->
+    <div class="toolbar" style="gap:8px;flex-wrap:wrap">
+      <input type="search" placeholder="🔎 ຄົ້ນຫາ ຊື່/Email/Username"
+        value="${escapeHtml(f.q)}"
+        oninput="window._uFilter.q=this.value;clearTimeout(window._uft);window._uft=setTimeout(()=>pages.cloud_users(),300)"
+        style="flex:1;min-width:200px;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit"/>
 
-    <div class="card" style="padding:0">
-      <table>
+      <select onchange="window._uFilter.branch=this.value;pages.cloud_users()"
+        style="padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit">
+        <option value="">🏢 ທຸກສາຂາ</option>
+        ${branches.map(b => `<option value="${b}" ${f.branch===b?'selected':''}>${b}</option>`).join('')}
+      </select>
+
+      <select onchange="window._uFilter.status=this.value;pages.cloud_users()"
+        style="padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit">
+        <option value="">⚪ ທຸກສະຖານະ</option>
+        <option value="active" ${f.status==='active'?'selected':''}>🟢 Active</option>
+        <option value="disabled" ${f.status==='disabled'?'selected':''}>🔴 Disabled</option>
+      </select>
+
+      ${cloud.hasRole('owner','it') ? `
+        <button class="btn" onclick="openCloudUserForm()">+ ສ້າງ User</button>
+        <button class="btn outline" onclick="pages.cloud_users()" title="Refresh">🔄</button>
+      ` : ''}
+    </div>
+
+    <!-- Compact User Table -->
+    <div class="card" style="padding:0;overflow:hidden">
+      ${filtered.length === 0 ? `<div class="empty" style="padding:30px"><div class="icon">👥</div><p>ບໍ່ພົບ User ທີ່ກົງເງື່ອນໄຂ</p></div>` : `
+      <table style="font-size:13px">
         <tr>
-          <th>Email</th>
-          <th>ຊື່</th>
-          <th>Role</th>
-          <th>ສາຂາ</th>
-          <th>ສະຖານະ</th>
-          <th>Login ສຸດທ້າຍ</th>
-          ${cloud.hasRole('owner','it') ? '<th>ການເຮັດງານ</th>' : ''}
+          <th style="padding:10px 12px">User</th>
+          <th style="padding:10px 12px">Role</th>
+          <th style="padding:10px 12px">ສາຂາ</th>
+          <th style="padding:10px 12px;text-align:center">ສະຖານະ</th>
+          <th style="padding:10px 12px">Login</th>
+          ${cloud.hasRole('owner','it') ? '<th style="padding:10px 12px;text-align:right">ການເຮັດງານ</th>' : ''}
         </tr>
-        ${users.map(u => `<tr style="${u.active===false?'opacity:.5':''}">
-          <td><strong>${escapeHtml(u.email||'-')}</strong><br><small class="muted">${u.username||''}</small></td>
-          <td>${escapeHtml(u.name||'-')}</td>
-          <td><span class="pill" style="background:${u.role==='owner'?'#DC2626':u.role==='it'?'#475569':u.role==='manager'?'#EA580C':u.role==='driver'?'#2563EB':'#16A34A'};color:#fff">${ROLE_LABELS[u.role]||u.role}</span></td>
-          <td>${u.branch||'-'}</td>
-          <td>${u.active!==false?'🟢 Active':'🔴 Disabled'}</td>
-          <td style="font-size:11px">${u.last_login ? new Date(u.last_login).toLocaleString('lo') : 'ບໍ່ເຄີຍ'}</td>
-          ${cloud.hasRole('owner','it') ? `<td class="actions">
-            <button class="btn sm outline" onclick="editCloudUser('${u.id}')">✏️ ແກ້ໄຂ</button>
-            <button class="btn sm outline" onclick="resetCloudPassword('${u.email}')" title="Reset Password">🔑</button>
-            ${u.id !== cloud.user.id ? `<button class="btn sm" style="background:#F59E0B;color:#fff" onclick="forceLogoutUser('${u.id}','${u.email}')" title="Force Logout — ບີບ User ອອກຈາກລະບົບ">🚪 Logout</button>` : ''}
-            ${u.active!==false ? `<button class="btn sm danger" onclick="toggleCloudUser('${u.id}',false)" title="ປິດ Account ຖາວອນ">⏸ ປິດ</button>` :
-              `<button class="btn sm ok" onclick="toggleCloudUser('${u.id}',true)">▶️ ເປີດ</button>`}
-          </td>` : ''}
-        </tr>`).join('')}
-      </table>
+        ${filtered.map(u => {
+          const isMe = u.id === cloud.user?.id;
+          const isActive = u.active !== false;
+          return `<tr style="${!isActive?'opacity:.55;background:#FEF2F2':''}">
+            <td style="padding:8px 12px">
+              <div style="display:flex;align-items:center;gap:10px">
+                ${avatar(u.name, u.email)}
+                <div style="min-width:0;flex:1">
+                  <div style="font-weight:600;color:var(--text);display:flex;align-items:center;gap:6px">
+                    ${escapeHtml(u.name||'(ບໍ່ມີຊື່)')}
+                    ${isMe?'<span style="background:#DBEAFE;color:#1E40AF;font-size:10px;padding:1px 6px;border-radius:4px;font-weight:700">ທ່ານ</span>':''}
+                  </div>
+                  <div style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:240px" title="${escapeHtml(u.email||'')}">
+                    ${escapeHtml(u.email||'')}
+                  </div>
+                </div>
+              </div>
+            </td>
+            <td style="padding:8px 12px">
+              <span class="pill" style="background:${roleColor(u.role)};color:#fff;font-size:11px">${ROLE_LABELS[u.role]||u.role}</span>
+            </td>
+            <td style="padding:8px 12px;font-size:12px">${u.branch||'<span style="color:#CBD5E1">—</span>'}</td>
+            <td style="padding:8px 12px;text-align:center">
+              <span title="${isActive?'Active — ໃຊ້ໄດ້':'Disabled — ປິດແລ້ວ'}"
+                style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${isActive?'#10B981':'#EF4444'};box-shadow:0 0 0 3px ${isActive?'#D1FAE5':'#FEE2E2'}"></span>
+            </td>
+            <td style="padding:8px 12px;font-size:11px;color:var(--muted)">${relTime(u.last_login)}</td>
+            ${cloud.hasRole('owner','it') ? `<td style="padding:8px 12px;text-align:right;white-space:nowrap">
+              <button class="btn sm outline" onclick="editCloudUser('${u.id}')" title="ແກ້ໄຂ">✏️</button>
+              <button class="btn sm outline" onclick="resetCloudPassword('${u.email}')" title="Reset Password">🔑</button>
+              ${!isMe ? `<button class="btn sm" style="background:#F59E0B;color:#fff;padding:5px 8px" onclick="forceLogoutUser('${u.id}','${u.email}')" title="Force Logout">🚪</button>` : ''}
+              ${!isMe ? (isActive
+                ? `<button class="btn sm danger" style="padding:5px 8px" onclick="toggleCloudUser('${u.id}',false)" title="ປິດ Account">⏸</button>`
+                : `<button class="btn sm ok" style="padding:5px 8px" onclick="toggleCloudUser('${u.id}',true)" title="ເປີດ Account">▶️</button>`
+              ) : ''}
+            </td>` : ''}
+          </tr>`;
+        }).join('')}
+      </table>`}
+    </div>
+
+    <!-- Help footnote -->
+    <div style="margin-top:10px;padding:8px 12px;background:#F8FAFC;border-left:3px solid var(--accent);border-radius:6px;font-size:11px;color:var(--muted)">
+      💡 <strong>ໄອຄອນປຸ່ມ:</strong> ✏️ ແກ້ໄຂ · 🔑 Reset Password · 🚪 Force Logout (ບີບອອກ) · ⏸ ປິດ Account · ▶️ ເປີດຄືນ
+      &nbsp;·&nbsp; <strong>ສະຖານະ:</strong> 🟢 = ໃຊ້ໄດ້ · 🔴 = ປິດແລ້ວ
     </div>
   `;
 };
