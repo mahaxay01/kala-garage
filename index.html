@@ -619,6 +619,8 @@ const cloud = {
   realtimeActive: false,
   realtimeChannels: [],
   realtimeEventCount: 0,
+  // 🛡️ Flag ປ້ອງກັນ Loop — ຕັ້ງເປັນ true ໃນລະຫວ່າງ Apply Realtime ເພື່ອບໍ່ໃຫ້ Hook ສົ່ງກັບໄປ Cloud
+  applyingRealtimeChange: false,
 
   // Realtime Subscribe (ປ່ຽນແປງເຫັນທັນທີ)
   subscribeAll() {
@@ -637,6 +639,8 @@ const cloud = {
           // ບໍ່ຕ້ອງ Apply ການປ່ຽນແປງຂອງຕົນເອງກັບຄືນ (ກັນ loop)
           const isMine = payload.new && payload.new.updated_by === (this.profile?.username);
 
+          // 🛡️ ຕັ້ງ Flag ໃຫ້ Hook ຮູ້ວ່ານີ້ແມ່ນການ Apply ຈາກ Realtime — ບໍ່ໃຫ້ສົ່ງກັບ
+          this.applyingRealtimeChange = true;
           try {
             if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
               await db[localName].put(payload.new);
@@ -644,6 +648,8 @@ const cloud = {
               await db[localName].where('id').equals(payload.old.id).delete();
             }
           } catch(e) {}
+          // ປ່ອຍ Flag ຫລັງຈາກ delay ນ້ອຍໆ (Hook ຈະ async ປະຈຸບັນ)
+          setTimeout(() => { this.applyingRealtimeChange = false; }, 200);
 
           // ບັນທຶກ statistics
           this.realtimeEventCount++;
@@ -651,20 +657,37 @@ const cloud = {
           this.syncStatus = 'idle';
 
           // ສະແດງ Toast + Auto-refresh — ສະເພາະການປ່ຽນແປງຈາກຄົນອື່ນ
+          // 🛡️ Throttle Toast: ບໍ່ສະແດງເກີນ 1 ຄັ້ງ/3 ວິນາທີ ຕໍ່ table — ປ້ອງກັນ spam
           if (!isMine && typeof toast === 'function') {
             const labels = {
-              vehicles:'ລົດ', joborders:'JO', drivers:'ຄົນຂັບ', tires:'ຢາງ',
+              vehicles:'ລົດ', joborders:'JO', drivers:'ຄົນຂັບ', tires:'ຢາງ', tire_history:'ປະຫວັດຢາງ',
               labor_entries:'ຄ່າແຮງ', service_rates:'ບັນຊີຄ່າແຮງ', tech_profiles:'ໂປຣໄຟລ໌ຊ່າງ',
               vehicle_intakes:'ໃບຮັບລົດ', vendors:'ຜູ້ຈຳໜ່າຍ', parts:'ອາໄຫລ່',
               fuel_log:'ບິນນ້ຳມັນ', inspections:'ກວດປະຈຳວັນ', incidents:'ອຸປະຕິເຫດ',
               purchase_orders:'PO', purchase_requests:'PR',
               camera_counts:'ບັນທຶກກ້ອງ', customer_audits:'Customer Audit',
+              fluids:'ບັນທຶກນ້ຳມັນຫລໍ່ລື່ນ', mileage_log:'ບັນທຶກໄມຍ໌', categories:'ໝວດ',
+              pm_templates:'ແມ່ແບບ PM', vehicle_pm:'PM ລົດ', pm_history:'ປະຫວັດ PM',
+              receipt_inspections:'ໃບກວດຮັບ', predelivery_inspections:'ໃບກວດສົ່ງມອບ',
+              parts_replacements:'ປະຫວັດປ່ຽນອາໄຫລ່', driver_reviews:'ປະເມີນຄົນຂັບ',
+              vendor_prices:'ລາຄາຜູ້ຈຳໜ່າຍ', tools:'ເຄື່ອງມື', outsource:'ສ້ອມນອກ',
+              jo_items:'ລາຍການ JO', documents:'ເອກະສານ', exchange_rates:'ອັດຕາແລກປ່ຽນ',
+              gps_devices:'GPS', depreciation:'ຄ່າເສື່ອມ', part_movements:'ການເຄື່ອນຍ້າຍອາໄຫລ່',
+              job_orders:'JO',
             };
             const label = labels[table] || table;
-            const actionLabel = {INSERT:'➕ ສ້າງໃໝ່', UPDATE:'✏️ ແກ້ໄຂ', DELETE:'🗑 ລົບ'}[payload.eventType] || '🔄';
-            toast(`🔔 ${actionLabel} ${label}`, 'info');
 
-            // Auto-refresh ໜ້າປະຈຸບັນຫລັງຈາກ 800ms (debounced)
+            // Throttle: ກວດວ່າ table ນີ້ສະແດງ Toast ໄປແລ້ວໃນ 3 ວິນາທີຜ່ານມາ
+            if (!window._toastThrottle) window._toastThrottle = {};
+            const now = Date.now();
+            const lastShown = window._toastThrottle[table] || 0;
+            if (now - lastShown > 3000) {
+              window._toastThrottle[table] = now;
+              const actionLabel = {INSERT:'➕ ສ້າງໃໝ່', UPDATE:'✏️ ແກ້ໄຂ', DELETE:'🗑 ລົບ'}[payload.eventType] || '🔄';
+              toast(`🔔 ${actionLabel} ${label}`, 'info');
+            }
+
+            // Auto-refresh ໜ້າປະຈຸບັນຫລັງຈາກ 1200ms (debounced)
             if (window._realtimeRefreshTimer) clearTimeout(window._realtimeRefreshTimer);
             window._realtimeRefreshTimer = setTimeout(() => {
               try {
@@ -672,7 +695,7 @@ const cloud = {
                   pages[currentPage]();
                 }
               } catch(e) {}
-            }, 800);
+            }, 1200);
           }
 
           // ອັບເດດ Realtime status indicator
@@ -851,22 +874,27 @@ function setupAutoSync() {
     if (!localTables.includes(table.name)) continue;
     // Hook creating + updating + deleting
     table.hook('creating', function(primKey, obj) {
+      // 🛡️ ປ້ອງກັນ Loop — ຖ້າ Apply ຈາກ Realtime ມາ ບໍ່ຕ້ອງສົ່ງກັບ
+      if (cloud.applyingRealtimeChange) return;
       setTimeout(() => {
-        if (cloud.enabled && cloud.user) {
+        if (cloud.enabled && cloud.user && !cloud.applyingRealtimeChange) {
           _autoSyncQueue.push({ table: table.name, action: 'upsert', data: { ...obj, id: primKey || obj.id } });
           _flushAutoSync();
         }
       }, 100);
     });
     table.hook('updating', function(mods, primKey, obj) {
+      if (cloud.applyingRealtimeChange) return;
       setTimeout(() => {
-        if (cloud.enabled && cloud.user) {
+        if (cloud.enabled && cloud.user && !cloud.applyingRealtimeChange) {
           _autoSyncQueue.push({ table: table.name, action: 'upsert', data: { ...obj, ...mods, id: primKey } });
           _flushAutoSync();
         }
       }, 100);
     });
     table.hook('deleting', function(primKey, obj) {
+      // 🛡️ ປ້ອງກັນ Loop — ຖ້າ Apply Realtime ມາ ບໍ່ຕ້ອງສົ່ງກັບ Cloud
+      if (cloud.applyingRealtimeChange) return;
       if (cloud.enabled && cloud.user) {
         _autoSyncQueue.push({ table: table.name, action: 'delete', id: primKey });
         setTimeout(() => _flushAutoSync(), 100);
