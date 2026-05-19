@@ -1217,6 +1217,48 @@ db.version(2).stores({
   outsource: '++id, jo_id, vendor_id, status',
   settings: 'key',
 });
+db.version(14).stores({
+  vehicles: '++id, vehicle_id, plate, type, branch, status, category_id',
+  inspections: '++id, vehicle_id, date, status, frequency, driver',
+  joborders: '++id, jo_id, vehicle_id, priority, status, created',
+  parts: '++id, code, class, grade, category_id, warehouse, status',
+  partmovements: '++id, part_id, type, date',
+  drivers: '++id, driver_id, name, license_expiry, assigned_vehicle',
+  tires: '++id, tire_id, current_vehicle, position, status, install_km, install_date',
+  tire_history: '++id, tire_id, date, event_type, vehicle_id, position, km',
+  vendors: '++id, vendor_id, name, category_id, province',
+  vendorprices: '++id, vendor_id, part_code, currency, date',
+  tools: '++id, tool_id, name, calib_due, status',
+  outsource: '++id, jo_id, vendor_id, status',
+  fluids: '++id, vehicle_id, type, date, next_due_date',
+  mileage_log: '++id, vehicle_id, date, mileage',
+  categories: '++id, name, type, parent_id',
+  exchange_rates: '++id, currency, rate, valid_from',
+  pm_templates: '++id, vehicle_type, interval_type, interval_value',
+  pm_history: '++id, vehicle_id, template_id, date, mileage',
+  fuel_log: '++id, vehicle_id, date, driver, station',
+  documents: '++id, entity_type, entity_id, doc_type, expiry_date',
+  incidents: '++id, date, vehicle_id, driver_id, severity, status',
+  audit_log: '++id, timestamp, user, action, entity',
+  purchase_requests: '++id, pr_id, vendor_id, status, created, total_lak',
+  purchase_orders: '++id, po_id, vendor_id, status, created, urgency, total_lak',
+  vehicle_pm: '++id, vehicle_id, interval_type, interval_value, active',
+  gps_devices: '++id, vehicle_id, imei, model, platform, status, installed_date',
+  driver_reviews: '++id, driver_id, review_date, reviewer, period, total_score',
+  receipt_inspections: '++id, jo_id, vehicle_id, date, inspector',
+  predelivery_inspections: '++id, jo_id, vehicle_id, date, inspector, approved',
+  users: '++id, username, role, name, active, created',
+  depreciation: '++id, vehicle_id, year, month, value, accumulated',
+  parts_replacements: '++id, vehicle_id, part_type, date, km, cost, jo_id',
+  ai_chat_history: '++id, timestamp, role, content',
+  deleted_items: '++id, deleted_at, deleted_by, store, original_id, summary, restored',
+  price_change_audit: '++id, timestamp, user, entity_type, entity_id, field, old_value, new_value, summary',
+  // ===== NEW v14: Labor + Commission System =====
+  service_rates: '++id, service_code, service_name, category, vehicle_group, base_charge, skill_required, active',
+  tech_profiles: '++id, tech_id, name, skill_level, commission_pct, active, branch',
+  labor_entries: '++id, entry_id, date, jo_id, vehicle_id, tech_id, service_code, charge_amount, commission_amount, status, approved_by',
+  settings: 'key',
+});
 db.version(13).stores({
   vehicles: '++id, vehicle_id, plate, type, branch, status, category_id',
   inspections: '++id, vehicle_id, date, status, frequency, driver',
@@ -1752,6 +1794,11 @@ function renderNav() {
     <a data-page="defects"><span>🔧</span><span class="label">ຄວາມບົກພ່ອງຂະນະໃຊ້</span></a>
     <a data-page="documents"><span>📜</span><span class="label">${t('nav_docs')}</span></a>
     <a data-page="jo"><span>📋</span><span class="label">${t('nav_jo')}</span></a>
+    <a data-page="labor_entries"><span>💼</span><span class="label">ບັນທຶກວຽກ + ຄ່າແຮງ</span></a>
+    <a data-page="tech_performance"><span>📊</span><span class="label">ຜົນງານຊ່າງ (Daily)</span></a>
+    <a data-page="commission"><span>💰</span><span class="label">ສະຫຼຸບຄອມມິສຊັ່ນ</span></a>
+    <a data-page="tech_profiles"><span>🔧</span><span class="label">ໂປຣໄຟລ໌ຊ່າງ</span></a>
+    <a data-page="service_rates"><span>📋</span><span class="label">ບັນຊີຄ່າແຮງ</span></a>
     <a data-page="pm"><span>🗓</span><span class="label">${t('nav_pm')}</span></a>
     <a data-page="pm_schedule"><span>📅</span><span class="label">ກຳນົດການ PM (Schedule)</span></a>
     <a data-page="pm_templates"><span>📝</span><span class="label">${t('nav_pm_templates')}</span></a>
@@ -12475,6 +12522,861 @@ async function aiTireLife() {
     ? tires.map(i => `${i.icon} ${i.title}\n${i.desc}\n`).join('\n')
     : 'ບໍ່ມີຢາງໃກ້ໝົດອາຍຸ');
 }
+
+// =============================================================================
+// 💼 LABOR + COMMISSION SYSTEM — ລະບົບຄ່າແຮງ + ຄອມມິສຊັ່ນຊ່າງ KALA
+// =============================================================================
+// 4 ໜ້າຫຼັກ:
+//   1) pages.service_rates — ບັນຊີຄ່າແຮງມາດຕະຖານ
+//   2) pages.tech_profiles — ໂປຣໄຟລ໌ຊ່າງ + % ຄອມມິສຊັ່ນ
+//   3) pages.labor_entries — ບັນທຶກວຽກສ້ອມ + ຄ່າແຮງ
+//   4) pages.tech_performance — Dashboard ຜົນງານປະຈຳວັນ + Leaderboard
+//   5) pages.commission — ສະຫຼຸບຄອມມິສຊັ່ນລາຍເດືອນ + Approval
+
+// Constants
+const SVC_CATEGORIES = [
+  { id:'PM', label:'🛢 PM / ບຳລຸງຮັກສາ', color:'#10B981' },
+  { id:'Brake', label:'🛑 ເບຣກ', color:'#EF4444' },
+  { id:'Engine', label:'⚙️ ເຄື່ອງຍົນ', color:'#F59E0B' },
+  { id:'Electrical', label:'⚡ ໄຟຟ້າ', color:'#3B82F6' },
+  { id:'Tire', label:'🛞 ຢາງ', color:'#8B5CF6' },
+  { id:'Body', label:'🚗 ໂຄງລົດ / ສີ', color:'#EC4899' },
+  { id:'Hydraulic', label:'🔧 Hydraulic', color:'#0891B2' },
+  { id:'Welding', label:'🔥 ເຊື່ອມ', color:'#F97316' },
+  { id:'Diagnostic', label:'🔍 ກວດສອບ Diagnostic', color:'#64748B' },
+  { id:'AC', label:'❄️ ແອ', color:'#06B6D4' },
+  { id:'Other', label:'📌 ອື່ນໆ', color:'#94A3B8' },
+];
+const VEHICLE_GROUPS = [
+  { id:'all', label:'🌐 ທຸກປະເພດ' },
+  { id:'light', label:'🚙 ລົດເບົາ (ເກ໋ງ/ກະບະ/ຕູ້)' },
+  { id:'heavy', label:'🚛 ລົດໜັກ (6/10 ລໍ້, ໂມປູນ, ພ່ວງ)' },
+  { id:'agri', label:'🚜 ກະສິກຳ (ລົດໄຖ)' },
+  { id:'construction', label:'🏗 ກໍ່ສ້າງ (ແບັກໂຮ, ຕັກດິນ)' },
+  { id:'special', label:'🏭 ພິເສດ (ເຄຣນ)' },
+];
+const SKILL_LEVELS = [
+  { id:'L1', label:'L1 — ຊ່າງຝຶກຫັດ', commission_default:10, color:'#5EEAD4' },
+  { id:'L2', label:'L2 — ຊ່າງຊຳນານ', commission_default:20, color:'#14B8A6' },
+  { id:'L3', label:'L3 — ຊ່າງເຕັກນິກຊັ້ນສູງ', commission_default:30, color:'#0F766E' },
+];
+const LABOR_STATUS = {
+  pending: { label:'⏳ ລໍຖ້າອະນຸມັດ', color:'#F59E0B', bg:'#FEF3C7' },
+  approved: { label:'✅ ອະນຸມັດແລ້ວ', color:'#10B981', bg:'#D1FAE5' },
+  rejected: { label:'❌ ປະຕິເສດ', color:'#EF4444', bg:'#FEE2E2' },
+  paid: { label:'💰 ຈ່າຍແລ້ວ', color:'#3B82F6', bg:'#DBEAFE' },
+};
+
+// Helpers
+const svcCatColor = (id) => (SVC_CATEGORIES.find(c=>c.id===id)?.color) || '#94A3B8';
+const svcCatLabel = (id) => (SVC_CATEGORIES.find(c=>c.id===id)?.label) || id;
+const vehGroupLabel = (id) => (VEHICLE_GROUPS.find(v=>v.id===id)?.label) || id;
+const skillColor = (id) => (SKILL_LEVELS.find(s=>s.id===id)?.color) || '#94A3B8';
+
+// Generate next labor entry ID: LE-YYYYMM-NNNN
+async function nextLaborEntryId() {
+  const d = new Date(); const yymm = d.getFullYear()+ String(d.getMonth()+1).padStart(2,'0');
+  const all = await db.labor_entries.toArray();
+  const month = all.filter(e => (e.entry_id||'').includes('LE-'+yymm));
+  const nums = month.map(e => parseInt((e.entry_id||'').split('-').pop())||0);
+  const n = (nums.length ? Math.max(...nums) : 0) + 1;
+  return `LE-${yymm}-${String(n).padStart(4,'0')}`;
+}
+
+// Generate next tech ID
+async function nextTechId() {
+  const all = await db.tech_profiles.toArray();
+  const nums = all.map(t => parseInt((t.tech_id||'').replace(/\D/g,''))||0);
+  return 'TECH-' + String((nums.length?Math.max(...nums):0)+1).padStart(3,'0');
+}
+
+// Seed standard service rates (run once)
+async function seedServiceRates() {
+  if ((await db.service_rates.count()) > 0) {
+    if (!confirm('ມີຂໍ້ມູນຄ່າແຮງຢູ່ແລ້ວ — ເພີ່ມມາດຕະຖານ KALA ອີກບໍ?')) return;
+  }
+  const rates = [
+    // PM — Preventive Maintenance
+    { service_code:'SVC-PM-LV-MINOR',  service_name:'PM Minor ລົດເບົາ (ປ່ຽນນ້ຳມັນ + ໄສ້ກອງ)',     category:'PM', vehicle_group:'light',        standard_hours:1.5, base_charge:80000,   skill_required:'L1', active:true },
+    { service_code:'SVC-PM-LV-MAJOR',  service_name:'PM Major ລົດເບົາ (ນ້ຳມັນ + ໄສ້ກອງທັງໝົດ + ກວດທົ່ວ)', category:'PM', vehicle_group:'light',        standard_hours:3,   base_charge:200000,  skill_required:'L2', active:true },
+    { service_code:'SVC-PM-HV-MINOR',  service_name:'PM Minor ລົດໜັກ (ປ່ຽນນ້ຳມັນເຄື່ອງ HD)',         category:'PM', vehicle_group:'heavy',        standard_hours:2.5, base_charge:150000,  skill_required:'L1', active:true },
+    { service_code:'SVC-PM-HV-MAJOR',  service_name:'PM Major ລົດໜັກ (ນ້ຳມັນ + Air Dryer + Coolant + ກວດທົ່ວ)', category:'PM', vehicle_group:'heavy',        standard_hours:5,   base_charge:450000,  skill_required:'L2', active:true },
+    { service_code:'SVC-PM-EX-500H',   service_name:'PM 500 ຊມ (ແບັກໂຮ/ຕັກດິນ)',                  category:'PM', vehicle_group:'construction', standard_hours:4,   base_charge:350000,  skill_required:'L2', active:true },
+    { service_code:'SVC-PM-TR-100H',   service_name:'PM 100 ຊມ (ລົດໄຖ)',                          category:'PM', vehicle_group:'agri',         standard_hours:2,   base_charge:120000,  skill_required:'L1', active:true },
+    // Brake
+    { service_code:'SVC-BRK-PAD-LV',    service_name:'ປ່ຽນຜ້າເບຣກໜ້າ (ລົດເບົາ)',                  category:'Brake', vehicle_group:'light',    standard_hours:1.5, base_charge:120000,  skill_required:'L1', active:true },
+    { service_code:'SVC-BRK-DISC-LV',   service_name:'ປ່ຽນຈານເບຣກ (ລົດເບົາ)',                     category:'Brake', vehicle_group:'light',    standard_hours:2.5, base_charge:200000,  skill_required:'L2', active:true },
+    { service_code:'SVC-BRK-AIR-HV',    service_name:'ສ້ອມລະບົບເບຣກລົມ (ລົດໜັກ)',                  category:'Brake', vehicle_group:'heavy',    standard_hours:4,   base_charge:450000,  skill_required:'L3', active:true },
+    // Engine
+    { service_code:'SVC-ENG-OH-LV',     service_name:'Overhaul ເຄື່ອງ (ລົດເບົາ)',                  category:'Engine', vehicle_group:'light',    standard_hours:16, base_charge:3000000, skill_required:'L3', active:true },
+    { service_code:'SVC-ENG-OH-HV',     service_name:'Overhaul ເຄື່ອງ (ລົດໜັກ/ແບັກໂຮ)',           category:'Engine', vehicle_group:'heavy',    standard_hours:32, base_charge:8000000, skill_required:'L3', active:true },
+    { service_code:'SVC-ENG-TIMING',    service_name:'ປ່ຽນສາຍ Timing Belt',                       category:'Engine', vehicle_group:'light',    standard_hours:4,  base_charge:400000,  skill_required:'L2', active:true },
+    // Tire
+    { service_code:'SVC-TIR-CHG-1',     service_name:'ປ່ຽນຢາງ 1 ເສັ້ນ',                            category:'Tire', vehicle_group:'all',        standard_hours:0.5, base_charge:30000,   skill_required:'L1', active:true },
+    { service_code:'SVC-TIR-ROT-4',     service_name:'ສະຫຼັບຕຳແໜ່ງຢາງ 4 ເສັ້ນ',                   category:'Tire', vehicle_group:'all',        standard_hours:1,   base_charge:60000,   skill_required:'L1', active:true },
+    { service_code:'SVC-TIR-ALIGN',     service_name:'ຕັ້ງສູນ + ຖ່ວງລໍ້',                          category:'Tire', vehicle_group:'all',        standard_hours:1.5, base_charge:150000,  skill_required:'L2', active:true },
+    // Electrical
+    { service_code:'SVC-ELEC-BAT',      service_name:'ປ່ຽນໝໍ້ໄຟ',                                  category:'Electrical', vehicle_group:'all',  standard_hours:0.5, base_charge:30000,   skill_required:'L1', active:true },
+    { service_code:'SVC-ELEC-ALT',      service_name:'ສ້ອມ/ປ່ຽນ Alternator',                       category:'Electrical', vehicle_group:'all',  standard_hours:3,   base_charge:300000,  skill_required:'L2', active:true },
+    { service_code:'SVC-ELEC-DIAG',     service_name:'Diagnostic OBD-II / ECU Scan',               category:'Electrical', vehicle_group:'all',  standard_hours:1,   base_charge:100000,  skill_required:'L2', active:true },
+    // Hydraulic
+    { service_code:'SVC-HYD-FLT',       service_name:'ປ່ຽນ Hydraulic Filter + ນ້ຳມັນ',             category:'Hydraulic', vehicle_group:'construction', standard_hours:3, base_charge:400000, skill_required:'L2', active:true },
+    { service_code:'SVC-HYD-OH-CYL',    service_name:'Overhaul Hydraulic Cylinder',                category:'Hydraulic', vehicle_group:'construction', standard_hours:8, base_charge:1200000, skill_required:'L3', active:true },
+    // AC
+    { service_code:'SVC-AC-RECH',       service_name:'ເຕີມນ້ຳຢາແອ',                                 category:'AC', vehicle_group:'all',          standard_hours:1,   base_charge:120000,  skill_required:'L1', active:true },
+    { service_code:'SVC-AC-COMP',       service_name:'ປ່ຽນ Compressor ແອ',                          category:'AC', vehicle_group:'all',          standard_hours:4,   base_charge:500000,  skill_required:'L2', active:true },
+    // Welding & Body
+    { service_code:'SVC-WLD-FRAME',     service_name:'ເຊື່ອມສ້ອມໂຄງລົດ',                            category:'Welding', vehicle_group:'all',     standard_hours:3,   base_charge:300000,  skill_required:'L2', active:true },
+    { service_code:'SVC-BODY-PAINT',    service_name:'ສ້ອມສີ Body Panel (ຕໍ່ປະຕູ)',                category:'Body', vehicle_group:'light',     standard_hours:6,   base_charge:600000,  skill_required:'L2', active:true },
+  ];
+  await db.service_rates.bulkPut(rates);
+  if (typeof auditLog==='function') auditLog('seed', 'service_rates', null, `${rates.length} rates`);
+  toast(`✅ ເພີ່ມຄ່າແຮງມາດຕະຖານ KALA ${rates.length} ລາຍການ`);
+  pages.service_rates();
+}
+
+// ===== PAGE: Service Rates =====
+let svcFilterCat = ''; let svcFilterVG = ''; let svcSearch = '';
+pages.service_rates = async () => {
+  const all = await db.service_rates.toArray();
+  let rates = all.slice();
+  if (svcFilterCat) rates = rates.filter(r => r.category === svcFilterCat);
+  if (svcFilterVG) rates = rates.filter(r => r.vehicle_group === svcFilterVG);
+  if (svcSearch) {
+    const q = svcSearch.toLowerCase();
+    rates = rates.filter(r => (r.service_name||'').toLowerCase().includes(q) || (r.service_code||'').toLowerCase().includes(q));
+  }
+
+  $('#main').innerHTML = `
+    <div class="crumbs">${t('nav_settings')} › 💼 ບັນຊີຄ່າແຮງ</div>
+    <div class="page-title">💼 ບັນຊີຄ່າແຮງມາດຕະຖານ <small style="font-weight:400;color:var(--muted);font-size:13px">— ${rates.length}/${all.length} ລາຍການ</small></div>
+
+    <div class="alert info" style="font-size:13px">
+      💡 ບັນຊີຄ່າແຮງມາດຕະຖານ — Manager ສາມາດປັບລາຄາໄດ້ໃນເວລາບັນທຶກວຽກສ້ອມຈິງ. ໝວດງານ + ກຸ່ມລົດ ໃຫ້ກວດສອບງ່າຍຂຶ້ນ.
+    </div>
+
+    ${all.length === 0 ? `
+      <div class="card" style="text-align:center;padding:30px;background:linear-gradient(135deg,#EFF6FF,#DBEAFE)">
+        <div style="font-size:48px">📥</div>
+        <h3 style="color:var(--primary)">ຍັງບໍ່ມີຂໍ້ມູນຄ່າແຮງມາດຕະຖານ</h3>
+        <p class="muted">ກົດປຸ່ມລຸ່ມເພື່ອເພີ່ມລາຍການມາດຕະຖານ KALA (PM, ເບຣກ, ເຄື່ອງຍົນ, Hydraulic...) ປະມານ 24 ລາຍການ</p>
+        <button class="btn ok" style="margin-top:10px" onclick="seedServiceRates()">📦 ໂຫຼດມາດຕະຖານ KALA</button>
+      </div>
+    ` : ''}
+
+    <div class="toolbar" style="flex-wrap:wrap;gap:8px">
+      <input type="search" placeholder="🔎 ຄົ້ນຫາ" value="${escapeHtml(svcSearch)}"
+        oninput="svcSearch=this.value;clearTimeout(window._svct);window._svct=setTimeout(()=>pages.service_rates(),300)"
+        style="flex:1;min-width:180px;padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit"/>
+      <select onchange="svcFilterCat=this.value;pages.service_rates()" style="padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px">
+        <option value="">🌐 ທຸກໝວດງານ</option>
+        ${SVC_CATEGORIES.map(c => `<option value="${c.id}" ${svcFilterCat===c.id?'selected':''}>${c.label}</option>`).join('')}
+      </select>
+      <select onchange="svcFilterVG=this.value;pages.service_rates()" style="padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px">
+        <option value="">🌐 ທຸກກຸ່ມລົດ</option>
+        ${VEHICLE_GROUPS.map(v => `<option value="${v.id}" ${svcFilterVG===v.id?'selected':''}>${v.label}</option>`).join('')}
+      </select>
+      <button class="btn" onclick="openServiceRateModal()">+ ເພີ່ມຄ່າແຮງ</button>
+      ${all.length > 0 ? `<button class="btn outline" onclick="seedServiceRates()" title="ໂຫຼດເພີ່ມມາດຕະຖານ KALA">📦 ໂຫຼດມາດຕະຖານ</button>` : ''}
+    </div>
+
+    <div class="card" style="padding:0">
+      ${rates.length === 0 ? `<div class="empty" style="padding:30px"><div class="icon">💼</div><p>ບໍ່ພົບລາຍການ</p></div>` : `
+      <table>
+        <tr>
+          <th>ລະຫັດ</th>
+          <th>ຊື່ບໍລິການ</th>
+          <th>ໝວດງານ</th>
+          <th>ກຸ່ມລົດ</th>
+          <th style="text-align:center">ຊມ.</th>
+          <th>ທັກສະ</th>
+          <th style="text-align:right">ຄ່າແຮງ (ກີບ)</th>
+          <th></th>
+        </tr>
+        ${rates.map(r => `<tr style="${r.active===false?'opacity:.5':''}">
+          <td><strong style="font-family:monospace;font-size:11px">${r.service_code}</strong></td>
+          <td><strong>${escapeHtml(r.service_name)}</strong></td>
+          <td><span class="pill" style="background:${svcCatColor(r.category)}22;color:${svcCatColor(r.category)}">${svcCatLabel(r.category)}</span></td>
+          <td style="font-size:12px;color:var(--muted)">${vehGroupLabel(r.vehicle_group)}</td>
+          <td style="text-align:center;font-weight:600">${r.standard_hours}</td>
+          <td><span class="pill" style="background:${skillColor(r.skill_required)}33;color:${skillColor(r.skill_required)}">${r.skill_required}</span></td>
+          <td style="text-align:right;font-weight:700;color:var(--ok)">${fmt(r.base_charge)}</td>
+          <td class="actions compact">
+            <button class="btn sm icon outline" onclick="openServiceRateModal(${r.id})" title="ແກ້ໄຂ">✏️</button>
+            <button class="btn sm icon danger" onclick="delServiceRate(${r.id})" title="ລົບ">🗑</button>
+          </td>
+        </tr>`).join('')}
+      </table>`}
+    </div>
+  `;
+};
+
+async function openServiceRateModal(id) {
+  let r = { service_code:'', service_name:'', category:'PM', vehicle_group:'all', standard_hours:1, base_charge:100000, skill_required:'L1', active:true, notes:'' };
+  if (id) r = Object.assign(r, await db.service_rates.get(id));
+  if (!r.service_code) {
+    const n = (await db.service_rates.count()) + 1;
+    r.service_code = 'SVC-' + String(n).padStart(4,'0');
+  }
+  const body = `
+    <div class="row">
+      <div class="fld"><label>ລະຫັດ</label><input id="sr_code" value="${r.service_code}"/></div>
+      <div class="fld"><label>ຊື່ບໍລິການ</label><input id="sr_name" value="${escapeHtml(r.service_name)}" placeholder="ປ່ຽນຜ້າເບຣກໜ້າ..."/></div>
+    </div>
+    <div class="row">
+      <div class="fld"><label>ໝວດງານ</label><select id="sr_cat">
+        ${SVC_CATEGORIES.map(c => `<option value="${c.id}" ${r.category===c.id?'selected':''}>${c.label}</option>`).join('')}
+      </select></div>
+      <div class="fld"><label>ກຸ່ມລົດ</label><select id="sr_vg">
+        ${VEHICLE_GROUPS.map(v => `<option value="${v.id}" ${r.vehicle_group===v.id?'selected':''}>${v.label}</option>`).join('')}
+      </select></div>
+    </div>
+    <div class="row">
+      <div class="fld"><label>ຊົ່ວໂມງມາດຕະຖານ</label><input id="sr_hours" type="number" step="0.25" value="${r.standard_hours}"/></div>
+      <div class="fld"><label>ທັກສະຂັ້ນຕ່ຳ</label><select id="sr_skill">
+        ${SKILL_LEVELS.map(s => `<option value="${s.id}" ${r.skill_required===s.id?'selected':''}>${s.label}</option>`).join('')}
+      </select></div>
+    </div>
+    <div class="fld"><label>ຄ່າແຮງມາດຕະຖານ (ກີບ)</label><input id="sr_charge" type="number" value="${r.base_charge}"/></div>
+    <div class="fld"><label>ໝາຍເຫດ</label><textarea id="sr_notes">${escapeHtml(r.notes||'')}</textarea></div>
+    <div class="fld">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+        <input type="checkbox" id="sr_active" ${r.active!==false?'checked':''}/>
+        🟢 ເປີດໃຊ້ງານ (ສະແດງໃນລາຍການເລືອກ)
+      </label>
+    </div>
+  `;
+  modal(id?'✏️ ແກ້ໄຂຄ່າແຮງ':'+ ເພີ່ມຄ່າແຮງ', body, `
+    <button class="btn outline" onclick="closeModal()">${t('cancel')}</button>
+    <button class="btn ok" onclick="saveServiceRate(${id||'null'})">${t('save')}</button>`);
+}
+
+async function saveServiceRate(id) {
+  const data = {
+    service_code: $('#sr_code').value.trim(),
+    service_name: $('#sr_name').value.trim(),
+    category: $('#sr_cat').value,
+    vehicle_group: $('#sr_vg').value,
+    standard_hours: +($('#sr_hours').value)||0,
+    base_charge: +($('#sr_charge').value)||0,
+    skill_required: $('#sr_skill').value,
+    active: $('#sr_active').checked,
+    notes: $('#sr_notes').value,
+  };
+  if (!data.service_code || !data.service_name) { toast('ກະລຸນາໃສ່ລະຫັດ + ຊື່', 'bad'); return; }
+  if (id) await db.service_rates.update(id, data);
+  else await db.service_rates.add(data);
+  toast('✅ ບັນທຶກສຳເລັດ');
+  closeModal(); pages.service_rates();
+}
+
+async function delServiceRate(id) {
+  if (!confirm('ລົບລາຍການນີ້?')) return;
+  await db.service_rates.delete(id);
+  toast('🗑 ລົບສຳເລັດ');
+  pages.service_rates();
+}
+
+// ===== PAGE: Tech Profiles =====
+pages.tech_profiles = async () => {
+  const techs = await db.tech_profiles.toArray();
+  const entries = await db.labor_entries.toArray();
+  // Stats per tech (this month)
+  const yymm = new Date().toISOString().slice(0,7);
+  const monthEntries = entries.filter(e => (e.date||'').startsWith(yymm));
+
+  $('#main').innerHTML = `
+    <div class="crumbs">${t('nav_settings')} › 🔧 ໂປຣໄຟລ໌ຊ່າງ</div>
+    <div class="page-title">🔧 ໂປຣໄຟລ໌ຊ່າງ <small style="font-weight:400;color:var(--muted);font-size:13px">— ${techs.length} ຄົນ</small></div>
+
+    <div class="alert info" style="font-size:13px">
+      💡 ບັນທຶກຊ່າງ + ກຳນົດ % ຄອມມິສຊັ່ນ — ສະຖິຕິລາຍເດືອນສະແດງເທິງ ສຳລັບການປະເມີນຜົນງານ
+    </div>
+
+    <div class="toolbar">
+      <button class="btn" onclick="openTechProfileModal()">+ ເພີ່ມຊ່າງ</button>
+      <div style="flex:1"></div>
+      <button class="btn outline" onclick="go('tech_performance')">📊 Dashboard ຜົນງານ</button>
+      <button class="btn outline" onclick="go('commission')">💰 ສະຫຼຸບຄອມມິສຊັ່ນ</button>
+    </div>
+
+    <div class="card" style="padding:0">
+      ${techs.length === 0 ? `<div class="empty" style="padding:30px"><div class="icon">🔧</div><p>ຍັງບໍ່ມີຂໍ້ມູນຊ່າງ</p></div>` : `
+      <table>
+        <tr>
+          <th>ລະຫັດ</th>
+          <th>ຊື່</th>
+          <th>ທັກສະ</th>
+          <th>% ຄອມມິສຊັ່ນ</th>
+          <th>ສາຂາ</th>
+          <th style="text-align:center">ວຽກເດືອນນີ້</th>
+          <th style="text-align:right">ຄອມເດືອນນີ້ (ກີບ)</th>
+          <th></th>
+        </tr>
+        ${techs.map(tc => {
+          const techEntries = monthEntries.filter(e => e.tech_id === tc.tech_id);
+          const totalComm = techEntries.reduce((a,e) => a + (e.commission_amount||0), 0);
+          return `<tr style="${tc.active===false?'opacity:.5':''}">
+            <td><strong style="font-family:monospace">${tc.tech_id}</strong></td>
+            <td><strong>${escapeHtml(tc.name)}</strong><br><small class="muted">${escapeHtml(tc.specialty||'')}</small></td>
+            <td><span class="pill" style="background:${skillColor(tc.skill_level)}33;color:${skillColor(tc.skill_level)};font-weight:700">${tc.skill_level}</span></td>
+            <td style="font-weight:700;color:var(--accent)">${tc.commission_pct||0}%</td>
+            <td>${tc.branch||'-'}</td>
+            <td style="text-align:center">${techEntries.length}</td>
+            <td style="text-align:right;font-weight:700;color:var(--ok)">${fmt(totalComm)}</td>
+            <td class="actions compact">
+              <button class="btn sm icon outline" onclick="openTechProfileModal(${tc.id})" title="ແກ້ໄຂ">✏️</button>
+              <button class="btn sm icon danger" onclick="delTechProfile(${tc.id})" title="ລົບ">🗑</button>
+            </td>
+          </tr>`;
+        }).join('')}
+      </table>`}
+    </div>
+  `;
+};
+
+async function openTechProfileModal(id) {
+  let tc = { tech_id:'', name:'', skill_level:'L1', commission_pct:10, specialty:'', branch:'ປາກເຊ', hire_date:todayISO(), active:true, notes:'' };
+  if (id) tc = Object.assign(tc, await db.tech_profiles.get(id));
+  if (!tc.tech_id) tc.tech_id = await nextTechId();
+  const body = `
+    <div class="row">
+      <div class="fld"><label>ລະຫັດຊ່າງ</label><input id="tc_id" value="${tc.tech_id}"/></div>
+      <div class="fld"><label>ຊື່</label><input id="tc_name" value="${escapeHtml(tc.name)}" placeholder="ສົມຊາຍ"/></div>
+    </div>
+    <div class="row">
+      <div class="fld"><label>ທັກສະ</label><select id="tc_skill" onchange="updateCommDefault()">
+        ${SKILL_LEVELS.map(s => `<option value="${s.id}" data-pct="${s.commission_default}" ${tc.skill_level===s.id?'selected':''}>${s.label}</option>`).join('')}
+      </select></div>
+      <div class="fld"><label>% ຄອມມິສຊັ່ນ</label><input id="tc_comm" type="number" step="0.5" value="${tc.commission_pct||10}"/></div>
+    </div>
+    <div class="row">
+      <div class="fld"><label>ຄວາມຊຳນານ</label><input id="tc_spec" value="${escapeHtml(tc.specialty||'')}" placeholder="ເຄື່ອງຍົນ, ເບຣກ"/></div>
+      <div class="fld"><label>ສາຂາ</label><select id="tc_branch">
+        ${(typeof BRANCH_OPTIONS!=='undefined'?BRANCH_OPTIONS:['ປາກເຊ','ປາກຊ່ອງ','ໂຂງ','ອັດຕະປື','ສາລະວັນ','ສະຫວັນນະເຂດ','ເຊໂນ','ວຽງຈັນ']).map(b => `<option ${tc.branch===b?'selected':''}>${b}</option>`).join('')}
+      </select></div>
+    </div>
+    <div class="row">
+      <div class="fld"><label>ວັນທີເຂົ້າວຽກ</label><input id="tc_hire" type="date" value="${tc.hire_date||todayISO()}"/></div>
+      <div class="fld" style="display:flex;align-items:center">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+          <input type="checkbox" id="tc_active" ${tc.active!==false?'checked':''}/>
+          🟢 ເປີດໃຊ້ງານ
+        </label>
+      </div>
+    </div>
+    <div class="fld"><label>ໝາຍເຫດ</label><textarea id="tc_notes">${escapeHtml(tc.notes||'')}</textarea></div>
+  `;
+  modal(id?'✏️ ແກ້ໄຂຊ່າງ':'+ ເພີ່ມຊ່າງ', body, `
+    <button class="btn outline" onclick="closeModal()">${t('cancel')}</button>
+    <button class="btn ok" onclick="saveTechProfile(${id||'null'})">${t('save')}</button>`);
+}
+
+function updateCommDefault() {
+  const sel = $('#tc_skill');
+  const pct = sel.options[sel.selectedIndex].getAttribute('data-pct');
+  if ($('#tc_comm')) $('#tc_comm').value = pct;
+}
+
+async function saveTechProfile(id) {
+  const data = {
+    tech_id: $('#tc_id').value.trim(),
+    name: $('#tc_name').value.trim(),
+    skill_level: $('#tc_skill').value,
+    commission_pct: +($('#tc_comm').value)||0,
+    specialty: $('#tc_spec').value,
+    branch: $('#tc_branch').value,
+    hire_date: $('#tc_hire').value,
+    active: $('#tc_active').checked,
+    notes: $('#tc_notes').value,
+  };
+  if (!data.tech_id || !data.name) { toast('ກະລຸນາໃສ່ລະຫັດ + ຊື່', 'bad'); return; }
+  if (id) await db.tech_profiles.update(id, data);
+  else await db.tech_profiles.add(data);
+  toast('✅ ບັນທຶກສຳເລັດ');
+  closeModal(); pages.tech_profiles();
+}
+
+async function delTechProfile(id) {
+  if (!confirm('ລົບໂປຣໄຟລ໌ຊ່າງນີ້?')) return;
+  await db.tech_profiles.delete(id);
+  toast('🗑 ລົບສຳເລັດ');
+  pages.tech_profiles();
+}
+
+// ===== LABOR ENTRY FORM =====
+async function openLaborEntryModal(id, opts) {
+  opts = opts || {};
+  const techs = (await db.tech_profiles.toArray()).filter(t => t.active!==false);
+  const services = (await db.service_rates.toArray()).filter(r => r.active!==false);
+  const vehicles = await db.vehicles.toArray();
+  const jos = await db.joborders.toArray();
+
+  if (techs.length === 0) { toast('⚠️ ກະລຸນາສ້າງໂປຣໄຟລ໌ຊ່າງກ່ອນ', 'warn'); go('tech_profiles'); return; }
+  if (services.length === 0) { toast('⚠️ ກະລຸນາໂຫຼດຄ່າແຮງມາດຕະຖານກ່ອນ', 'warn'); go('service_rates'); return; }
+
+  let e = {
+    entry_id: '', date: todayISO(),
+    jo_id: opts.jo_id||'', vehicle_id: opts.vehicle_id||'',
+    tech_id: techs[0]?.tech_id||'',
+    service_code: services[0]?.service_code||'',
+    standard_hours: services[0]?.standard_hours||1,
+    actual_hours: services[0]?.standard_hours||1,
+    charge_amount: services[0]?.base_charge||0,
+    charge_adjusted: false,
+    commission_pct: techs[0]?.commission_pct||0,
+    commission_amount: 0,
+    status: 'pending', notes: ''
+  };
+  if (id) e = Object.assign(e, await db.labor_entries.get(id));
+  if (!e.entry_id) e.entry_id = await nextLaborEntryId();
+  e.commission_amount = Math.round((e.charge_amount||0) * (e.commission_pct||0) / 100);
+
+  const body = `
+    <div class="alert info" style="font-size:12px">💼 <strong>${e.entry_id}</strong> — ບັນທຶກວຽກສ້ອມ + ຄຳນວນຄ່າແຮງ ແລະ ຄອມມິສຊັ່ນອັດຕະໂນມັດ</div>
+
+    <div class="row">
+      <div class="fld"><label>📅 ວັນທີ</label><input id="le_date" type="date" value="${e.date}"/></div>
+      <div class="fld"><label>📋 Job Order (ບໍ່ບັງຄັບ)</label><select id="le_jo">
+        <option value="">— ບໍ່ມີ —</option>
+        ${jos.map(j => `<option value="${j.jo_id}" ${e.jo_id===j.jo_id?'selected':''}>${j.jo_id} — ${j.vehicle_id}</option>`).join('')}
+      </select></div>
+    </div>
+
+    <div class="row">
+      <div class="fld"><label>🚚 ລົດ</label><select id="le_vehicle">
+        ${vehicles.map(v => `<option value="${v.vehicle_id}" ${e.vehicle_id===v.vehicle_id?'selected':''}>${v.vehicle_id} — ${v.type}</option>`).join('')}
+      </select></div>
+      <div class="fld"><label>🔧 ຊ່າງ</label><select id="le_tech" onchange="recalcLaborCommission()">
+        ${techs.map(tc => `<option value="${tc.tech_id}" data-pct="${tc.commission_pct||0}" data-name="${escapeHtml(tc.name)}" ${e.tech_id===tc.tech_id?'selected':''}>${tc.tech_id} — ${escapeHtml(tc.name)} (${tc.skill_level})</option>`).join('')}
+      </select></div>
+    </div>
+
+    <div class="fld"><label>💼 ບໍລິການ</label><select id="le_service" onchange="updateLaborService()">
+      ${services.map(s => `<option value="${s.service_code}" data-charge="${s.base_charge}" data-hours="${s.standard_hours}" data-name="${escapeHtml(s.service_name)}" data-cat="${s.category}" ${e.service_code===s.service_code?'selected':''}>${s.service_code} — ${escapeHtml(s.service_name)} (${fmt(s.base_charge)} ກີບ)</option>`).join('')}
+    </select></div>
+
+    <div class="row">
+      <div class="fld"><label>⏱ ຊມ. ມາດຕະຖານ</label><input id="le_std_hours" type="number" step="0.25" value="${e.standard_hours}" readonly style="background:var(--bg)"/></div>
+      <div class="fld"><label>⏱ ຊມ. ໃຊ້ຈິງ</label><input id="le_act_hours" type="number" step="0.25" value="${e.actual_hours}"/></div>
+    </div>
+
+    <div style="background:linear-gradient(135deg,#FEF3C7,#FDE68A);padding:12px;border-radius:10px;margin:10px 0">
+      <div class="row">
+        <div class="fld"><label>💰 ຄ່າແຮງ (ກີບ) <small style="color:var(--muted)">— ມາດຕະຖານ ຫຼື ປັບໄດ້</small></label>
+          <input id="le_charge" type="number" value="${e.charge_amount}" onchange="recalcLaborCommission()"/>
+        </div>
+        <div class="fld"><label>% ຄອມມິສຊັ່ນ <small style="color:var(--muted)">— ຈາກໂປຣໄຟລ໌ຊ່າງ</small></label>
+          <input id="le_comm_pct" type="number" step="0.5" value="${e.commission_pct}" onchange="recalcLaborCommission()"/>
+        </div>
+      </div>
+      <div style="text-align:center;padding:10px;background:white;border-radius:8px;margin-top:8px">
+        <div style="font-size:11px;color:var(--muted);font-weight:600">💵 ຄອມມິສຊັ່ນຄຳນວນອັດຕະໂນມັດ</div>
+        <div id="le_comm_display" style="font-size:24px;font-weight:800;color:var(--ok);margin-top:4px">${fmt(e.commission_amount)} ກີບ</div>
+      </div>
+    </div>
+
+    <div class="fld"><label>📝 ໝາຍເຫດ</label><textarea id="le_notes" placeholder="ລາຍລະອຽດເພີ່ມເຕີມ...">${escapeHtml(e.notes||'')}</textarea></div>
+  `;
+  modal(id?'✏️ ແກ້ໄຂບັນທຶກວຽກ':'+ ບັນທຶກວຽກສ້ອມ', body, `
+    <button class="btn outline" onclick="closeModal()">${t('cancel')}</button>
+    <button class="btn ok" onclick="saveLaborEntry(${id||'null'})">${t('save')}</button>`);
+}
+
+function updateLaborService() {
+  const sel = $('#le_service');
+  const opt = sel.options[sel.selectedIndex];
+  if ($('#le_charge')) $('#le_charge').value = opt.getAttribute('data-charge');
+  if ($('#le_std_hours')) $('#le_std_hours').value = opt.getAttribute('data-hours');
+  if ($('#le_act_hours')) $('#le_act_hours').value = opt.getAttribute('data-hours');
+  recalcLaborCommission();
+}
+
+function recalcLaborCommission() {
+  const techSel = $('#le_tech');
+  const pctFromTech = techSel ? +techSel.options[techSel.selectedIndex].getAttribute('data-pct') : 0;
+  // Sync % from selected tech if user changed tech
+  if ($('#le_comm_pct') && $('#le_comm_pct').dataset.synced !== '1') {
+    $('#le_comm_pct').value = pctFromTech;
+  }
+  const charge = +($('#le_charge').value)||0;
+  const pct = +($('#le_comm_pct').value)||0;
+  const comm = Math.round(charge * pct / 100);
+  if ($('#le_comm_display')) $('#le_comm_display').textContent = fmt(comm) + ' ກີບ';
+}
+
+async function saveLaborEntry(id) {
+  const techSel = $('#le_tech');
+  const svcSel = $('#le_service');
+  const techOpt = techSel.options[techSel.selectedIndex];
+  const svcOpt = svcSel.options[svcSel.selectedIndex];
+
+  const charge = +($('#le_charge').value)||0;
+  const pct = +($('#le_comm_pct').value)||0;
+  const stdCharge = +svcOpt.getAttribute('data-charge')||0;
+
+  const data = {
+    entry_id: id ? (await db.labor_entries.get(id)).entry_id : await nextLaborEntryId(),
+    date: $('#le_date').value,
+    jo_id: $('#le_jo').value || null,
+    vehicle_id: $('#le_vehicle').value,
+    tech_id: techSel.value,
+    tech_name: techOpt.getAttribute('data-name'),
+    service_code: svcSel.value,
+    service_name: svcOpt.getAttribute('data-name'),
+    category: svcOpt.getAttribute('data-cat'),
+    standard_hours: +($('#le_std_hours').value)||0,
+    actual_hours: +($('#le_act_hours').value)||0,
+    charge_amount: charge,
+    charge_adjusted: charge !== stdCharge,
+    commission_pct: pct,
+    commission_amount: Math.round(charge * pct / 100),
+    notes: $('#le_notes').value,
+    status: id ? (await db.labor_entries.get(id)).status : 'pending',
+    created_by: (typeof cloud!=='undefined' && cloud.profile?.username) || 'local',
+    created_at: id ? (await db.labor_entries.get(id)).created_at : new Date().toISOString(),
+  };
+  if (!data.vehicle_id || !data.tech_id || !data.service_code) {
+    toast('ກະລຸນາເລືອກລົດ, ຊ່າງ, ບໍລິການ', 'bad'); return;
+  }
+  if (id) await db.labor_entries.update(id, data);
+  else await db.labor_entries.add(data);
+  if (typeof auditLog==='function') auditLog(id?'update':'create', 'labor_entries', null, `${data.entry_id} — ${data.tech_name} — ${fmt(data.commission_amount)} ກີບ`);
+  toast(`✅ ບັນທຶກ ${data.entry_id} — ຄອມມິສຊັ່ນ ${fmt(data.commission_amount)} ກີບ`);
+  closeModal();
+  if (window.location.hash.includes('labor_entries')) pages.labor_entries();
+  else if (window.location.hash.includes('tech_performance')) pages.tech_performance();
+}
+
+// Approve / Reject / Mark Paid
+async function approveLaborEntry(id) {
+  if (!confirm('ອະນຸມັດການຈ່າຍຄອມມິສຊັ່ນລາຍການນີ້?')) return;
+  await db.labor_entries.update(id, {
+    status: 'approved',
+    approved_by: (typeof cloud!=='undefined' && cloud.profile?.username) || 'local',
+    approved_at: new Date().toISOString(),
+  });
+  if (typeof auditLog==='function') auditLog('approve', 'labor_entries', id, 'approved');
+  toast('✅ ອະນຸມັດແລ້ວ');
+  pages.labor_entries();
+}
+
+async function rejectLaborEntry(id) {
+  const reason = prompt('ເຫດຜົນປະຕິເສດ:'); if (reason===null) return;
+  await db.labor_entries.update(id, {
+    status: 'rejected', rejection_reason: reason,
+    approved_by: (typeof cloud!=='undefined' && cloud.profile?.username) || 'local',
+    approved_at: new Date().toISOString(),
+  });
+  toast('❌ ປະຕິເສດແລ້ວ');
+  pages.labor_entries();
+}
+
+async function markLaborPaid(id) {
+  if (!confirm('ບັນທຶກວ່າຈ່າຍຄອມມິສຊັ່ນແລ້ວ?')) return;
+  await db.labor_entries.update(id, {
+    status: 'paid',
+    paid_at: new Date().toISOString(),
+    paid_by: (typeof cloud!=='undefined' && cloud.profile?.username) || 'local',
+  });
+  toast('💰 ບັນທຶກການຈ່າຍສຳເລັດ');
+  pages.labor_entries();
+}
+
+async function delLaborEntry(id) {
+  if (!confirm('ລົບລາຍການນີ້?')) return;
+  await db.labor_entries.delete(id);
+  toast('🗑 ລົບສຳເລັດ');
+  pages.labor_entries();
+}
+
+// ===== PAGE: Labor Entries (list) =====
+let leFilterStatus = ''; let leFilterTech = ''; let leFilterDate = '';
+pages.labor_entries = async () => {
+  let entries = await db.labor_entries.toArray();
+  entries.sort((a,b) => (b.date||'').localeCompare(a.date||''));
+  const techs = await db.tech_profiles.toArray();
+
+  if (leFilterStatus) entries = entries.filter(e => e.status === leFilterStatus);
+  if (leFilterTech) entries = entries.filter(e => e.tech_id === leFilterTech);
+  if (leFilterDate) entries = entries.filter(e => (e.date||'').startsWith(leFilterDate));
+
+  const stats = { pending:0, approved:0, paid:0, rejected:0 };
+  entries.forEach(e => { stats[e.status] = (stats[e.status]||0)+1; });
+  const sumCharge = entries.reduce((a,e) => a+(e.charge_amount||0), 0);
+  const sumComm = entries.reduce((a,e) => a+(e.commission_amount||0), 0);
+
+  $('#main').innerHTML = `
+    <div class="crumbs">${t('nav_jobs')||'ວຽກສ້ອມ'} › 💼 ບັນທຶກວຽກ + ຄ່າແຮງ</div>
+    <div class="page-title">💼 ບັນທຶກວຽກສ້ອມ + ຄ່າແຮງ <small style="font-weight:400;color:var(--muted);font-size:13px">— ${entries.length} ລາຍການ</small></div>
+
+    <div class="kpi-grid">
+      <div class="kpi"><div class="label">📋 ລາຍການລວມ</div><div class="val">${entries.length}</div></div>
+      <div class="kpi"><div class="label">⏳ ລໍຖ້າອະນຸມັດ</div><div class="val" style="color:var(--warn)">${stats.pending||0}</div></div>
+      <div class="kpi"><div class="label">💵 ຄ່າແຮງລວມ (ກີບ)</div><div class="val" style="font-size:18px;color:var(--accent)">${fmt(sumCharge)}</div></div>
+      <div class="kpi"><div class="label">💰 ຄອມລວມ (ກີບ)</div><div class="val" style="font-size:18px;color:var(--ok)">${fmt(sumComm)}</div></div>
+    </div>
+
+    <div class="toolbar" style="flex-wrap:wrap;gap:8px">
+      <select onchange="leFilterStatus=this.value;pages.labor_entries()" style="padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px">
+        <option value="">⚪ ທຸກສະຖານະ</option>
+        ${Object.entries(LABOR_STATUS).map(([k,v]) => `<option value="${k}" ${leFilterStatus===k?'selected':''}>${v.label}</option>`).join('')}
+      </select>
+      <select onchange="leFilterTech=this.value;pages.labor_entries()" style="padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px">
+        <option value="">🔧 ທຸກຊ່າງ</option>
+        ${techs.map(tc => `<option value="${tc.tech_id}" ${leFilterTech===tc.tech_id?'selected':''}>${escapeHtml(tc.name)} (${tc.tech_id})</option>`).join('')}
+      </select>
+      <input type="month" value="${leFilterDate}" onchange="leFilterDate=this.value;pages.labor_entries()" style="padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px"/>
+      <button class="btn outline" onclick="leFilterStatus='';leFilterTech='';leFilterDate='';pages.labor_entries()">🔄 ລ້າງ Filter</button>
+      <div style="flex:1"></div>
+      <button class="btn" onclick="openLaborEntryModal()">+ ບັນທຶກວຽກໃໝ່</button>
+    </div>
+
+    <div class="card" style="padding:0">
+      ${entries.length === 0 ? `<div class="empty" style="padding:30px"><div class="icon">💼</div><p>ບໍ່ມີລາຍການ</p></div>` : `
+      <table style="font-size:12px">
+        <tr>
+          <th>ລະຫັດ</th>
+          <th>ວັນທີ</th>
+          <th>ຊ່າງ</th>
+          <th>ບໍລິການ</th>
+          <th>ລົດ</th>
+          <th style="text-align:right">ຄ່າແຮງ</th>
+          <th style="text-align:right">ຄອມ</th>
+          <th>ສະຖານະ</th>
+          <th></th>
+        </tr>
+        ${entries.map(e => {
+          const st = LABOR_STATUS[e.status] || LABOR_STATUS.pending;
+          return `<tr>
+            <td><strong style="font-family:monospace;font-size:11px">${e.entry_id}</strong></td>
+            <td>${e.date}</td>
+            <td><strong>${escapeHtml(e.tech_name||'-')}</strong></td>
+            <td>
+              <strong style="font-size:12px">${escapeHtml(e.service_name||'-')}</strong>
+              ${e.category?`<br><span class="pill" style="background:${svcCatColor(e.category)}22;color:${svcCatColor(e.category)};font-size:10px">${svcCatLabel(e.category)}</span>`:''}
+            </td>
+            <td>${e.vehicle_id||'-'}</td>
+            <td style="text-align:right;font-weight:700">${fmt(e.charge_amount||0)}${e.charge_adjusted?`<br><small style="color:var(--warn);font-size:10px">⚠ ປັບແລ້ວ</small>`:''}</td>
+            <td style="text-align:right;font-weight:700;color:var(--ok)">${fmt(e.commission_amount||0)}<br><small style="color:var(--muted);font-size:10px">${e.commission_pct||0}%</small></td>
+            <td><span class="pill" style="background:${st.bg};color:${st.color}">${st.label}</span></td>
+            <td class="actions compact">
+              ${e.status==='pending' && (typeof cloud==='undefined' || cloud.hasRole('owner','manager','it')) ? `
+                <button class="btn sm icon ok" onclick="approveLaborEntry(${e.id})" title="ອະນຸມັດ">✅</button>
+                <button class="btn sm icon danger" onclick="rejectLaborEntry(${e.id})" title="ປະຕິເສດ">❌</button>
+              ` : ''}
+              ${e.status==='approved' && (typeof cloud==='undefined' || cloud.hasRole('owner','manager','accounting','it')) ? `
+                <button class="btn sm icon" style="background:#3B82F6;color:#fff" onclick="markLaborPaid(${e.id})" title="ບັນທຶກວ່າຈ່າຍແລ້ວ">💰</button>
+              ` : ''}
+              <button class="btn sm icon outline" onclick="openLaborEntryModal(${e.id})" title="ແກ້ໄຂ">✏️</button>
+              <button class="btn sm icon danger" onclick="delLaborEntry(${e.id})" title="ລົບ">🗑</button>
+            </td>
+          </tr>`;
+        }).join('')}
+      </table>`}
+    </div>
+  `;
+};
+
+// ===== PAGE: Tech Performance Dashboard =====
+let tpDateFilter = '';
+pages.tech_performance = async () => {
+  const today = tpDateFilter || todayISO();
+  const allEntries = await db.labor_entries.toArray();
+  const techs = (await db.tech_profiles.toArray()).filter(t => t.active!==false);
+  const todayEntries = allEntries.filter(e => e.date === today);
+
+  // Per-tech daily stats
+  const perTech = {};
+  techs.forEach(tc => { perTech[tc.tech_id] = { tech: tc, entries:[], totalCharge:0, totalComm:0, totalHours:0 }; });
+  todayEntries.forEach(e => {
+    if (!perTech[e.tech_id]) perTech[e.tech_id] = { tech: { tech_id:e.tech_id, name:e.tech_name, skill_level:'?', commission_pct:e.commission_pct }, entries:[], totalCharge:0, totalComm:0, totalHours:0 };
+    perTech[e.tech_id].entries.push(e);
+    perTech[e.tech_id].totalCharge += e.charge_amount||0;
+    perTech[e.tech_id].totalComm += e.commission_amount||0;
+    perTech[e.tech_id].totalHours += e.actual_hours||0;
+  });
+  const sorted = Object.values(perTech).sort((a,b) => b.totalComm - a.totalComm);
+
+  // Day totals
+  const dayCharge = todayEntries.reduce((a,e) => a+(e.charge_amount||0), 0);
+  const dayComm = todayEntries.reduce((a,e) => a+(e.commission_amount||0), 0);
+
+  // Trend last 7 days
+  const trend = [];
+  for (let i=6; i>=0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const iso = d.toISOString().slice(0,10);
+    const dayEnt = allEntries.filter(e => e.date === iso);
+    trend.push({ date: iso.slice(5), count: dayEnt.length, comm: dayEnt.reduce((a,e)=>a+(e.commission_amount||0), 0) });
+  }
+  const maxTrend = Math.max(1, ...trend.map(d => d.comm));
+
+  $('#main').innerHTML = `
+    <div class="crumbs">${t('nav_jobs')||'ວຽກສ້ອມ'} › 📊 ຜົນງານຊ່າງ</div>
+    <div class="page-title">📊 Dashboard ຜົນງານຊ່າງ <small style="font-weight:400;color:var(--muted);font-size:13px">— ${today}</small></div>
+
+    <div class="toolbar">
+      <label style="font-size:13px;font-weight:500">ວັນທີ:</label>
+      <input type="date" value="${today}" onchange="tpDateFilter=this.value;pages.tech_performance()" style="padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px"/>
+      <button class="btn sm outline" onclick="tpDateFilter='';pages.tech_performance()">📅 ມື້ນີ້</button>
+      <div style="flex:1"></div>
+      <button class="btn" onclick="openLaborEntryModal()">+ ບັນທຶກວຽກ</button>
+      <button class="btn outline" onclick="go('labor_entries')">📋 ລາຍການທັງໝົດ</button>
+      <button class="btn outline" onclick="go('commission')">💰 ສະຫຼຸບເດືອນ</button>
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi"><div class="label">📋 ວຽກວັນນີ້</div><div class="val">${todayEntries.length}</div></div>
+      <div class="kpi"><div class="label">👥 ຊ່າງເຮັດວຽກ</div><div class="val" style="color:var(--accent)">${Object.keys(perTech).filter(k=>perTech[k].entries.length>0).length} / ${techs.length}</div></div>
+      <div class="kpi"><div class="label">💵 ຄ່າແຮງລວມ (ກີບ)</div><div class="val" style="font-size:20px;color:var(--accent)">${fmt(dayCharge)}</div></div>
+      <div class="kpi"><div class="label">💰 ຄອມລວມ (ກີບ)</div><div class="val" style="font-size:20px;color:var(--ok)">${fmt(dayComm)}</div></div>
+    </div>
+
+    <!-- 7-day trend chart -->
+    <div class="card">
+      <h3>📈 ແນວໂນ້ມ 7 ມື້ — ຄອມມິສຊັ່ນລວມຕໍ່ມື້</h3>
+      <div style="display:flex;align-items:flex-end;gap:8px;height:140px;padding:10px 0;border-bottom:2px solid var(--line)">
+        ${trend.map(d => {
+          const h = Math.round(d.comm / maxTrend * 120);
+          return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+            <div style="font-size:10px;color:var(--muted);font-weight:600">${fmt(d.comm)}</div>
+            <div style="width:100%;background:linear-gradient(180deg,#10B981,#059669);height:${h}px;border-radius:6px 6px 0 0;transition:height .3s" title="${d.date}: ${fmt(d.comm)} ກີບ"></div>
+            <div style="font-size:11px;color:var(--text);font-weight:600">${d.date}</div>
+            <div style="font-size:10px;color:var(--muted)">${d.count} ວຽກ</div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+
+    <!-- Per-tech performance cards -->
+    <div class="card">
+      <h3>🏆 ຜົນງານຕໍ່ຊ່າງວັນທີ ${today}</h3>
+      ${sorted.length === 0 ? '<div class="empty"><div class="icon">📊</div><p>ບໍ່ມີຂໍ້ມູນ</p></div>' : `
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px">
+        ${sorted.map((p, idx) => {
+          const tc = p.tech;
+          const medal = idx===0?'🥇':idx===1?'🥈':idx===2?'🥉':'';
+          const active = p.entries.length > 0;
+          return `<div style="border:2px solid ${active?skillColor(tc.skill_level):'var(--line)'};border-radius:12px;padding:14px;background:${active?'white':'#F8FAFC'};${!active?'opacity:.6':''}">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+              <div>
+                <strong style="font-size:14px">${medal} ${escapeHtml(tc.name||tc.tech_id)}</strong>
+                <span class="pill" style="background:${skillColor(tc.skill_level)}33;color:${skillColor(tc.skill_level)};margin-left:4px;font-size:10px">${tc.skill_level}</span>
+              </div>
+              <small style="color:var(--muted)">${tc.commission_pct||0}%</small>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center;margin:8px 0">
+              <div><div style="font-size:18px;font-weight:700;color:var(--accent)">${p.entries.length}</div><small style="color:var(--muted);font-size:10px">ວຽກ</small></div>
+              <div><div style="font-size:14px;font-weight:700;color:var(--text)">${p.totalHours.toFixed(1)}</div><small style="color:var(--muted);font-size:10px">ຊມ.</small></div>
+              <div><div style="font-size:14px;font-weight:700;color:var(--ok)">${fmt(p.totalComm)}</div><small style="color:var(--muted);font-size:10px">ຄອມ (ກີບ)</small></div>
+            </div>
+            ${p.entries.length > 0 ? `
+              <div style="background:var(--bg);padding:6px 8px;border-radius:6px;margin-top:6px;font-size:11px">
+                ${p.entries.map(e => `<div style="margin:3px 0;color:var(--text)">• ${escapeHtml(e.service_name||'')} <small style="color:var(--muted)">(${e.vehicle_id}) ${fmt(e.commission_amount||0)} ກີບ</small></div>`).join('')}
+              </div>
+            ` : '<div style="text-align:center;color:var(--muted);font-size:11px;padding:8px">— ບໍ່ມີວຽກວັນນີ້ —</div>'}
+          </div>`;
+        }).join('')}
+      </div>`}
+    </div>
+  `;
+};
+
+// ===== PAGE: Commission Summary (monthly) =====
+let comMonth = '';
+pages.commission = async () => {
+  const yymm = comMonth || new Date().toISOString().slice(0,7);
+  const allEntries = await db.labor_entries.toArray();
+  const monthEntries = allEntries.filter(e => (e.date||'').startsWith(yymm));
+  const techs = await db.tech_profiles.toArray();
+
+  // Per-tech month summary
+  const perTech = {};
+  techs.forEach(tc => { perTech[tc.tech_id] = { tech: tc, entries:[], pending:0, approved:0, paid:0, rejected:0,
+    totalCharge:0, pendingComm:0, approvedComm:0, paidComm:0 }; });
+  monthEntries.forEach(e => {
+    if (!perTech[e.tech_id]) perTech[e.tech_id] = { tech:{ tech_id:e.tech_id, name:e.tech_name, skill_level:'?', commission_pct:e.commission_pct },
+      entries:[], pending:0, approved:0, paid:0, rejected:0, totalCharge:0, pendingComm:0, approvedComm:0, paidComm:0 };
+    const p = perTech[e.tech_id];
+    p.entries.push(e);
+    p.totalCharge += e.charge_amount||0;
+    p[e.status] = (p[e.status]||0) + 1;
+    if (e.status==='pending') p.pendingComm += e.commission_amount||0;
+    else if (e.status==='approved') p.approvedComm += e.commission_amount||0;
+    else if (e.status==='paid') p.paidComm += e.commission_amount||0;
+  });
+  const list = Object.values(perTech).filter(p => p.entries.length > 0).sort((a,b) => (b.approvedComm+b.paidComm) - (a.approvedComm+a.paidComm));
+
+  const totalApprovedComm = list.reduce((a,p) => a+p.approvedComm, 0);
+  const totalPaidComm = list.reduce((a,p) => a+p.paidComm, 0);
+  const totalPendingComm = list.reduce((a,p) => a+p.pendingComm, 0);
+
+  $('#main').innerHTML = `
+    <div class="crumbs">${t('nav_jobs')||'ວຽກສ້ອມ'} › 💰 ສະຫຼຸບຄອມມິສຊັ່ນ</div>
+    <div class="page-title">💰 ສະຫຼຸບຄອມມິສຊັ່ນລາຍເດືອນ <small style="font-weight:400;color:var(--muted);font-size:13px">— ${yymm}</small></div>
+
+    <div class="toolbar">
+      <label style="font-size:13px;font-weight:500">ເດືອນ:</label>
+      <input type="month" value="${yymm}" onchange="comMonth=this.value;pages.commission()" style="padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px"/>
+      <div style="flex:1"></div>
+      <button class="btn outline" onclick="go('labor_entries')">📋 ລາຍການທັງໝົດ</button>
+      <button class="btn outline" onclick="window.print()">🖨 ພິມສະຫຼຸບ</button>
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi" style="border-left:4px solid var(--warn)"><div class="label">⏳ ລໍຖ້າອະນຸມັດ</div><div class="val" style="font-size:18px;color:var(--warn)">${fmt(totalPendingComm)}</div><div class="muted">ກີບ</div></div>
+      <div class="kpi" style="border-left:4px solid var(--ok)"><div class="label">✅ ອະນຸມັດແລ້ວ (ຍັງບໍ່ໄດ້ຈ່າຍ)</div><div class="val" style="font-size:18px;color:var(--ok)">${fmt(totalApprovedComm)}</div><div class="muted">ກີບ</div></div>
+      <div class="kpi" style="border-left:4px solid var(--accent)"><div class="label">💰 ຈ່າຍແລ້ວ</div><div class="val" style="font-size:18px;color:var(--accent)">${fmt(totalPaidComm)}</div><div class="muted">ກີບ</div></div>
+      <div class="kpi" style="border-left:4px solid var(--primary)"><div class="label">📋 ລາຍການລວມ</div><div class="val">${monthEntries.length}</div></div>
+    </div>
+
+    <div class="card" style="padding:0">
+      ${list.length === 0 ? `<div class="empty" style="padding:30px"><div class="icon">💰</div><p>ບໍ່ມີຂໍ້ມູນໃນເດືອນນີ້</p></div>` : `
+      <table>
+        <tr>
+          <th>ຊ່າງ</th>
+          <th style="text-align:center">ລາຍການ</th>
+          <th style="text-align:right">ຄ່າແຮງລວມ</th>
+          <th style="text-align:right;background:#FEF3C7">⏳ ລໍຖ້າ</th>
+          <th style="text-align:right;background:#D1FAE5">✅ ອະນຸມັດ</th>
+          <th style="text-align:right;background:#DBEAFE">💰 ຈ່າຍແລ້ວ</th>
+          <th style="text-align:right">💵 ຄອມລວມ</th>
+        </tr>
+        ${list.map(p => {
+          const tc = p.tech;
+          const totalComm = p.pendingComm + p.approvedComm + p.paidComm;
+          return `<tr>
+            <td>
+              <strong>${escapeHtml(tc.name||tc.tech_id)}</strong>
+              <span class="pill" style="background:${skillColor(tc.skill_level)}33;color:${skillColor(tc.skill_level)};margin-left:4px;font-size:10px">${tc.skill_level||'-'}</span>
+              <br><small class="muted">${tc.tech_id} · ${tc.commission_pct||0}%</small>
+            </td>
+            <td style="text-align:center;font-weight:600">${p.entries.length}<br><small class="muted">ວຽກ</small></td>
+            <td style="text-align:right;font-weight:600">${fmt(p.totalCharge)}</td>
+            <td style="text-align:right;color:var(--warn);font-weight:600">${fmt(p.pendingComm)}</td>
+            <td style="text-align:right;color:var(--ok);font-weight:600">${fmt(p.approvedComm)}</td>
+            <td style="text-align:right;color:var(--accent);font-weight:600">${fmt(p.paidComm)}</td>
+            <td style="text-align:right;font-weight:800;color:var(--primary);font-size:14px">${fmt(totalComm)}</td>
+          </tr>`;
+        }).join('')}
+        <tr style="background:var(--bg);font-weight:700">
+          <td colspan="2" style="text-align:right">ລວມ:</td>
+          <td style="text-align:right">${fmt(list.reduce((a,p)=>a+p.totalCharge,0))}</td>
+          <td style="text-align:right;color:var(--warn)">${fmt(totalPendingComm)}</td>
+          <td style="text-align:right;color:var(--ok)">${fmt(totalApprovedComm)}</td>
+          <td style="text-align:right;color:var(--accent)">${fmt(totalPaidComm)}</td>
+          <td style="text-align:right;font-size:15px;color:var(--primary)">${fmt(totalPendingComm+totalApprovedComm+totalPaidComm)}</td>
+        </tr>
+      </table>`}
+    </div>
+
+    <div style="margin-top:14px;padding:10px 14px;background:#F8FAFC;border-left:4px solid var(--accent);border-radius:6px;font-size:12px;color:var(--muted)">
+      💡 <strong>ການອະນຸມັດ:</strong> ໄປໜ້າ "ບັນທຶກວຽກ + ຄ່າແຮງ" → Filter "ລໍຖ້າອະນຸມັດ" → ກົດ ✅ ເພື່ອອະນຸມັດ
+      <br>💡 <strong>ການຈ່າຍ:</strong> ຫຼັງຈາກອະນຸມັດ → Accounting/Manager ກົດ 💰 ເພື່ອບັນທຶກວ່າຈ່າຍແລ້ວ
+    </div>
+  `;
+};
 
 // ===================== ABOUT =====================
 pages.about = async () => {
