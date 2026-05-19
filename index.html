@@ -119,6 +119,16 @@ button.btn.outline:hover { background: var(--accent-light); color: var(--primary
 button.btn.danger { background: var(--bad); } button.btn.danger:hover { background: #DC2626; }
 button.btn.ok { background: var(--ok); } button.btn.ok:hover { background: #059669; }
 button.btn.sm { padding: 5px 11px; font-size: 12px; border-radius: 6px; }
+button.btn.icon { padding: 5px 8px; min-width: 30px; font-size: 13px; border-radius: 6px; line-height: 1; }
+/* Table action cells — buttons stay in one horizontal row */
+td.actions { white-space: nowrap; text-align: right; vertical-align: middle; }
+td.actions .btn-group { display: inline-flex; gap: 4px; align-items: center; justify-content: flex-end; flex-wrap: nowrap; }
+td.actions .btn,
+td.actions button.btn { margin: 0; flex: 0 0 auto; }
+td.actions > .btn + .btn,
+td.actions > button + button { margin-left: 4px; }
+/* Compact mode for tight columns */
+td.actions.compact button.btn { padding: 5px 8px; font-size: 12px; min-width: 30px; }
 .search { padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; width: 280px; font-size: 13px; background: #fff; transition: all .15s; }
 .search:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-light); }
 .toolbar { display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; align-items: center; }
@@ -2183,18 +2193,20 @@ pages.vendors = async () => {
 
   const renderVendorRow = (v) => `<tr>
     <td><strong style="cursor:pointer;color:var(--accent);text-decoration:underline" onclick="openVendorReport('${v.vendor_id}')">${v.vendor_id}</strong></td>
-    <td><a style="cursor:pointer;color:var(--accent)" onclick="openVendorReport('${v.vendor_id}')">${escapeHtml(v.name)}</a>
-      <div class="muted" style="font-size:11px">
+    <td><a style="cursor:pointer;color:var(--accent);font-weight:600" onclick="openVendorReport('${v.vendor_id}')">${escapeHtml(v.name)}</a>
+      <div class="muted" style="font-size:11px;margin-top:2px">
         ${v.province?`🗺 ${escapeHtml(v.province)}${v.city?' • '+escapeHtml(v.city):''}`:''}
         ${v.category_id?`${v.province?' • ':''}📁 ${escapeHtml(v.category_id)}`:''}
       </div>
     </td>
     <td>${escapeHtml(v.city||'')}</td>
     <td>${v.lead_time||'-'}</td>
-    <td>${v.contact||'-'}</td>
-    <td class="actions"><button class="btn sm" onclick="openVendorReport('${v.vendor_id}')">${t('view_vendor')}</button>
-      <button class="btn sm outline" onclick="openVendorModal(${v.id})">${t('edit')}</button>
-      <button class="btn sm danger" onclick="delVendor(${v.id})">${t('delete')}</button></td>
+    <td style="font-size:12px;color:var(--muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(v.contact||'')}">${escapeHtml(v.contact||'-')}</td>
+    <td class="actions compact">
+      <button class="btn sm icon" onclick="openVendorReport('${v.vendor_id}')" title="ເບິ່ງປະຫວັດ">👁</button>
+      <button class="btn sm icon outline" onclick="openVendorModal(${v.id})" title="ແກ້ໄຂ">✏️</button>
+      <button class="btn sm icon danger" onclick="delVendor(${v.id})" title="ລົບ">🗑</button>
+    </td>
   </tr>`;
 
   // Build body — group by selected mode
