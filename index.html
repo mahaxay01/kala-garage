@@ -242,6 +242,15 @@ td.actions.compact button.btn { padding: 5px 8px; font-size: 12px; min-width: 30
 // ໂມດູນນີ້ບໍ່ກະທົບການເຮັດງານປະຈຸບັນ — ເປີດສະເພາະຖ້າຕັ້ງຄ່າ Cloud Mode
 // ໝາຍເຫດ: ໃຊ້ localStorage ສຳລັບເກັບ Config + Session
 // =====================================================
+// 🎯 EMBEDDED CONFIG — Admin ໃຫ້ໃສ່ URL + Anon Key ຂອງບໍລິສັດທີ່ນີ້
+// ໝາຍເຫດ: Anon Key ປອດໄພທີ່ຈະເປີດເຜີຍ ເພາະຖືກປ້ອງກັນດ້ວຍ RLS Policies ໃນ Supabase
+// ການແກ້ໄຂ: ປ່ຽນຄ່າຢູ່ຂ້າງລຸ່ມ ແລ້ວ Upload ໄປ GitHub Pages ໃໝ່
+// ============================================================================
+const KALA_EMBEDDED_CONFIG = {
+  url: '',      // ⚠️ ໃສ່ Supabase URL ຂອງບໍລິສັດ ເຊັ່ນ: 'https://xxxx.supabase.co'
+  anonKey: '',  // ⚠️ ໃສ່ Anon Public Key (ບໍ່ໃຊ່ service_role!) ຈາກ Supabase → Settings → API
+};
+
 const cloud = {
   client: null,
   user: null,
@@ -251,14 +260,62 @@ const cloud = {
   syncStatus: 'idle', // idle | syncing | error
   lastSyncAt: null,
 
-  // ໂຫລດ Config ຈາກ localStorage
+  // ໂຫລດ Config — ລຳດັບຄວາມສຳຄັນ:
+  //   1. URL Parameter ?cloud=base64(json)  → ບັນທຶກໃສ່ localStorage ອັດຕະໂນມັດ
+  //   2. localStorage (saved from previous setup)
+  //   3. KALA_EMBEDDED_CONFIG (hardcoded — fallback ສຳລັບ deploy ໃຫ້ບໍລິສັດເຮັດໄດ້ໂດຍບໍ່ຕ້ອງ Setup)
   loadConfig() {
     try {
+      // 1) ກວດ URL parameter ?cloud=base64
+      const params = new URLSearchParams(window.location.search);
+      const cloudParam = params.get('cloud');
+      if (cloudParam) {
+        try {
+          const decoded = JSON.parse(atob(cloudParam));
+          if (decoded.url && decoded.anonKey) {
+            localStorage.setItem('kala_cloud_config', JSON.stringify(decoded));
+            this.config = decoded;
+            this.enabled = true;
+            // ລົບ parameter ອອກຈາກ URL (ສະອາດ)
+            const cleanUrl = window.location.origin + window.location.pathname + window.location.hash;
+            window.history.replaceState({}, document.title, cleanUrl);
+            console.log('☁️ Cloud config loaded from URL parameter');
+            setTimeout(() => { if (typeof toast==='function') toast('✅ ຕັ້ງຄ່າ Cloud ອັດຕະໂນມັດສຳເລັດ — ກະລຸນາ Login'); }, 1000);
+            return this.config;
+          }
+        } catch(e) { console.warn('Invalid cloud param:', e); }
+      }
+
+      // 2) ໂຫລດຈາກ localStorage
       const raw = localStorage.getItem('kala_cloud_config');
-      this.config = raw ? JSON.parse(raw) : null;
-      this.enabled = !!(this.config && this.config.url && this.config.anonKey);
-      return this.config;
+      if (raw) {
+        this.config = JSON.parse(raw);
+        this.enabled = !!(this.config && this.config.url && this.config.anonKey);
+        if (this.enabled) return this.config;
+      }
+
+      // 3) Fallback — ຖ້າ HTML ມີ KALA_EMBEDDED_CONFIG ໃຫ້ໃຊ້
+      if (typeof KALA_EMBEDDED_CONFIG !== 'undefined' && KALA_EMBEDDED_CONFIG.url && KALA_EMBEDDED_CONFIG.anonKey) {
+        this.config = { ...KALA_EMBEDDED_CONFIG };
+        this.enabled = true;
+        // ບັນທຶກໃສ່ localStorage ເພື່ອບໍ່ຕ້ອງໂຫລດໃໝ່
+        localStorage.setItem('kala_cloud_config', JSON.stringify(this.config));
+        console.log('☁️ Cloud config loaded from embedded HTML');
+        return this.config;
+      }
+
+      this.config = null;
+      this.enabled = false;
+      return null;
     } catch(e) { return null; }
+  },
+
+  // ສ້າງ Share Link ສຳລັບສົ່ງໃຫ້ອຸປະກອນອື່ນ
+  generateShareLink() {
+    if (!this.config || !this.config.url || !this.config.anonKey) return null;
+    const encoded = btoa(JSON.stringify({ url: this.config.url, anonKey: this.config.anonKey }));
+    const baseUrl = window.location.origin + window.location.pathname;
+    return baseUrl + '?cloud=' + encoded;
   },
 
   // ບັນທຶກ Config
@@ -9810,6 +9867,35 @@ pages.cloud = async () => {
       </p>
     </div>
 
+    <!-- 🆕 Share Link ສຳລັບອຸປະກອນອື່ນ -->
+    <div class="card" style="background:linear-gradient(135deg,#EFF6FF,#DBEAFE);border:2px solid #3B82F6">
+      <h3 style="color:#1E40AF">🔗 ສ້າງ Link ໃຫ້ພະນັກງານ — ໃຊ້ງານໄດ້ທັນທີ ບໍ່ຕ້ອງ Setup</h3>
+      <p style="font-size:12px;color:#1E3A8A;line-height:1.6">
+        💡 <strong>ປະຫຍັດເວລາ:</strong> ສ້າງ Link ດຽວແລ້ວສົ່ງໃຫ້ພະນັກງານ — ກົດເປີດແລ້ວ Setup Cloud ໂດຍອັດຕະໂນມັດ
+        <br>📱 ໃຊ້ໄດ້ກັບ: ມືຖື, ຄອມພິວເຕີ, Tablet — ທຸກອຸປະກອນ
+      </p>
+
+      <div id="cloud_share_box" style="display:none;background:white;padding:12px;border-radius:8px;margin-top:10px">
+        <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase">🔗 Setup Link (ກົດເພື່ອກ໋ອບປີ້)</label>
+        <input id="cloud_share_link" type="text" readonly onclick="this.select()"
+          style="width:100%;padding:8px;border:2px solid #3B82F6;border-radius:6px;font-family:monospace;font-size:11px;margin-top:4px;background:#F0F9FF;cursor:pointer"/>
+        <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+          <button class="btn sm" onclick="copyCloudShareLink()">📋 ກ໋ອບປີ້ Link</button>
+          <button class="btn sm outline" onclick="shareCloudViaWeb()">📤 Share (Web Share)</button>
+          <button class="btn sm outline" onclick="showCloudQR()">📱 ສະແດງ QR Code</button>
+        </div>
+        <div id="cloud_qr_box" style="display:none;margin-top:10px;text-align:center"></div>
+      </div>
+
+      <button class="btn" style="background:linear-gradient(135deg,#3B82F6,#1E40AF);color:#fff;margin-top:8px" onclick="generateCloudShareLink()">
+        🔗 ສ້າງ Setup Link
+      </button>
+
+      <div style="margin-top:10px;padding:8px 12px;background:#FEF3C7;border-left:3px solid #F59E0B;border-radius:4px;font-size:11px;color:#78350F">
+        ⚠️ <strong>ສຳຄັນ:</strong> Link ນີ້ມີ Anon Key (ປອດໄພທີ່ຈະແຊຣ໌) — ແຕ່ <strong>ບໍ່ມີ Password</strong> ຂອງ User. ພະນັກງານຍັງຕ້ອງ Login ດ້ວຍ Username/Password ຕົນເອງ.
+      </div>
+    </div>
+
     <div class="card" style="background:#FEF3C7;border:1px solid #FCD34D">
       <h3 style="color:#92400E">⚙️ ການຕັ້ງຄ່າ Cloud</h3>
       <p style="font-size:12px;color:#78350F">URL: <code style="background:#fff;padding:2px 6px;border-radius:3px">${cloud.config?.url||'-'}</code></p>
@@ -9817,6 +9903,61 @@ pages.cloud = async () => {
     </div>
   `;
 };
+
+// ===================== CLOUD SHARE LINK =====================
+function generateCloudShareLink() {
+  const link = cloud.generateShareLink();
+  if (!link) { toast('⚠️ ກະລຸນາ Setup Cloud ກ່ອນ', 'warn'); return; }
+  $('#cloud_share_box').style.display = 'block';
+  $('#cloud_share_link').value = link;
+  $('#cloud_share_link').select();
+  toast('✅ Link ສ້າງສຳເລັດ — ກົດກ໋ອບປີ້ ຫລື ສະແກນ QR');
+}
+
+function copyCloudShareLink() {
+  const inp = $('#cloud_share_link');
+  if (!inp || !inp.value) { toast('ກະລຸນາສ້າງ Link ກ່ອນ', 'warn'); return; }
+  inp.select();
+  navigator.clipboard.writeText(inp.value).then(() => {
+    toast('📋 ກ໋ອບປີ້ Link ສຳເລັດ — ສົ່ງໃຫ້ພະນັກງານໄດ້ເລີຍ');
+  }).catch(() => {
+    document.execCommand('copy');
+    toast('📋 ກ໋ອບປີ້ Link ສຳເລັດ');
+  });
+}
+
+async function shareCloudViaWeb() {
+  const link = $('#cloud_share_link')?.value;
+  if (!link) { toast('ກະລຸນາສ້າງ Link ກ່ອນ', 'warn'); return; }
+  if (navigator.share) {
+    try {
+      await navigator.share({
+        title: 'KALA Garage Setup',
+        text: 'ກົດເປີດ Link ນີ້ເພື່ອເຂົ້າລະບົບ KALA Garage',
+        url: link,
+      });
+      toast('📤 Share ສຳເລັດ');
+    } catch(e) { /* user cancelled */ }
+  } else {
+    copyCloudShareLink();
+  }
+}
+
+function showCloudQR() {
+  const link = $('#cloud_share_link')?.value;
+  if (!link) { toast('ກະລຸນາສ້າງ Link ກ່ອນ', 'warn'); return; }
+  const box = $('#cloud_qr_box');
+  if (box.style.display === 'block') { box.style.display = 'none'; return; }
+  // ໃຊ້ QR Server API (ບໍ່ຕ້ອງ load library)
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(link)}`;
+  box.style.display = 'block';
+  box.innerHTML = `
+    <div style="background:white;padding:14px;border-radius:8px;display:inline-block;border:2px dashed var(--accent)">
+      <img src="${qrUrl}" alt="QR Code" style="display:block;width:240px;height:240px"/>
+      <div style="font-size:11px;color:var(--muted);margin-top:8px">📱 ສະແກນດ້ວຍກ້ອງມືຖື</div>
+    </div>
+  `;
+}
 
 // ===================== CLOUD ACTIONS =====================
 async function saveCloudConfig() {
