@@ -47,13 +47,51 @@ header.topbar { grid-area: header; background: #fff; color: var(--primary); disp
   font-weight: 800; font-size: 19px; letter-spacing: 2px; flex-direction: column; }
 .logo small { font-size: 9px; opacity: .75; font-weight: 500; letter-spacing: 1.5px; margin-top: 2px; }
 aside.side { grid-area: side; background: linear-gradient(180deg, #0F172A 0%, #1E293B 100%); color: #CBD5E1; overflow-y: auto; }
-aside.side nav { padding: 18px 0; }
-aside.side h6 { padding: 18px 22px 8px; color: #64748B; font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 600; }
-aside.side a { display: flex; align-items: center; gap: 12px; padding: 10px 22px; color: #CBD5E1;
-  text-decoration: none; border-left: 3px solid transparent; font-size: 13.5px; cursor: pointer; transition: all .15s; position: relative; }
+aside.side nav { padding: 10px 0 24px; }
+/* Search box at top of sidebar */
+aside.side .nav-search { padding: 10px 14px; position: sticky; top: 0; background: rgba(15,23,42,.95); backdrop-filter: blur(4px); z-index: 5; border-bottom: 1px solid rgba(255,255,255,.06); }
+aside.side .nav-search input {
+  width: 100%; padding: 7px 10px 7px 28px; border-radius: 6px;
+  background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1);
+  color: #E2E8F0; font-size: 12px; font-family: inherit;
+}
+aside.side .nav-search input::placeholder { color: #64748B; }
+aside.side .nav-search input:focus { outline: none; border-color: var(--accent); background: rgba(255,255,255,.1); }
+aside.side .nav-search::before {
+  content: '🔍'; position: absolute; left: 22px; top: 50%; transform: translateY(-50%);
+  font-size: 12px; opacity: .6; pointer-events: none;
+}
+
+/* Collapsible group header */
+aside.side .nav-group { user-select: none; }
+aside.side .nav-group-h {
+  display: flex; align-items: center; gap: 6px;
+  padding: 10px 18px 6px; color: #94A3B8; font-size: 10px;
+  text-transform: uppercase; letter-spacing: 1px; font-weight: 700;
+  cursor: pointer; transition: color .15s;
+}
+aside.side .nav-group-h:hover { color: #E2E8F0; }
+aside.side .nav-group-h .chev {
+  transition: transform .2s; font-size: 9px; opacity: .7;
+}
+aside.side .nav-group.collapsed .chev { transform: rotate(-90deg); }
+aside.side .nav-group.collapsed .nav-items { display: none; }
+aside.side .nav-group-h .count {
+  margin-left: auto; background: rgba(255,255,255,.08); padding: 1px 6px;
+  border-radius: 8px; font-size: 9px; color: #64748B;
+}
+
+aside.side .nav-items { padding-bottom: 4px; }
+aside.side a { display: flex; align-items: center; gap: 10px; padding: 7px 18px 7px 32px; color: #CBD5E1;
+  text-decoration: none; border-left: 3px solid transparent; font-size: 13px; cursor: pointer; transition: all .15s; position: relative; line-height: 1.4; }
 aside.side a:hover { background: rgba(59, 130, 246, .08); color: #fff; }
 aside.side a.active { background: rgba(59, 130, 246, .15); color: #fff; border-left-color: var(--accent); font-weight: 600; }
-aside.side a span:first-child { width: 20px; text-align: center; font-size: 15px; }
+aside.side a span:first-child { width: 18px; text-align: center; font-size: 14px; flex-shrink: 0; }
+aside.side a.pinned { padding-left: 22px; font-weight: 500; border-left-color: rgba(245, 158, 11, .3); }
+
+/* Hidden state when filtered out */
+aside.side a.nav-hidden { display: none !important; }
+aside.side .nav-group.nav-hidden { display: none !important; }
 main { grid-area: main; overflow-y: auto; padding: 28px 32px; }
 .crumbs { color: var(--muted); font-size: 12.5px; margin-bottom: 8px; font-weight: 500; }
 .page-title { font-size: 24px; font-weight: 700; color: var(--primary); margin-bottom: 20px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; letter-spacing: -0.3px; }
@@ -1909,65 +1947,199 @@ function renderPhotoGallery(photos) {
 }
 
 // ===================== NAV =====================
+// ============================================================================
+// 🗂️ NAVIGATION — Collapsible Sidebar with Search
+// ============================================================================
+// ໂຄງສ້າງເມນູໃໝ່: ກຸ່ມຍຸບໄດ້ + ຄົ້ນຫາ + ກະທັດຮັດ
+const NAV_GROUPS = [
+  // 🎯 Pinned ໜ້າຫລັກ — ບໍ່ມີ group header, ສະແດງສະເໝີ
+  {
+    pinned: true, items: [
+      { page:'dashboard',     icon:'📊', label:'ໜ້າຫລັກ Dashboard' },
+      { page:'notifications', icon:'🔔', label:'ສູນແຈ້ງເຕືອນ' },
+      { page:'ai_assistant',  icon:'🤖', label:'AI ຜູ້ຊ່ວຍສະຫຼາດ' },
+    ]
+  },
+  // 🚗 ລົດ ແລະ ການກວດປະຈຳວັນ
+  {
+    id:'fleet', icon:'🚗', label:'ລົດ ແລະ ການກວດປະຈຳວັນ',
+    items: [
+      { page:'vehicles',    icon:'🚗', label:'ທະບຽນລົດ' },
+      { page:'drivers',     icon:'👤', label:'ຄົນຂັບ' },
+      { page:'driver_perf', icon:'🏆', label:'ຄະແນນຄົນຂັບ' },
+      { page:'daily',       icon:'✅', label:'ກວດປະຈຳວັນ' },
+      { page:'fuel',        icon:'⛽', label:'ບິນນ້ຳມັນ' },
+      { page:'mileage',     icon:'📏', label:'ບັນທຶກ Mileage' },
+      { page:'tires',       icon:'⚙️', label:'ຈັດການຢາງ' },
+      { page:'incidents',   icon:'🚨', label:'ອຸປະຕິເຫດ' },
+      { page:'defects',     icon:'🔧', label:'ຄວາມບົກພ່ອງ' },
+      { page:'documents',   icon:'📜', label:'ເອກະສານ' },
+    ]
+  },
+  // 🔧 ການສ້ອມບຳລຸງ
+  {
+    id:'repair', icon:'🔧', label:'ການສ້ອມບຳລຸງ',
+    items: [
+      { page:'jo',           icon:'📋', label:'ໃບສັ່ງສ້ອມ (JO)' },
+      { page:'fluids',       icon:'🛢', label:'ຕິດຕາມການເຕີມນ້ຳມັນ' },
+      { page:'outsource',    icon:'🔨', label:'ສົ່ງສ້ອມນອກ' },
+      { page:'pm',           icon:'🗓', label:'ແຜນ PM' },
+      { page:'pm_schedule',  icon:'📅', label:'ກຳນົດການ PM' },
+      { page:'pm_templates', icon:'📝', label:'ແມ່ແບບ PM' },
+      { page:'predictive',   icon:'🔮', label:'Predictive Maintenance' },
+    ]
+  },
+  // 👷 ຊ່າງ ແລະ ຄ່າແຮງ
+  {
+    id:'labor', icon:'👷', label:'ຊ່າງ ແລະ ຄ່າແຮງ',
+    items: [
+      { page:'labor_entries',    icon:'💼', label:'ບັນທຶກວຽກ + ຄ່າແຮງ' },
+      { page:'tech_performance', icon:'📊', label:'ຜົນງານຊ່າງ (Daily)' },
+      { page:'commission',       icon:'💰', label:'ສະຫຼຸບຄອມມິສຊັ່ນ' },
+      { page:'tech_profiles',    icon:'🔧', label:'ໂປຣໄຟລ໌ຊ່າງ' },
+      { page:'service_rates',    icon:'📋', label:'ບັນຊີຄ່າແຮງ' },
+    ]
+  },
+  // 🛡️ ການກວດສອບ Anti-Fraud
+  {
+    id:'antifraud', icon:'🛡️', label:'ການກວດສອບ Anti-Fraud',
+    items: [
+      { page:'camera_reconciliation', icon:'📷', label:'Camera Reconciliation' },
+      { page:'customer_audit',        icon:'📞', label:'Customer Audit (ສຸ່ມໂທ)' },
+      { page:'intakes',               icon:'🛡️', label:'ໃບຮັບລົດເຂົ້າ (ງານໃຫຍ່)' },
+    ]
+  },
+  // 📦 ສາງ ແລະ ຈັດຊື້
+  {
+    id:'warehouse', icon:'📦', label:'ສາງ ແລະ ຈັດຊື້',
+    items: [
+      { page:'inv',      icon:'📦', label:'ສາງອາໄຫລ່' },
+      { page:'vendors',  icon:'💰', label:'ຜູ້ຈຳໜ່າຍ' },
+      { page:'pr',       icon:'📝', label:'ໃບສະເໜີຊື້ (PR)' },
+      { page:'po',       icon:'🧾', label:'ໃບສັ່ງຊື້ (PO)' },
+      { page:'forecast', icon:'📈', label:'Parts Forecast' },
+      { page:'tools',    icon:'🛠', label:'ເຄື່ອງມື' },
+    ]
+  },
+  // 📊 ລາຍງານ ແລະ ເຄື່ອງມື
+  {
+    id:'reports', icon:'📊', label:'ລາຍງານ ແລະ ເຄື່ອງມື',
+    items: [
+      { page:'reports',      icon:'📈', label:'ລາຍງານ' },
+      { page:'forms_hub',    icon:'📋', label:'ຟອມ ແລະ ໃບລາຍງານ' },
+      { page:'depreciation', icon:'📉', label:'ຄ່າເສື່ອມຊັບສິນ' },
+      { page:'price_audit',  icon:'💱', label:'ການປ່ຽນລາຄາ' },
+      { page:'gps',          icon:'🗺', label:'GPS / Telematics' },
+      { page:'ai_tools',     icon:'🛠', label:'AI Tools (20 ຄວາມສາມາດ)' },
+    ]
+  },
+  // ⚙️ ຕັ້ງຄ່າ
+  {
+    id:'settings', icon:'⚙️', label:'ຕັ້ງຄ່າ ແລະ ການຄຸ້ມຄອງ',
+    items: [
+      { page:'cloud_users', icon:'👥', label:'ຄຸ້ມຄອງ User' },
+      { page:'cloud',       icon:'☁️', label:'Cloud Sync' },
+      { page:'categories',  icon:'📑', label:'ໝວດ + ກຸ່ມ' },
+      { page:'audit',       icon:'📋', label:'Audit Log' },
+      { page:'recycle',     icon:'🗑', label:'ຖັງຂີ້ເຫຍື້ອ (ກູ້ຄືນ)' },
+      { page:'bulk_import', icon:'📥', label:'Bulk Import' },
+      { page:'data_storage',icon:'💾', label:'Data Storage' },
+      { page:'settings',    icon:'⚙️', label:'Settings' },
+      { page:'about',       icon:'ℹ️', label:'ກ່ຽວກັບລະບົບ' },
+    ]
+  },
+];
+
 function renderNav() {
-  $('#sideNav').innerHTML = `
-    <h6>${t('nav_overview')}</h6>
-    <a data-page="dashboard"><span>📊</span><span class="label">${t('nav_dashboard')}</span></a>
-    <a data-page="notifications"><span>🔔</span><span class="label">${t('nav_notif')}</span></a>
-    <a data-page="reports"><span>📈</span><span class="label">${t('nav_reports')}</span></a>
-    <a data-page="forms_hub"><span>📋</span><span class="label">ຟອມ ແລະ ໃບລາຍງານ</span></a>
-    <a data-page="ai_assistant"><span>🤖</span><span class="label">AI ຜູ້ຊ່ວຍສະຫຼາດ</span></a>
-    <h6>${t('nav_operations')}</h6>
-    <a data-page="vehicles"><span>🚗</span><span class="label">${t('nav_vehicles')}</span></a>
-    <a data-page="drivers"><span>👤</span><span class="label">${t('nav_drivers')}</span></a>
-    <a data-page="driver_perf"><span>🏆</span><span class="label">${t('nav_driver_perf')}</span></a>
-    <a data-page="daily"><span>✅</span><span class="label">${t('nav_daily')}</span></a>
-    <a data-page="fuel"><span>⛽</span><span class="label">${t('nav_fuel')}</span></a>
-    <a data-page="incidents"><span>🚨</span><span class="label">${t('nav_incidents')}</span></a>
-    <a data-page="defects"><span>🔧</span><span class="label">ຄວາມບົກພ່ອງຂະນະໃຊ້</span></a>
-    <a data-page="documents"><span>📜</span><span class="label">${t('nav_docs')}</span></a>
-    <a data-page="jo"><span>📋</span><span class="label">${t('nav_jo')}</span></a>
-    <a data-page="labor_entries"><span>💼</span><span class="label">ບັນທຶກວຽກ + ຄ່າແຮງ</span></a>
-    <a data-page="camera_reconciliation"><span>📷</span><span class="label">Camera Reconciliation 🛡️</span></a>
-    <a data-page="customer_audit"><span>📞</span><span class="label">Customer Audit (ສຸ່ມໂທ)</span></a>
-    <a data-page="intakes"><span>🛡️</span><span class="label">ໃບຮັບລົດເຂົ້າ (ງານໃຫຍ່)</span></a>
-    <a data-page="tech_performance"><span>📊</span><span class="label">ຜົນງານຊ່າງ (Daily)</span></a>
-    <a data-page="commission"><span>💰</span><span class="label">ສະຫຼຸບຄອມມິສຊັ່ນ</span></a>
-    <a data-page="tech_profiles"><span>🔧</span><span class="label">ໂປຣໄຟລ໌ຊ່າງ</span></a>
-    <a data-page="service_rates"><span>📋</span><span class="label">ບັນຊີຄ່າແຮງ</span></a>
-    <a data-page="pm"><span>🗓</span><span class="label">${t('nav_pm')}</span></a>
-    <a data-page="pm_schedule"><span>📅</span><span class="label">ກຳນົດການ PM (Schedule)</span></a>
-    <a data-page="pm_templates"><span>📝</span><span class="label">${t('nav_pm_templates')}</span></a>
-    <a data-page="predictive"><span>🔮</span><span class="label">${t('nav_predictive')}</span></a>
-    <a data-page="mileage"><span>📏</span><span class="label">${t('nav_mileage')}</span></a>
-    <a data-page="fluids"><span>🛢</span><span class="label">${t('nav_fluids')}</span></a>
-    <a data-page="tires"><span>⚙️</span><span class="label">${t('nav_tires')}</span></a>
-    <a data-page="depreciation"><span>📉</span><span class="label">ຄ່າເສື່ອມຊັບສິນ</span></a>
-    <h6>${t('nav_warehouse')}</h6>
-    <a data-page="inv"><span>📦</span><span class="label">${t('nav_inv')}</span></a>
-    <a data-page="vendors"><span>💰</span><span class="label">${t('nav_vendors')}</span></a>
-    <a data-page="outsource"><span>🔨</span><span class="label">${t('nav_outsource')}</span></a>
-    <a data-page="pr"><span>📝</span><span class="label">${t('nav_pr')}</span></a>
-    <a data-page="po"><span>🧾</span><span class="label">ໃບສັ່ງຊື້ (PO)</span></a>
-    <a data-page="forecast"><span>📈</span><span class="label">${t('nav_forecast')}</span></a>
-    <a data-page="gps"><span>🗺</span><span class="label">${t('nav_gps')}</span></a>
-    <a data-page="tools"><span>🔧</span><span class="label">${t('nav_tools')}</span></a>
-    <h6>${t('nav_settings')}</h6>
-    <a data-page="users"><span>👥</span><span class="label">ຜູ້ໃຊ້ ແລະ ສິດ</span></a>
-    <a data-page="categories"><span>📑</span><span class="label">${t('nav_categories')}</span></a>
-    <a data-page="audit"><span>📋</span><span class="label">${t('nav_audit')}</span></a>
-    <a data-page="recycle"><span>🗑</span><span class="label">ຖັງຂີ້ເຫຍື້ອ (ກູ້ຄືນ)</span></a>
-    <a data-page="price_audit"><span>💱</span><span class="label">ການປ່ຽນລາຄາ</span></a>
-    <a data-page="bulk_import"><span>📥</span><span class="label">Bulk Import (ປະຫວັດເກົ່າ)</span></a>
-    <a data-page="ai_tools"><span>🛠</span><span class="label">AI Tools (20 ຄວາມສາມາດ)</span></a>
-    <a data-page="data_storage"><span>💾</span><span class="label">Data Storage</span></a>
-    <a data-page="cloud"><span>☁️</span><span class="label">Cloud Sync</span></a>
-    <a data-page="cloud_users"><span>👥</span><span class="label">ຄຸ້ມຄອງ User</span></a>
-    <a data-page="settings"><span>⚙️</span><span class="label">${t('nav_settings')}</span></a>
-    <a data-page="about"><span>ℹ️</span><span class="label">${t('nav_about')}</span></a>
+  // ໂຫຼດສະຖານະການຍຸບກຸ່ມ
+  const collapsed = JSON.parse(localStorage.getItem('kala_nav_collapsed') || '{}');
+
+  // ສ້າງ HTML
+  let html = `
+    <div class="nav-search" style="position:relative">
+      <input id="nav_search_input" type="search" placeholder="ຄົ້ນຫາໜ້າ... (Ctrl+K)"
+        autocomplete="off" oninput="filterNav(this.value)"/>
+    </div>
   `;
+
+  NAV_GROUPS.forEach(grp => {
+    if (grp.pinned) {
+      // Pinned items — no header, always visible
+      html += '<div class="nav-pinned">';
+      grp.items.forEach(it => {
+        html += `<a data-page="${it.page}" data-label="${it.label}" class="pinned"><span>${it.icon}</span><span class="label">${it.label}</span></a>`;
+      });
+      html += '</div>';
+    } else {
+      const isCollapsed = collapsed[grp.id] === true;
+      html += `
+        <div class="nav-group ${isCollapsed?'collapsed':''}" data-group-id="${grp.id}">
+          <div class="nav-group-h" onclick="toggleNavGroup('${grp.id}')">
+            <span class="chev">▼</span>
+            <span style="font-size:13px">${grp.icon}</span>
+            <span>${grp.label}</span>
+            <span class="count">${grp.items.length}</span>
+          </div>
+          <div class="nav-items">
+            ${grp.items.map(it => `<a data-page="${it.page}" data-label="${it.label}"><span>${it.icon}</span><span class="label">${it.label}</span></a>`).join('')}
+          </div>
+        </div>
+      `;
+    }
+  });
+
+  $('#sideNav').innerHTML = html;
   document.querySelectorAll('aside.side a').forEach(a => a.addEventListener('click', () => go(a.dataset.page)));
   document.querySelectorAll('aside.side a').forEach(a => a.classList.toggle('active', a.dataset.page === currentPage));
+
+  // Auto-expand the group containing the active page
+  document.querySelectorAll('aside.side a.active').forEach(a => {
+    const grp = a.closest('.nav-group');
+    if (grp) grp.classList.remove('collapsed');
+  });
+
+  // Ctrl+K hotkey ສຳລັບໂຟກັສຊ່ອງຄົ້ນຫາ
+  if (!window._navSearchHotkey) {
+    window._navSearchHotkey = true;
+    document.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey||e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        const inp = document.getElementById('nav_search_input');
+        if (inp) inp.focus();
+      }
+    });
+  }
+}
+
+function toggleNavGroup(groupId) {
+  const grp = document.querySelector(`.nav-group[data-group-id="${groupId}"]`);
+  if (!grp) return;
+  grp.classList.toggle('collapsed');
+  const collapsed = JSON.parse(localStorage.getItem('kala_nav_collapsed') || '{}');
+  collapsed[groupId] = grp.classList.contains('collapsed');
+  localStorage.setItem('kala_nav_collapsed', JSON.stringify(collapsed));
+}
+
+function filterNav(query) {
+  const q = (query||'').trim().toLowerCase();
+  // Clear filter — show everything
+  if (!q) {
+    document.querySelectorAll('aside.side a').forEach(a => a.classList.remove('nav-hidden'));
+    document.querySelectorAll('aside.side .nav-group').forEach(g => g.classList.remove('nav-hidden'));
+    return;
+  }
+  // Filter items
+  document.querySelectorAll('aside.side a').forEach(a => {
+    const label = (a.dataset.label||'').toLowerCase();
+    const matches = label.includes(q);
+    a.classList.toggle('nav-hidden', !matches);
+  });
+  // Hide groups with no visible items, and auto-expand visible groups
+  document.querySelectorAll('aside.side .nav-group').forEach(g => {
+    const visible = g.querySelectorAll('a:not(.nav-hidden)').length;
+    g.classList.toggle('nav-hidden', visible === 0);
+    if (visible > 0) g.classList.remove('collapsed');  // expand to show matches
+  });
 }
 
 let currentPage = 'dashboard';
@@ -7069,7 +7241,8 @@ pages.jo = async () => {
       <button class="btn sm ${!joBillView?'':'outline'}" onclick="joBillView=false; pages.jo()">📋 ${t('list_view')}</button>
       <button class="btn sm ${joBillView?'':'outline'}" onclick="joBillView=true; pages.jo()">🧾 ${t('bill_view')}</button>
       <div style="flex:1"></div>
-      <button class="btn" onclick="openJOModal()">${t('add_jo')}</button>
+      <button class="btn" style="background:linear-gradient(135deg,#0F3D7A,#1E40AF);font-weight:700" onclick="openJOWorkflow()">🎯 ເປີດ JO ໃໝ່ (Workflow)</button>
+      <button class="btn outline" onclick="openJOModal()">+ ສ້າງແບບເກົ່າ</button>
     </div>
     ${joBillView ? `
       <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(340px, 1fr));gap:14px">
@@ -7091,9 +7264,10 @@ pages.jo = async () => {
               ${j.photos?.length ? `<span class="pill gray">📷 ${j.photos.length}</span>` : ''}
             </div>
             <div style="display:flex;gap:6px;margin-top:8px;border-top:1px dashed var(--line);padding-top:8px">
-              <button class="btn sm" onclick="printJO(${j.id})">🖨</button>
-              <button class="btn sm outline" onclick="openJOModal(${j.id})">${t('edit')}</button>
-              <button class="btn sm danger" onclick="delJO(${j.id})">${t('delete')}</button>
+              <button class="btn sm" style="flex:1;background:linear-gradient(135deg,#0F3D7A,#1E40AF);font-weight:700" onclick="openJOWorkflow(${j.id})">🎯 Workflow</button>
+              <button class="btn sm icon" onclick="printJO(${j.id})" title="ພິມ">🖨</button>
+              <button class="btn sm icon outline" onclick="openJOModal(${j.id})" title="ແກ້">✏️</button>
+              <button class="btn sm icon danger" onclick="delJO(${j.id})" title="ລົບ">🗑</button>
             </div>
           </div>`;
         }).join('')}
@@ -7115,10 +7289,11 @@ pages.jo = async () => {
           <td>${j.assigned||'-'}</td><td>${j.created}</td>
           <td><button class="btn sm ${j.receipt_done?'ok':'outline'}" onclick="openReceiptInspection('${j.jo_id}','${j.vehicle_id}')" title="ໃບກວດຮັບລົດເຂົ້າສ້ອມ">${j.receipt_done?'✓':'+'} ໃບກວດຮັບ</button></td>
           <td><button class="btn sm ${j.predelivery_done?'ok':'outline'}" onclick="openPreDeliveryInspection('${j.jo_id}','${j.vehicle_id}')" title="ໃບກວດກ່ອນສົ່ງມອບ">${j.predelivery_done?'✓':'+'} ສົ່ງມອບ</button></td>
-          <td class="actions">
-            <button class="btn sm" onclick="printJO(${j.id})" title="${t('print')}">🖨</button>
-            <button class="btn sm outline" onclick="openJOModal(${j.id})">${t('edit')}</button>
-            ${adminOnly(`<button class="btn sm danger" onclick="delJO(${j.id})">${t('delete')}</button>`)}</td>
+          <td class="actions compact">
+            <button class="btn sm icon" style="background:linear-gradient(135deg,#0F3D7A,#1E40AF);color:#fff" onclick="openJOWorkflow(${j.id})" title="ເປີດ Workflow Wizard">🎯</button>
+            <button class="btn sm icon" onclick="printJO(${j.id})" title="${t('print')}">🖨</button>
+            <button class="btn sm icon outline" onclick="openJOModal(${j.id})" title="${t('edit')}">✏️</button>
+            ${adminOnly(`<button class="btn sm icon danger" onclick="delJO(${j.id})" title="${t('delete')}">🗑</button>`)}</td>
         </tr>`).join('')}
       </table>
       ${pagerUI('jo', totalJ, 'pages.jo')}`}
@@ -7254,6 +7429,641 @@ async function regenerateJoId(dateStr) {
   if (!dateStr) return;
   const newId = await genIdAsync('JO', 'joborders', 'jo_id', dateStr);
   if ($('#j_id')) $('#j_id').value = newId;
+}
+
+// ===========================================================================
+// 🎯 JO WORKFLOW WIZARD — ບິນຕໍ່ເນື່ອງ 6 ຂັ້ນຕອນໃນທີ່ດຽວ
+// ===========================================================================
+// ຂັ້ນຕອນ: 1) ຮັບລົດ → 2) ວິໄຈ → 3) ອາໄຫລ່ → 4) ສ້ອມ + ຄ່າແຮງ → 5) QC → 6) ສົ່ງມອບ
+
+const JO_STEPS = [
+  { id:1, icon:'🚪', label:'ຮັບລົດເຂົ້າ',     status:'open',     desc:'ບັນທຶກລົດເຂົ້າ, km, ອາການ' },
+  { id:2, icon:'🔍', label:'ການວິໄຈ',         status:'diag',     desc:'ກວດ + ສິ່ງທີ່ພົບ + ປະເມີນ' },
+  { id:3, icon:'📦', label:'ອາໄຫລ່',          status:'progress', desc:'ເລືອກອາໄຫລ່ + ສັ່ງຊື້' },
+  { id:4, icon:'🔧', label:'ສ້ອມ + ຄ່າແຮງ',   status:'progress', desc:'ບັນທຶກວຽກສ້ອມ + Labor Entry' },
+  { id:5, icon:'✅', label:'QC',              status:'qc',       desc:'ກວດສອບກ່ອນສົ່ງມອບ' },
+  { id:6, icon:'🚪', label:'ສົ່ງມອບ',          status:'done',     desc:'ສະຫຼຸບ + ພິມບິນ + ຮັບເງິນ' },
+];
+
+let _joWizStep = 1;
+let _joWizData = null;
+
+async function openJOWorkflow(joId) {
+  let j;
+  if (joId) {
+    j = await db.joborders.get(joId);
+    if (!j) { toast('ບໍ່ພົບ JO', 'bad'); return; }
+  } else {
+    // ສ້າງ JO ໃໝ່
+    const vehicles = await db.vehicles.toArray();
+    if (vehicles.length === 0) { toast('ຍັງບໍ່ມີລົດໃນລະບົບ', 'warn'); return; }
+    j = {
+      jo_id: await genIdAsync('JO', 'joborders', 'jo_id'),
+      vehicle_id: vehicles[0].vehicle_id,
+      complaint:'', priority:'normal', status:'open', work_type:'corrective',
+      assigned:'', driver:'', km_in:0, diagnosis:'', work_done:'',
+      parts_used:'', labor_hours:0, estimated_cost:0, actual_cost:0,
+      parts_cost:0, labor_cost:0, outsource_cost:0,
+      date_in: todayISO(), date_promised:'', date_completed:'',
+      location:'in_house', payment_method:'company',
+      customer_phone:'', customer_note:'', notes:'',
+      // Workflow tracking
+      wiz_step:1, wiz_step1_done:false, wiz_step2_done:false,
+      wiz_step3_done:false, wiz_step4_done:false, wiz_step5_done:false, wiz_step6_done:false,
+      fuel_in:'half', condition_in:'', received_by_tech:'',
+      created: todayISO(),
+    };
+    const newId = await db.joborders.add(j);
+    j.id = newId;
+  }
+  _joWizData = j;
+  _joWizStep = j.wiz_step || 1;
+  await renderJOWorkflow();
+}
+
+async function renderJOWorkflow() {
+  const j = _joWizData;
+  const vehicles = await db.vehicles.toArray();
+  const v = vehicles.find(x => x.vehicle_id === j.vehicle_id);
+
+  // Step indicator bar
+  const stepBar = JO_STEPS.map(s => {
+    const done = j[`wiz_step${s.id}_done`];
+    const active = _joWizStep === s.id;
+    const bgColor = active ? '#0F3D7A' : done ? '#10B981' : '#E2E8F0';
+    const txtColor = (active || done) ? '#fff' : '#64748B';
+    return `<div onclick="changeJOStep(${s.id})"
+      style="cursor:pointer;flex:1;display:flex;flex-direction:column;align-items:center;padding:6px;background:${bgColor};color:${txtColor};font-weight:600;transition:all .2s;min-width:80px"
+      title="${s.desc}">
+      <div style="font-size:18px;line-height:1">${done?'✅':s.icon}</div>
+      <div style="font-size:10px;margin-top:2px;text-align:center">${s.id}. ${s.label}</div>
+    </div>`;
+  }).join('<div style="width:0;align-self:stretch;background:#CBD5E1;width:1px"></div>');
+
+  const mainBg = document.querySelector('.modal-bg') || (() => {
+    const m = document.createElement('div'); m.className='modal-bg'; document.body.appendChild(m); return m;
+  })();
+
+  // Render step-specific content
+  let stepContent = '';
+  if (_joWizStep === 1) stepContent = await renderJOStep1(j, v);
+  else if (_joWizStep === 2) stepContent = await renderJOStep2(j);
+  else if (_joWizStep === 3) stepContent = await renderJOStep3(j);
+  else if (_joWizStep === 4) stepContent = await renderJOStep4(j);
+  else if (_joWizStep === 5) stepContent = await renderJOStep5(j);
+  else if (_joWizStep === 6) stepContent = await renderJOStep6(j);
+
+  mainBg.classList.add('show');
+  mainBg.innerHTML = `
+    <div class="modal" style="max-width:900px;width:96%;max-height:96vh;display:flex;flex-direction:column">
+      <!-- Header -->
+      <div class="modal-h" style="background:linear-gradient(135deg,#0F3D7A,#1E40AF)">
+        <div style="flex:1">
+          <div style="display:flex;align-items:center;gap:10px">
+            <h3 style="margin:0;font-size:18px">🎯 JO Workflow — ${j.jo_id}</h3>
+            <span class="pill" style="background:rgba(255,255,255,.2);color:#fff;font-size:11px">${t('jo_'+j.status)||j.status}</span>
+          </div>
+          <div style="font-size:11px;opacity:.85;margin-top:2px">
+            🚗 ${j.vehicle_id} ${v?'— '+v.type+' ('+v.plate+')':''} · 📅 ${j.date_in}
+            ${j.customer_phone?' · 📞 '+j.customer_phone:''}
+          </div>
+        </div>
+        <button class="x" onclick="closeJOWizard()">✕</button>
+      </div>
+
+      <!-- Step indicator -->
+      <div style="display:flex;background:#F8FAFC;border-bottom:1px solid var(--line)">
+        ${stepBar}
+      </div>
+
+      <!-- Main content -->
+      <div class="modal-b" style="flex:1;overflow-y:auto;padding:18px">
+        ${stepContent}
+      </div>
+
+      <!-- Footer with navigation -->
+      <div class="modal-f" style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          ${_joWizStep > 1 ? `<button class="btn outline" onclick="changeJOStep(${_joWizStep-1})">← ກັບຄືນ</button>` : ''}
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn outline" onclick="closeJOWizard()">💾 ບັນທຶກ + ປິດ</button>
+          ${_joWizStep < 6 ?
+            `<button class="btn ok" onclick="completeJOStep(${_joWizStep}, true)">✅ ສຳເລັດຂັ້ນນີ້ → ຕໍ່ໄປ</button>` :
+            `<button class="btn ok" onclick="completeJOStep(6, false)">💾 ບັນທຶກ ສຳເລັດ</button>
+             <button class="btn" style="background:#8B5CF6" onclick="printJOFinalReceipt(${j.id})">🖨 ພິມບິນສຳເລັດ</button>`}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function closeJOWizard() {
+  saveJOWizardData();
+  const mbg = document.querySelector('.modal-bg'); if (mbg) mbg.classList.remove('show');
+  _joWizData = null;
+  if (currentPage === 'jo') pages.jo();
+}
+
+async function changeJOStep(stepId) {
+  // ບັນທຶກກ່ອນປ່ຽນ
+  await saveJOWizardData();
+  _joWizStep = stepId;
+  _joWizData = await db.joborders.get(_joWizData.id);
+  await renderJOWorkflow();
+}
+
+async function completeJOStep(stepId, advance) {
+  await saveJOWizardData();
+  _joWizData[`wiz_step${stepId}_done`] = true;
+  // ປ່ຽນ status ຂອງ JO ໃຫ້ກົງກັບຂັ້ນຕອນ
+  const stepCfg = JO_STEPS.find(s => s.id === stepId);
+  if (stepCfg) _joWizData.status = stepCfg.status;
+  await db.joborders.update(_joWizData.id, _joWizData);
+  if (typeof auditLog==='function') auditLog('jo_step', 'joborders', _joWizData.id, `${_joWizData.jo_id} — Step ${stepId} done`);
+  toast(`✅ ສຳເລັດຂັ້ນຕອນ ${stepId}`);
+  if (advance && stepId < 6) {
+    _joWizStep = stepId + 1;
+    _joWizData.wiz_step = _joWizStep;
+  }
+  _joWizData = await db.joborders.get(_joWizData.id);
+  await renderJOWorkflow();
+}
+
+async function saveJOWizardData() {
+  if (!_joWizData) return;
+  // Collect ALL field values from current step (use IDs from each render function)
+  const fields = [
+    'wiz_km_in','wiz_fuel_in','wiz_condition_in','wiz_received_by','wiz_complaint','wiz_customer_phone','wiz_driver',
+    'wiz_diagnosis','wiz_estimated','wiz_date_promised','wiz_assigned',
+    'wiz_parts_used','wiz_parts_cost',
+    'wiz_work_done','wiz_labor_h','wiz_labor_cost',
+    'wiz_qc_notes',
+    'wiz_actual_cost','wiz_payment_method','wiz_customer_note','wiz_notes','wiz_date_completed'
+  ];
+  // Map wiz_xxx → JO field
+  const mapping = {
+    wiz_km_in:'km_in', wiz_fuel_in:'fuel_in', wiz_condition_in:'condition_in', wiz_received_by:'received_by_tech',
+    wiz_complaint:'complaint', wiz_customer_phone:'customer_phone', wiz_driver:'driver',
+    wiz_diagnosis:'diagnosis', wiz_estimated:'estimated_cost', wiz_date_promised:'date_promised', wiz_assigned:'assigned',
+    wiz_parts_used:'parts_used', wiz_parts_cost:'parts_cost',
+    wiz_work_done:'work_done', wiz_labor_h:'labor_hours', wiz_labor_cost:'labor_cost',
+    wiz_qc_notes:'qc_notes',
+    wiz_actual_cost:'actual_cost', wiz_payment_method:'payment_method',
+    wiz_customer_note:'customer_note', wiz_notes:'notes', wiz_date_completed:'date_completed',
+  };
+  const updates = { wiz_step: _joWizStep };
+  for (const fid of fields) {
+    const el = document.getElementById(fid);
+    if (el) {
+      let val = el.value;
+      if (el.type === 'number') val = +val || 0;
+      updates[mapping[fid]] = val;
+    }
+  }
+  await db.joborders.update(_joWizData.id, updates);
+  _joWizData = { ..._joWizData, ...updates };
+}
+
+// ===== Step 1: ຮັບລົດເຂົ້າ =====
+async function renderJOStep1(j, v) {
+  const drivers = await db.drivers.toArray();
+  const techs = (await db.tech_profiles.toArray()).filter(t => t.active!==false);
+  return `
+    <h3 style="color:var(--primary);margin:0 0 6px;display:flex;align-items:center;gap:8px">
+      <span style="background:#3B82F6;color:#fff;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700">1</span>
+      🚪 ຮັບລົດເຂົ້າສ້ອມ
+    </h3>
+    <p style="color:var(--muted);font-size:12px;margin:0 0 14px">ບັນທຶກຂໍ້ມູນເບື້ອງຕົ້ນເມື່ອລົດເຂົ້າອູ່</p>
+
+    <div class="row">
+      <div class="fld"><label>📏 km ຕອນເຂົ້າ</label><input id="wiz_km_in" type="number" value="${j.km_in||0}"/></div>
+      <div class="fld"><label>⛽ ລະດັບນ້ຳມັນ</label><select id="wiz_fuel_in">
+        <option value="empty" ${j.fuel_in==='empty'?'selected':''}>E - ຫມົດ</option>
+        <option value="quarter" ${j.fuel_in==='quarter'?'selected':''}>¼ - ໜ້ອຍ</option>
+        <option value="half" ${j.fuel_in==='half'?'selected':''}>½ - ກາງ</option>
+        <option value="three_quarter" ${j.fuel_in==='three_quarter'?'selected':''}>¾ - ຫຼາຍ</option>
+        <option value="full" ${j.fuel_in==='full'?'selected':''}>F - ເຕັມ</option>
+      </select></div>
+    </div>
+    <div class="fld"><label>📝 ສະພາບລົດຕອນເຂົ້າ</label>
+      <textarea id="wiz_condition_in" rows="2" placeholder="ມີຮອຍຂູດເລັກນ້ອຍ ດ້ານຊ້າຍ, ບໍ່ມີຄວາມເສຍຫາຍຫລັກ...">${escapeHtml(j.condition_in||'')}</textarea>
+    </div>
+    <div class="row">
+      <div class="fld"><label>👤 ຄົນສົ່ງສ້ອມ</label><select id="wiz_driver">
+        <option value="">— ບໍ່ໄດ້ລະບຸ —</option>
+        ${drivers.map(d => `<option value="${escapeHtml(d.name)}" ${j.driver===d.name?'selected':''}>${escapeHtml(d.name)} (${d.driver_id})</option>`).join('')}
+      </select></div>
+      <div class="fld"><label>📞 ເບີຄົນສົ່ງ</label><input id="wiz_customer_phone" value="${escapeHtml(j.customer_phone||'')}" placeholder="020-xxx-xxxx"/></div>
+    </div>
+    <div class="fld"><label>🩺 ອາການທີ່ແຈ້ງ (Complaint)</label>
+      <textarea id="wiz_complaint" rows="3" placeholder="ເຄື່ອງເຮັດສຽງດັງເວລາສະຕາດ, ເບຣກລື່ນ..." style="font-size:13px">${escapeHtml(j.complaint||'')}</textarea>
+    </div>
+    <div class="fld"><label>👨‍🔧 ຊ່າງຜູ້ຮັບລົດ</label><select id="wiz_received_by">
+      <option value="">— ບໍ່ໄດ້ລະບຸ —</option>
+      ${techs.map(tc => `<option value="${tc.tech_id}" ${j.received_by_tech===tc.tech_id?'selected':''}>${tc.tech_id} — ${escapeHtml(tc.name)} (${tc.skill_level})</option>`).join('')}
+    </select></div>
+
+    <div style="background:#EFF6FF;padding:10px 12px;border-radius:6px;font-size:11px;color:var(--muted);margin-top:10px">
+      💡 <strong>ຄຳແນະນຳ:</strong> ບັນທຶກສະພາບລົດໃຫ້ລະອຽດ — ປ້ອງກັນຂໍ້ຖຽງກັນກັບລູກຄ້າພາຍຫລັງ. ຖ່າຍຮູບເພີ່ມເຕີມໃນຂັ້ນຕອນ QC.
+    </div>
+  `;
+}
+
+// ===== Step 2: ການວິໄຈ =====
+async function renderJOStep2(j) {
+  const techs = (await db.tech_profiles.toArray()).filter(t => t.active!==false);
+  return `
+    <h3 style="color:var(--primary);margin:0 0 6px;display:flex;align-items:center;gap:8px">
+      <span style="background:#F59E0B;color:#fff;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700">2</span>
+      🔍 ການວິໄຈ (Diagnosis)
+    </h3>
+    <p style="color:var(--muted);font-size:12px;margin:0 0 14px">ກວດສອບ + ສິ່ງທີ່ພົບ + ປະເມີນຄ່າໃຊ້ຈ່າຍ</p>
+
+    <div class="fld"><label>👷 ຊ່າງຜູ້ວິໄຈ / ຮັບຜິດຊອບ</label>
+      <select id="wiz_assigned">
+        <option value="">— ບໍ່ໄດ້ມອບໝາຍ —</option>
+        ${techs.map(tc => `<option value="${escapeHtml(tc.name)} (${tc.skill_level})" ${j.assigned?.includes(tc.name)?'selected':''}>${escapeHtml(tc.name)} (${tc.skill_level})</option>`).join('')}
+      </select>
+    </div>
+
+    <div class="fld"><label>🔍 ສິ່ງທີ່ພົບ (Findings)</label>
+      <textarea id="wiz_diagnosis" rows="5" placeholder="1. ປ໊ອມນ້ຳມັນເຄື່ອງເສຍ → ນ້ຳມັນລົ່ນ&#10;2. ໝໍ້ໄຟໝົດອາຍຸ → ສະຕາດບໍ່ໄດ້&#10;3. ໄສ້ກອງອາກາດສົກກະປົກ → ປ່ຽນ" style="font-size:13px">${escapeHtml(j.diagnosis||'')}</textarea>
+    </div>
+
+    <div class="row">
+      <div class="fld"><label>💰 ປະເມີນຄ່າສ້ອມລ່ວງໜ້າ (ກີບ)</label>
+        <input id="wiz_estimated" type="number" value="${j.estimated_cost||0}"/>
+      </div>
+      <div class="fld"><label>📅 ນັດສົ່ງມອບ</label>
+        <input id="wiz_date_promised" type="date" value="${j.date_promised||''}"/>
+      </div>
+    </div>
+
+    <div style="background:#FEF3C7;border-left:3px solid #F59E0B;padding:10px 12px;border-radius:4px;margin-top:10px">
+      <strong style="font-size:12px;color:#92400E">📞 ຂໍຄວາມເຫັນລູກຄ້າ:</strong>
+      <p style="font-size:11px;color:#78350F;margin:4px 0">ກ່ອນດຳເນີນສ້ອມ — ໂທແຈ້ງລູກຄ້າເຖິງສິ່ງທີ່ພົບ + ປະເມີນຄ່າໃຊ້ຈ່າຍ → ໃຫ້ລູກຄ້າອະນຸມັດ</p>
+    </div>
+  `;
+}
+
+// ===== Step 3: ອາໄຫລ່ =====
+async function renderJOStep3(j) {
+  const parts = await db.parts.toArray();
+  return `
+    <h3 style="color:var(--primary);margin:0 0 6px;display:flex;align-items:center;gap:8px">
+      <span style="background:#8B5CF6;color:#fff;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700">3</span>
+      📦 ອາໄຫລ່ທີ່ໃຊ້
+    </h3>
+    <p style="color:var(--muted);font-size:12px;margin:0 0 14px">ລາຍການອາໄຫລ່ + ລາຄາ (ດຶງຈາກສະຕັອກ ຫຼື ສັ່ງຊື້)</p>
+
+    <div class="fld"><label>📦 ລາຍການອາໄຫລ່</label>
+      <textarea id="wiz_parts_used" rows="6" placeholder="1 ແຖວ ຕໍ່ລາຍການ — ໃຊ້ Format: ລະຫັດ × ຈຳນວນ — ລາຄາ&#10;P-OIL-15W40 × 1 — 280,000&#10;P-FLT-OIL-HD × 1 — 120,000" style="font-size:13px;font-family:monospace">${escapeHtml(j.parts_used||'')}</textarea>
+    </div>
+
+    <div class="fld"><label>💰 ຄ່າອາໄຫລ່ລວມ (ກີບ)</label>
+      <input id="wiz_parts_cost" type="number" value="${j.parts_cost||0}"/>
+    </div>
+
+    <div style="background:#FAF5FF;border:1px solid #DDD6FE;border-radius:8px;padding:10px;margin-top:14px">
+      <strong style="font-size:12px;color:#5B21B6">📦 ສະຕັອກອາໄຫລ່ສຳຄັນ (Top 10)</strong>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:4px;margin-top:6px;font-size:11px;max-height:160px;overflow-y:auto">
+        ${parts.slice(0,10).map(p => `
+          <div style="background:white;padding:4px 8px;border-radius:4px;display:flex;justify-content:space-between">
+            <span><strong>${p.code}</strong> ${escapeHtml(p.name||'').slice(0,25)}</span>
+            <span style="color:${p.stock<p.min?'var(--bad)':'var(--ok)'};font-weight:600">${p.stock} ${p.unit||''}</span>
+          </div>
+        `).join('')}
+      </div>
+      <p style="font-size:10px;color:var(--muted);margin-top:6px">💡 ຖ້າຕ້ອງສັ່ງຊື້: ໄປໜ້າ <a onclick="closeJOWizard();go('pr')" style="color:var(--accent);cursor:pointer">ໃບສະເໜີຊື້ (PR)</a></p>
+    </div>
+  `;
+}
+
+// ===== Step 4: ສ້ອມ + ຄ່າແຮງ =====
+async function renderJOStep4(j) {
+  const labor = (await db.labor_entries.toArray()).filter(le => le.jo_id === j.jo_id);
+  const totalLaborCost = labor.reduce((a,le) => a + (le.charge_amount||0), 0);
+  const totalCommission = labor.reduce((a,le) => a + (le.commission_amount||0), 0);
+
+  return `
+    <h3 style="color:var(--primary);margin:0 0 6px;display:flex;align-items:center;gap:8px">
+      <span style="background:#10B981;color:#fff;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700">4</span>
+      🔧 ການສ້ອມ + Labor Entry (ຄ່າແຮງ)
+    </h3>
+    <p style="color:var(--muted);font-size:12px;margin:0 0 14px">ບັນທຶກວຽກສ້ອມທີ່ເຮັດ + ຄ່າແຮງຊ່າງ (Labor Entries)</p>
+
+    <div class="fld"><label>🔧 ວຽກທີ່ເຮັດ (Work Summary)</label>
+      <textarea id="wiz_work_done" rows="4" placeholder="1. ປ່ຽນປ໊ອມນ້ຳມັນເຄື່ອງ + ໄສ້ກອງ&#10;2. ປ່ຽນຖ່ານໝໍ້ໄຟ + ກວດສະຕາດ&#10;3. ປ່ຽນໄສ້ກອງອາກາດ" style="font-size:13px">${escapeHtml(j.work_done||'')}</textarea>
+    </div>
+
+    <!-- Labor Entries linked to this JO -->
+    <div style="background:#F0FDF4;border:2px solid #10B981;border-radius:10px;padding:12px;margin:14px 0">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <strong style="color:#047857;font-size:13px">💼 Labor Entries — ບັນທຶກຄ່າແຮງຊ່າງ</strong>
+        <button class="btn sm" style="background:#10B981;color:#fff" onclick="addLaborToJO('${j.jo_id}', ${j.id})">+ ເພີ່ມຄ່າແຮງ</button>
+      </div>
+
+      ${labor.length === 0 ? `
+        <div style="text-align:center;padding:14px;color:var(--muted);font-size:12px">
+          ຍັງບໍ່ມີ Labor Entry — ກົດ <strong>+ ເພີ່ມຄ່າແຮງ</strong> ເພື່ອບັນທຶກວຽກສ້ອມຂອງຊ່າງ
+        </div>
+      ` : `
+        <table style="font-size:12px;background:white;border-radius:6px;overflow:hidden">
+          <tr><th>ຊ່າງ</th><th>ບໍລິການ</th><th style="text-align:right">ຄ່າແຮງ</th><th style="text-align:right">ຄອມ</th><th></th></tr>
+          ${labor.map(le => `<tr>
+            <td>${escapeHtml(le.tech_name||'-')}${le.is_team?'<br><small style="color:#0F766E">👥 ທີມ '+le.team_splits.length+'</small>':''}</td>
+            <td>${escapeHtml(le.service_name||'-')}<br><small style="color:var(--muted)">${le.actual_hours||0} ຊມ.</small></td>
+            <td style="text-align:right;font-weight:700">${fmt(le.charge_amount||0)}</td>
+            <td style="text-align:right;color:var(--ok);font-weight:600">${fmt(le.commission_amount||0)}</td>
+            <td class="actions compact">
+              <button class="btn sm icon outline" onclick="openLaborEntryModal(${le.id})" title="ແກ້">✏️</button>
+            </td>
+          </tr>`).join('')}
+          <tr style="background:#DCFCE7;font-weight:700">
+            <td colspan="2" style="text-align:right">ລວມ:</td>
+            <td style="text-align:right">${fmt(totalLaborCost)}</td>
+            <td style="text-align:right;color:var(--ok)">${fmt(totalCommission)}</td>
+            <td></td>
+          </tr>
+        </table>
+      `}
+    </div>
+
+    <div class="row">
+      <div class="fld"><label>⏱ ຊົ່ວໂມງລວມ</label><input id="wiz_labor_h" type="number" step="0.5" value="${j.labor_hours||0}"/></div>
+      <div class="fld"><label>💰 ຄ່າແຮງລວມ (Auto)</label>
+        <input id="wiz_labor_cost" type="number" value="${j.labor_cost||totalLaborCost}" style="background:#FEF3C7;font-weight:700"/>
+      </div>
+    </div>
+  `;
+}
+
+// Helper: ເພີ່ມ Labor Entry ໃຫ້ JO ນີ້ (ເປີດ Modal ໃໝ່ — pre-fill jo_id)
+async function addLaborToJO(joId, joDbId) {
+  // ບັນທຶກກ່ອນ ແລ້ວປິດ wizard ຊົ່ວຄາວ
+  await saveJOWizardData();
+  const j = await db.joborders.get(joDbId);
+  // ປິດ wizard modal ຊົ່ວຄາວ ບໍ່ໃຫ້ Modal ຊ້ອນກັນ
+  const mbg = document.querySelector('.modal-bg'); if (mbg) mbg.classList.remove('show');
+  await openLaborEntryModal(null, { jo_id: joId, vehicle_id: j.vehicle_id });
+  // ຫລັງຈາກປິດ Labor modal — ກັບມາ wizard ໂດຍຕົງ
+  const interval = setInterval(async () => {
+    if (!document.querySelector('.modal-bg.show')) {
+      clearInterval(interval);
+      _joWizData = await db.joborders.get(joDbId);
+      await renderJOWorkflow();
+    }
+  }, 500);
+}
+
+// ===== Step 5: QC =====
+async function renderJOStep5(j) {
+  return `
+    <h3 style="color:var(--primary);margin:0 0 6px;display:flex;align-items:center;gap:8px">
+      <span style="background:#06B6D4;color:#fff;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700">5</span>
+      ✅ QC (Quality Check) ກ່ອນສົ່ງມອບ
+    </h3>
+    <p style="color:var(--muted);font-size:12px;margin:0 0 14px">ກວດສອບຄຸນນະພາບກ່ອນສົ່ງມອບລົດໃຫ້ລູກຄ້າ</p>
+
+    <div style="background:#ECFEFF;border:1px solid #06B6D4;border-radius:8px;padding:12px;margin-bottom:14px">
+      <strong style="font-size:13px;color:#0E7490">📋 QC Checklist ມາດຕະຖານ KALA</strong>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-top:8px;font-size:12px">
+        ${[
+          {k:'leak',label:'🔍 ກວດການລົ່ນ (ນ້ຳມັນ, ນ້ຳ, ນ້ຳມັນເບຣກ)'},
+          {k:'engine',label:'🔧 ຟັງສຽງເຄື່ອງຍົນ'},
+          {k:'brake',label:'🛑 ທົດສອບເບຣກ'},
+          {k:'lights',label:'💡 ໄຟໜ້າ/ໄຟຫລັງ/ໄຟຕັ້ງ'},
+          {k:'horn',label:'🔊 ສຽງແກ'},
+          {k:'wiper',label:'💧 ປັດນ້ຳຝົນ'},
+          {k:'ac',label:'❄️ ແອ'},
+          {k:'tire',label:'🛞 ຢາງ + ແຮງດັນ'},
+          {k:'cleanliness',label:'🧹 ຄວາມສະອາດ'},
+          {k:'testdrive',label:'🚗 ທົດສອບຂັບ (Test Drive)'},
+        ].map(it => `
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;background:white;padding:6px 8px;border-radius:4px">
+            <input type="checkbox" id="qc_${it.k}" ${j.qc_results?.[it.k]?'checked':''}/>
+            ${it.label}
+          </label>
+        `).join('')}
+      </div>
+    </div>
+
+    <div class="fld"><label>📝 ໝາຍເຫດ QC + ບັນຫາທີ່ພົບ (ຖ້າມີ)</label>
+      <textarea id="wiz_qc_notes" rows="3" placeholder="ກວດສອບໝົດ ປ່ອຍລົດໄດ້... / ພົບປັນຫາ x ຕ້ອງສ້ອມເພີ່ມ">${escapeHtml(j.qc_notes||'')}</textarea>
+    </div>
+
+    <div style="background:#FEF3C7;border-left:3px solid #F59E0B;padding:10px 12px;border-radius:4px;font-size:11px;color:#78350F">
+      ⚠️ <strong>ກວດກວດ:</strong> ຖ້າພົບບັນຫາ → <strong>ກັບໄປຂັ້ນຕອນ 4</strong> ເພື່ອສ້ອມເພີ່ມ ກ່ອນສົ່ງມອບ
+    </div>
+  `;
+}
+
+// ===== Step 6: ສົ່ງມອບ =====
+async function renderJOStep6(j) {
+  const labor = (await db.labor_entries.toArray()).filter(le => le.jo_id === j.jo_id);
+  const totalLaborCost = labor.reduce((a,le) => a + (le.charge_amount||0), 0);
+  const partsCost = j.parts_cost||0;
+  const outsourceCost = j.outsource_cost||0;
+  const grandTotal = totalLaborCost + partsCost + outsourceCost;
+
+  return `
+    <h3 style="color:var(--primary);margin:0 0 6px;display:flex;align-items:center;gap:8px">
+      <span style="background:#0F3D7A;color:#fff;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700">6</span>
+      🚪 ສົ່ງລົດກັບ — ສະຫຼຸບ + ຮັບເງິນ
+    </h3>
+    <p style="color:var(--muted);font-size:12px;margin:0 0 14px">ສະຫຼຸບຄ່າໃຊ້ຈ່າຍທັງໝົດ + ພິມບິນ + ຮັບເງິນຈາກລູກຄ້າ</p>
+
+    <!-- Cost summary -->
+    <div style="background:linear-gradient(135deg,#FEF3C7,#FDE68A);border-radius:10px;padding:14px;margin-bottom:14px">
+      <h4 style="color:#92400E;margin:0 0 10px;font-size:14px">💰 ສະຫຼຸບຄ່າໃຊ້ຈ່າຍ</h4>
+      <table style="width:100%;font-size:13px">
+        <tr><td>💼 ຄ່າແຮງ (Labor Entries)</td><td style="text-align:right;font-weight:700">${fmt(totalLaborCost)} ກີບ</td></tr>
+        <tr><td>📦 ຄ່າອາໄຫລ່</td><td style="text-align:right;font-weight:700">${fmt(partsCost)} ກີບ</td></tr>
+        ${outsourceCost>0?`<tr><td>🔨 ຄ່າ Outsource</td><td style="text-align:right;font-weight:700">${fmt(outsourceCost)} ກີບ</td></tr>`:''}
+        <tr style="border-top:2px solid #92400E;font-size:16px"><td><strong>💴 ລວມຍອດທີ່ຕ້ອງຮັບ</strong></td><td style="text-align:right;font-weight:800;color:#92400E">${fmt(grandTotal)} ກີບ</td></tr>
+      </table>
+    </div>
+
+    <div class="row">
+      <div class="fld"><label>💴 ຍອດເງິນທີ່ຮັບແທ້ (ກີບ)</label>
+        <input id="wiz_actual_cost" type="number" value="${j.actual_cost||grandTotal}"/>
+      </div>
+      <div class="fld"><label>💳 ການຊຳລະ</label>
+        <select id="wiz_payment_method">
+          <option value="company" ${j.payment_method==='company'?'selected':''}>🏢 ບໍລິສັດຮັບຜິດຊອບ</option>
+          <option value="customer" ${j.payment_method==='customer'?'selected':''}>👤 ລູກຄ້າຈ່າຍເງິນສົດ</option>
+          <option value="customer_credit" ${j.payment_method==='customer_credit'?'selected':''}>👤 ລູກຄ້າຈ່າຍບັດເຄຣດິດ/Transfer</option>
+          <option value="warranty" ${j.payment_method==='warranty'?'selected':''}>🛡 Warranty (Free)</option>
+          <option value="insurance" ${j.payment_method==='insurance'?'selected':''}>📋 ປະກັນໄພ</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="fld"><label>📅 ວັນທີສຳເລັດຈິງ</label>
+      <input id="wiz_date_completed" type="date" value="${j.date_completed||todayISO()}"/>
+    </div>
+
+    <div class="fld"><label>📝 ໝາຍເຫດສຳລັບລູກຄ້າ</label>
+      <textarea id="wiz_customer_note" rows="2" placeholder="ໝາຍເຫດ ຫລື ຄຳແນະນຳໃຫ້ລູກຄ້າ...">${escapeHtml(j.customer_note||'')}</textarea>
+    </div>
+    <div class="fld"><label>📝 ໝາຍເຫດພາຍໃນ</label>
+      <textarea id="wiz_notes" rows="2">${escapeHtml(j.notes||'')}</textarea>
+    </div>
+
+    <div style="background:#DCFCE7;border:1px solid #10B981;border-radius:8px;padding:12px;text-align:center;margin-top:14px">
+      <strong style="color:#047857;font-size:13px">🎉 ພ້ອມສົ່ງມອບ!</strong>
+      <p style="font-size:11px;color:#065F46;margin:6px 0 0">ກົດ <strong>🖨 ພິມບິນສຳເລັດ</strong> ດ້ານລຸ່ມ ເພື່ອພິມເຈ້ຍໃບສຸດທ້າຍໃຫ້ລູກຄ້າເຊັນຮັບລົດ</p>
+    </div>
+  `;
+}
+
+// ===== ພິມບິນສຳເລັດ (Final Invoice) =====
+async function printJOFinalReceipt(joDbId) {
+  const j = await db.joborders.get(joDbId);
+  if (!j) { toast('ບໍ່ພົບ JO', 'bad'); return; }
+  const vehicles = await db.vehicles.toArray();
+  const v = vehicles.find(x => x.vehicle_id === j.vehicle_id);
+  const labor = (await db.labor_entries.toArray()).filter(le => le.jo_id === j.jo_id);
+
+  const totalLaborCost = labor.reduce((a,le) => a + (le.charge_amount||0), 0);
+  const partsCost = j.parts_cost||0;
+  const outsourceCost = j.outsource_cost||0;
+  const grandTotal = totalLaborCost + partsCost + outsourceCost;
+
+  // ດຶງລາຍການອາໄຫລ່ຈາກ parts_used (text format)
+  const partsLines = (j.parts_used||'').split('\n').filter(l => l.trim());
+
+  const now = new Date().toLocaleString('lo-LA');
+  const html = `<!DOCTYPE html>
+<html lang="lo"><head><meta charset="UTF-8">
+<title>ບິນສ້ອມລົດ ${j.jo_id}</title>
+<style>
+  @page { size: A4; margin: 14mm 18mm; }
+  body { font-family: 'Noto Sans Lao','Phetsarath OT',Arial,sans-serif; color:#1F2937; font-size:13px; line-height:1.5; margin:0 }
+  .header { text-align:center; border-bottom:3px double #0F3D7A; padding-bottom:14px; margin-bottom:18px }
+  .header h1 { color:#0F3D7A; font-size:22px; margin:0 0 4px; letter-spacing:1px }
+  .header .co { color:#475569; font-size:13px; margin:0 }
+  .badge { display:inline-block; background:#0F3D7A; color:#fff; padding:4px 14px; border-radius:20px; font-size:11px; font-weight:700; margin-bottom:10px }
+  h2 { color:#0F3D7A; font-size:15px; border-bottom:2px solid #0F3D7A; padding-bottom:4px; margin:14px 0 8px }
+  table.info td { padding:5px 8px; border:1px solid #E5E7EB; font-size:12px }
+  table.info td:nth-child(odd) { background:#F8FAFC; font-weight:600; color:#475569; width:22% }
+  table.items th { background:#0F3D7A; color:#fff; padding:8px; text-align:left; font-size:11px }
+  table.items td { padding:6px 8px; border-bottom:1px solid #E5E7EB; font-size:12px }
+  table.items td.right { text-align:right; font-weight:600 }
+  .totals { margin-top:14px; background:linear-gradient(135deg,#F0F9FF,#DBEAFE); padding:14px; border-radius:8px; border:2px solid #0F3D7A }
+  .totals .row { display:flex; justify-content:space-between; padding:4px 0; font-size:13px }
+  .totals .grand { font-size:18px; font-weight:800; color:#0F3D7A; border-top:2px solid #0F3D7A; padding-top:8px; margin-top:8px }
+  .sigs { display:grid; grid-template-columns:repeat(3,1fr); gap:24px; margin-top:30px; padding-top:14px }
+  .sig { text-align:center; border-top:1.5px solid #475569; padding-top:6px }
+  .sig .role { font-size:11px; color:#475569 }
+  .footer { margin-top:14px; padding-top:8px; border-top:1px dashed #94A3B8; font-size:10px; color:#94A3B8; text-align:center }
+  table.full { width:100% }
+  @media print { body { -webkit-print-color-adjust:exact; print-color-adjust:exact } .no-print{display:none} }
+</style></head><body>
+
+<div class="header">
+  <div class="badge">🧾 ບິນສ້ອມລົດ — JOB ORDER INVOICE</div>
+  <h1>🛠 KALA Garage</h1>
+  <div class="co">ບໍລິສັດ ມະຫາໄຊ ເທຣດດິ້ງ ຈຳກັດ — Mahasai Trading Co., Ltd.</div>
+</div>
+
+<div style="display:flex;justify-content:space-between;margin-bottom:8px">
+  <div><strong>📄 ເລກທີ:</strong> <span style="font-family:monospace;color:#0F3D7A;font-size:14px;font-weight:700">${j.jo_id}</span></div>
+  <div><strong>📅 ວັນທີ:</strong> ${j.date_completed||todayISO()}</div>
+</div>
+
+<h2>🚗 ຂໍ້ມູນລົດ</h2>
+<table class="info full">
+  <tr><td>ລະຫັດລົດ</td><td><strong>${j.vehicle_id}</strong></td>
+      <td>ປະເພດ</td><td>${v?escapeHtml(v.type):'-'}</td></tr>
+  <tr><td>ປ້າຍ</td><td>${v?escapeHtml(v.plate):'-'}</td>
+      <td>km ຕອນເຂົ້າ</td><td>${fmt(j.km_in||0)}</td></tr>
+  <tr><td>ຄົນສົ່ງສ້ອມ</td><td>${escapeHtml(j.driver||'-')}</td>
+      <td>ເບີໂທ</td><td>${escapeHtml(j.customer_phone||'-')}</td></tr>
+</table>
+
+<h2>🩺 ອາການ + ການວິໄຈ</h2>
+<table class="info full">
+  <tr><td>ອາການ</td><td colspan="3" style="background:#FEF3C7">${escapeHtml(j.complaint||'-')}</td></tr>
+  <tr><td>ການວິໄຈ</td><td colspan="3">${escapeHtml(j.diagnosis||'-').replace(/\n/g,'<br>')}</td></tr>
+  <tr><td>ວຽກທີ່ເຮັດ</td><td colspan="3">${escapeHtml(j.work_done||'-').replace(/\n/g,'<br>')}</td></tr>
+</table>
+
+${labor.length > 0 ? `
+<h2>💼 ຄ່າແຮງ (Labor)</h2>
+<table class="items full">
+  <tr>
+    <th>ຊ່າງ</th>
+    <th>ບໍລິການ</th>
+    <th width="60">ຊມ.</th>
+    <th width="120">ຄ່າແຮງ (ກີບ)</th>
+  </tr>
+  ${labor.map(le => `<tr>
+    <td>${escapeHtml(le.tech_name||'-')}${le.is_team?'<br><small>+ທີມ '+le.team_splits.length+'</small>':''}</td>
+    <td>${escapeHtml(le.service_name||'-')}</td>
+    <td style="text-align:center">${le.actual_hours||0}</td>
+    <td class="right">${fmt(le.charge_amount||0)}</td>
+  </tr>`).join('')}
+  <tr style="background:#F8FAFC;font-weight:700">
+    <td colspan="3" style="text-align:right">ລວມຄ່າແຮງ:</td>
+    <td class="right">${fmt(totalLaborCost)}</td>
+  </tr>
+</table>` : ''}
+
+${partsLines.length > 0 ? `
+<h2>📦 ອາໄຫລ່ທີ່ໃຊ້</h2>
+<table class="items full">
+  <tr><th>ລາຍການ</th></tr>
+  ${partsLines.map(l => `<tr><td>${escapeHtml(l)}</td></tr>`).join('')}
+  <tr style="background:#F8FAFC;font-weight:700">
+    <td style="text-align:right">ລວມຄ່າອາໄຫລ່: <span style="font-size:14px;color:#0F3D7A">${fmt(partsCost)} ກີບ</span></td>
+  </tr>
+</table>` : ''}
+
+<div class="totals">
+  <div class="row"><span>💼 ຄ່າແຮງ:</span><strong>${fmt(totalLaborCost)} ກີບ</strong></div>
+  <div class="row"><span>📦 ຄ່າອາໄຫລ່:</span><strong>${fmt(partsCost)} ກີບ</strong></div>
+  ${outsourceCost>0?`<div class="row"><span>🔨 ຄ່າ Outsource:</span><strong>${fmt(outsourceCost)} ກີບ</strong></div>`:''}
+  <div class="row grand"><span>💴 ລວມຍອດທີ່ຕ້ອງຊຳລະ:</span><span>${fmt(grandTotal)} ກີບ</span></div>
+</div>
+
+<div style="margin-top:10px;padding:8px 10px;background:#FEF3C7;border-left:3px solid #F59E0B;border-radius:4px;font-size:11px">
+  📌 <strong>ໝາຍເຫດ:</strong> ບໍລິສັດຮັບປະກັນຄຸນນະພາບງານສ້ອມ <strong>30 ມື້</strong> ນັບແຕ່ວັນທີຮັບລົດ. ສຳລັບອາໄຫລ່ ໃຊ້ການຮັບປະກັນຕາມຜູ້ຜະລິດ.
+  ${j.customer_note?`<br>📝 <strong>ຄຳແນະນຳເພີ່ມເຕີມ:</strong> ${escapeHtml(j.customer_note)}`:''}
+</div>
+
+<div class="sigs">
+  <div class="sig">
+    <div class="role">ຊ່າງຜູ້ສ້ອມ</div>
+    <div style="font-size:12px;margin-top:2px">${escapeHtml(j.assigned||'-')}</div>
+  </div>
+  <div class="sig">
+    <div class="role">Manager ກວດສອບ</div>
+    <div style="font-size:12px;margin-top:2px">............................</div>
+  </div>
+  <div class="sig">
+    <div class="role">ລູກຄ້າຮັບລົດ</div>
+    <div style="font-size:12px;margin-top:2px">${escapeHtml(j.driver||'............................')}</div>
+    <div style="font-size:9px;color:#94A3B8;margin-top:2px">ວັນທີ: ____/____/______</div>
+  </div>
+</div>
+
+<div class="footer">
+  ບິນອອກໂດຍລະບົບ KALA Garage Manager · ພິມ ${now}<br>
+  ບໍລິສັດ ມະຫາໄຊ ເທຣດດິ້ງ ຈຳກັດ · ໂທ. 020-XXX-XXXX
+</div>
+
+<div class="no-print" style="text-align:center;margin-top:20px;padding:14px;background:#F8FAFC;border-radius:8px">
+  <button onclick="window.print()" style="background:#0F3D7A;color:#fff;border:none;padding:10px 24px;border-radius:8px;font-size:14px;cursor:pointer;font-weight:600">🖨 ພິມບິນ</button>
+  <button onclick="window.close()" style="background:#64748B;color:#fff;border:none;padding:10px 24px;border-radius:8px;font-size:14px;cursor:pointer;margin-left:8px">✕ ປິດ</button>
+</div>
+
+</body></html>`;
+
+  const w = window.open('', '_blank');
+  if (!w) { toast('ກະລຸນາອະນຸຍາດ Pop-up', 'warn'); return; }
+  w.document.write(html); w.document.close();
 }
 
 function updateJOCostTotal() {
