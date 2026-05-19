@@ -877,7 +877,7 @@ const I18N = {
     save: "บันทึก", cancel: "ยกเลิก", delete: "ลบ", edit: "แก้ไข", view: "ดู", close: "ปิด",
     priority_critical: "ด่วนที่สุด", priority_high: "ด่วน", priority_normal: "ปกติ",
     status_active: "ใช้งาน", status_repair: "ซ่อม", status_pm: "รอ PM", status_disposed: "ปลด",
-    jo_open: "เปิดใหม่", jo_diag: "วินิจฉัย", jo_progress: "กำลังซ่อม", jo_qc: "QC", jo_done: "เสร็จสิ้น",
+    jo_open: "เปิดใหม่", jo_diag: "วินิจฉัย", jo_progress: "กำลังซ่อม", jo_qc: "QC", jo_done: "เสร็จสิ้น", jo_cancelled: "ยกเลิก",
     saved: "บันทึกแล้ว", deleted: "ลบแล้ว", confirm_delete: "ต้องการลบรายการนี้ใช่หรือไม่?",
     no_data: "ยังไม่มีข้อมูล กดปุ่ม + เพื่อเริ่มต้น",
     kpi_availability: "รถพร้อมใช้", kpi_open_jo: "ใบสั่งงานเปิด", kpi_pm_due: "PM ใกล้ครบ", kpi_low_stock: "อะไหล่ต่ำกว่า Min",
@@ -934,7 +934,7 @@ const I18N = {
     save: "ບັນທຶກ", cancel: "ຍົກເລີກ", delete: "ລຶບ", edit: "ແກ້ໄຂ", view: "ເບິ່ງ", close: "ປິດ",
     priority_critical: "ດ່ວນທີ່ສຸດ", priority_high: "ດ່ວນ", priority_normal: "ປົກກະຕິ",
     status_active: "ໃຊ້ງານ", status_repair: "ກຳລັງສ້ອມ", status_pm: "ລໍຖ້າ PM", status_disposed: "ປົດປະຈຳການ",
-    jo_open: "ເປີດໃໝ່", jo_diag: "ກຳລັງວິນິໄສ", jo_progress: "ກຳລັງສ້ອມ", jo_qc: "QC", jo_done: "ສຳເລັດ",
+    jo_open: "ເປີດໃໝ່", jo_diag: "ກຳລັງວິນິໄສ", jo_progress: "ກຳລັງສ້ອມ", jo_qc: "QC", jo_done: "ສຳເລັດ", jo_cancelled: "ຍົກເລີກ",
     saved: "ບັນທຶກແລ້ວ", deleted: "ລຶບແລ້ວ", confirm_delete: "ຕ້ອງການລຶບລາຍການນີ້ບໍ?",
     no_data: "ຍັງບໍ່ມີຂໍ້ມູນ ກົດປຸ່ມ + ເພື່ອເລີ່ມຕົ້ນ",
     kpi_availability: "ລົດພ້ອມໃຊ້", kpi_open_jo: "ໃບສັ່ງສ້ອມເປີດ", kpi_pm_due: "PM ໃກ້ຄົບ", kpi_low_stock: "ອາໄຫລ່ຕ່ຳກວ່າ Min",
@@ -7280,20 +7280,29 @@ pages.jo = async () => {
       <table class="resizable">
         <tr><th>JO</th><th>${t('nav_vehicles')}</th><th>${t('fld_complaint')}</th>
           <th>${t('fld_priority')}</th><th>${t('fld_status')}</th><th>${t('fld_assigned')}</th><th>Created</th><th>Receipt</th><th>Pre-Delivery</th><th></th></tr>
-        ${pageRes.items.map(j => `<tr>
-          <td><strong>${j.jo_id}</strong></td><td>${j.vehicle_id}</td><td>${escapeHtml(j.complaint).slice(0,60)}</td>
+        ${pageRes.items.map(j => `<tr style="${j.status==='cancelled'?'background:#FEE2E2;opacity:.75':''}">
+          <td><strong>${j.jo_id}</strong>${j.status==='cancelled'?'<br><small style="color:var(--bad);font-weight:700">🚫 ຍົກເລີກ</small>':''}</td>
+          <td>${j.customer_type==='walkin'?`<strong>${escapeHtml(j.customer_name||'-')}</strong><br><small style="color:#8B5CF6">🚪 ${escapeHtml(j.ext_vehicle_plate||'')}</small>`:j.vehicle_id||'-'}</td>
+          <td>${escapeHtml(j.complaint||'').slice(0,60)}${j.status==='cancelled'&&j.cancel_reason?`<br><small style="color:var(--bad)">⛔ ${escapeHtml(j.cancel_reason)}</small>`:''}</td>
           <td><span class="pill ${j.priority==='critical'?'bad':j.priority==='high'?'warn':'gray'}">${t('priority_'+j.priority)}</span></td>
-          <td><select onchange="updateJOStatus(${j.id}, this.value)" style="padding:3px 6px;font-size:12px;border:1px solid var(--line);border-radius:4px">
-            ${['open','diag','progress','qc','done'].map(s => `<option value="${s}" ${j.status===s?'selected':''}>${t('jo_'+s)}</option>`).join('')}
-          </select></td>
+          <td>${j.status==='cancelled'
+            ? '<span class="pill bad">🚫 ຍົກເລີກ</span>'
+            : `<select onchange="updateJOStatus(${j.id}, this.value)" style="padding:3px 6px;font-size:12px;border:1px solid var(--line);border-radius:4px">
+                ${['open','diag','progress','qc','done'].map(s => `<option value="${s}" ${j.status===s?'selected':''}>${t('jo_'+s)}</option>`).join('')}
+              </select>`}</td>
           <td>${j.assigned||'-'}</td><td>${j.created}</td>
-          <td><button class="btn sm ${j.receipt_done?'ok':'outline'}" onclick="openReceiptInspection('${j.jo_id}','${j.vehicle_id}')" title="ໃບກວດຮັບລົດເຂົ້າສ້ອມ">${j.receipt_done?'✓':'+'} ໃບກວດຮັບ</button></td>
-          <td><button class="btn sm ${j.predelivery_done?'ok':'outline'}" onclick="openPreDeliveryInspection('${j.jo_id}','${j.vehicle_id}')" title="ໃບກວດກ່ອນສົ່ງມອບ">${j.predelivery_done?'✓':'+'} ສົ່ງມອບ</button></td>
+          <td>${j.status!=='cancelled'?`<button class="btn sm ${j.receipt_done?'ok':'outline'}" onclick="openReceiptInspection('${j.jo_id}','${j.vehicle_id}')" title="ໃບກວດຮັບລົດເຂົ້າສ້ອມ">${j.receipt_done?'✓':'+'} ໃບກວດຮັບ</button>`:'<span style="color:var(--muted)">—</span>'}</td>
+          <td>${j.status!=='cancelled'?`<button class="btn sm ${j.predelivery_done?'ok':'outline'}" onclick="openPreDeliveryInspection('${j.jo_id}','${j.vehicle_id}')" title="ໃບກວດກ່ອນສົ່ງມອບ">${j.predelivery_done?'✓':'+'} ສົ່ງມອບ</button>`:'<span style="color:var(--muted)">—</span>'}</td>
           <td class="actions compact">
-            <button class="btn sm icon" style="background:linear-gradient(135deg,#0F3D7A,#1E40AF);color:#fff" onclick="openJOWorkflow(${j.id})" title="ເປີດ Workflow Wizard">🎯</button>
-            <button class="btn sm icon" onclick="printJO(${j.id})" title="${t('print')}">🖨</button>
-            <button class="btn sm icon outline" onclick="openJOModal(${j.id})" title="${t('edit')}">✏️</button>
-            ${adminOnly(`<button class="btn sm icon danger" onclick="delJO(${j.id})" title="${t('delete')}">🗑</button>`)}</td>
+            ${j.status==='cancelled' ? `
+              <button class="btn sm icon ok" onclick="reopenJO(${j.id})" title="ເປີດໃໝ່">🔄</button>
+            ` : `
+              <button class="btn sm icon" style="background:linear-gradient(135deg,#0F3D7A,#1E40AF);color:#fff" onclick="openJOWorkflow(${j.id})" title="ເປີດ Workflow Wizard">🎯</button>
+              <button class="btn sm icon" onclick="printJO(${j.id})" title="${t('print')}">🖨</button>
+              <button class="btn sm icon outline" onclick="openJOModal(${j.id})" title="${t('edit')}">✏️</button>
+              <button class="btn sm icon danger" onclick="cancelJO(${j.id}, false)" title="ຍົກເລີກ">🚫</button>
+            `}
+            ${adminOnly(`<button class="btn sm icon danger" onclick="delJO(${j.id})" title="ລົບຖາວອນ">🗑</button>`)}</td>
         </tr>`).join('')}
       </table>
       ${pagerUI('jo', totalJ, 'pages.jo')}`}
@@ -7431,6 +7440,107 @@ async function regenerateJoId(dateStr) {
   if ($('#j_id')) $('#j_id').value = newId;
 }
 
+// ============================================================================
+// 🚫 JO CANCEL / REOPEN — ຍົກເລີກ ຫລື ເປີດໃໝ່
+// ============================================================================
+async function cancelJO(joDbId, fromWizard) {
+  const j = await db.joborders.get(joDbId);
+  if (!j) { toast('ບໍ່ພົບ JO', 'bad'); return; }
+  if (j.status === 'done') { toast('JO ນີ້ສຳເລັດແລ້ວ — ບໍ່ສາມາດຍົກເລີກ', 'warn'); return; }
+  if (j.status === 'cancelled') { toast('JO ນີ້ຍົກເລີກແລ້ວ', 'warn'); return; }
+
+  // ສະແດງ Modal ເລືອກເຫດຜົນ
+  const labor = (await db.labor_entries.toArray()).filter(le => le.jo_id === j.jo_id);
+  const hasWork = labor.length > 0;
+
+  const body = `
+    <div class="alert ${hasWork?'bad':'warn'}" style="font-size:13px">
+      ⚠️ <strong>ຍົກເລີກ JO ${j.jo_id}</strong>
+      <br>${hasWork?`🚨 <strong>ມີ Labor Entry ${labor.length} ລາຍການ ເຊື່ອມໂຍງ</strong> — ການຍົກເລີກຈະບໍ່ລົບ Labor`:'✅ ບໍ່ມີ Labor ເຊື່ອມໂຍງ — ປອດໄພທີ່ຈະຍົກເລີກ'}
+    </div>
+
+    <div style="background:#F8FAFC;padding:10px;border-radius:8px;margin-bottom:10px;font-size:12px">
+      <strong>📋 ລາຍລະອຽດ JO:</strong><br>
+      ${j.customer_type==='walkin'
+        ? `👤 ${escapeHtml(j.customer_name||'-')} · 🚙 ${escapeHtml(j.ext_vehicle_plate||'-')}`
+        : `🚗 ${j.vehicle_id||'-'}`}<br>
+      🩺 ${escapeHtml((j.complaint||'').slice(0,80))}<br>
+      📅 ສ້າງ: ${j.date_in||j.created} · ສະຖານະ: <strong>${t('jo_'+j.status)||j.status}</strong>
+    </div>
+
+    <div class="fld">
+      <label>📋 ເຫດຜົນຍົກເລີກ *</label>
+      <select id="jo_cancel_reason" onchange="if(this.value==='ອື່ນໆ (ໃສ່ໝາຍເຫດ)'){document.getElementById('jo_cancel_other_box').style.display='block'}else{document.getElementById('jo_cancel_other_box').style.display='none'}">
+        <option value="">— ກະລຸນາເລືອກ —</option>
+        ${JO_CANCEL_REASONS.map(r => `<option value="${escapeHtml(r)}">${escapeHtml(r)}</option>`).join('')}
+      </select>
+    </div>
+
+    <div id="jo_cancel_other_box" style="display:none">
+      <div class="fld">
+        <label>ໝາຍເຫດເພີ່ມເຕີມ</label>
+        <input id="jo_cancel_other" placeholder="ອະທິບາຍເຫດຜົນລະອຽດ..."/>
+      </div>
+    </div>
+
+    <div class="fld">
+      <label>📝 ໝາຍເຫດເພີ່ມເຕີມ (ບໍ່ບັງຄັບ)</label>
+      <textarea id="jo_cancel_note" rows="2" placeholder="ລາຍລະອຽດເພີ່ມເຕີມ..."></textarea>
+    </div>
+
+    <div style="background:#FEE2E2;border-left:3px solid #DC2626;padding:8px 12px;border-radius:4px;font-size:11px;color:#991B1B">
+      ⚠️ <strong>ໝາຍເຫດ:</strong> ການຍົກເລີກບໍ່ໄດ້ລົບ JO — ຍັງເຫັນໃນປະຫວັດ. ສາມາດເປີດໃໝ່ໄດ້ພາຍຫລັງ (Manager ເທົ່ານັ້ນ).
+    </div>
+  `;
+
+  modal(`🚫 ຍົກເລີກ JO ${j.jo_id}`, body, `
+    <button class="btn outline" onclick="closeModal()">ບໍ່ ກັບຄືນ</button>
+    <button class="btn danger" onclick="confirmCancelJO(${joDbId}, ${!!fromWizard})">🚫 ຍ້ອນຍັນ ຍົກເລີກ</button>`);
+}
+
+async function confirmCancelJO(joDbId, fromWizard) {
+  const reason = $('#jo_cancel_reason').value;
+  const other = $('#jo_cancel_other')?.value || '';
+  const note = $('#jo_cancel_note').value;
+  if (!reason) { toast('ກະລຸນາເລືອກເຫດຜົນ', 'bad'); return; }
+
+  const fullReason = reason === 'ອື່ນໆ (ໃສ່ໝາຍເຫດ)' ? (other || 'ອື່ນໆ') : reason;
+  const user = (typeof cloud!=='undefined' && cloud.profile?.username) || 'local';
+
+  await db.joborders.update(joDbId, {
+    status: 'cancelled',
+    cancelled_at: new Date().toISOString(),
+    cancelled_by: user,
+    cancel_reason: fullReason,
+    cancel_note: note,
+    date_completed: todayISO(),
+  });
+
+  const j = await db.joborders.get(joDbId);
+  if (typeof auditLog==='function') auditLog('cancel', 'joborders', joDbId, `${j.jo_id} — ${fullReason}`);
+  toast(`🚫 ຍົກເລີກ ${j.jo_id} ສຳເລັດ`);
+
+  closeModal();
+  if (fromWizard) closeJOWizard();
+  if (currentPage === 'jo') pages.jo();
+}
+
+async function reopenJO(joDbId) {
+  const j = await db.joborders.get(joDbId);
+  if (!j) return;
+  if (j.status !== 'cancelled') { toast('JO ນີ້ບໍ່ໄດ້ຍົກເລີກ', 'warn'); return; }
+  if (!confirm(`ເປີດ JO ${j.jo_id} ໃໝ່? ສະຖານະຈະກັບໄປ "ເປີດໃໝ່"`)) return;
+
+  const user = (typeof cloud!=='undefined' && cloud.profile?.username) || 'local';
+  await db.joborders.update(joDbId, {
+    status: 'open', reopened_at: new Date().toISOString(), reopened_by: user,
+    cancelled_at: null, cancelled_by: null, cancel_reason: null,
+  });
+  if (typeof auditLog==='function') auditLog('reopen', 'joborders', joDbId, `${j.jo_id} reopened`);
+  toast(`🔄 ເປີດ ${j.jo_id} ໃໝ່ສຳເລັດ`);
+  pages.jo();
+}
+
 // ===========================================================================
 // 🎯 JO WORKFLOW WIZARD — ບິນຕໍ່ເນື່ອງ 6 ຂັ້ນຕອນໃນທີ່ດຽວ
 // ===========================================================================
@@ -7443,6 +7553,18 @@ const JO_STEPS = [
   { id:4, icon:'🔧', label:'ສ້ອມ + ຄ່າແຮງ',   status:'progress', desc:'ບັນທຶກວຽກສ້ອມ + Labor Entry' },
   { id:5, icon:'✅', label:'QC',              status:'qc',       desc:'ກວດສອບກ່ອນສົ່ງມອບ' },
   { id:6, icon:'🚪', label:'ສົ່ງມອບ',          status:'done',     desc:'ສະຫຼຸບ + ພິມບິນ + ຮັບເງິນ' },
+];
+
+// 🆕 ເຫດຜົນຍົກເລີກ JO — ມາດຕະຖານ KALA
+const JO_CANCEL_REASONS = [
+  'ລູກຄ້າປະຕິເສດການສ້ອມ (ລາຄາສູງເກີນ)',
+  'ລົດເຂົ້າແຕ່ບໍ່ມີບັນຫາຫຍັງ ກວດແລ້ວ ບໍ່ຕ້ອງສ້ອມ',
+  'ສ້ອມບໍ່ໄດ້ ຕ້ອງສົ່ງສ້ອມຮ້ານພາຍນອກ',
+  'ລົດເສຍຫາຍຫຼາຍ ບໍ່ຄຸ້ມຄ່າສ້ອມ',
+  'ລູກຄ້າຍົກເລີກ — ຕັດສິນໃຈເອົາລົດກັບ',
+  'ສ້າງຜິດ JO ໃຫ້ປ່ຽນລົດ',
+  'ຂໍ້ມູນຜິດພາດ — ສ້າງໃໝ່ດີກວ່າ',
+  'ອື່ນໆ (ໃສ່ໝາຍເຫດ)',
 ];
 
 let _joWizStep = 1;
@@ -7544,6 +7666,23 @@ async function renderJOWorkflow() {
         <button class="x" onclick="closeJOWizard()">✕</button>
       </div>
 
+      <!-- Cancelled banner -->
+      ${j.status==='cancelled' ? `
+        <div style="background:linear-gradient(135deg,#FEE2E2,#FECACA);padding:14px 18px;border-bottom:2px solid #DC2626">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <strong style="color:#991B1B;font-size:14px">🚫 JO ນີ້ຍົກເລີກແລ້ວ</strong>
+              <div style="font-size:11px;color:#7F1D1D;margin-top:2px">
+                ⛔ ${escapeHtml(j.cancel_reason||'')}
+                ${j.cancel_note?'<br>📝 '+escapeHtml(j.cancel_note):''}
+                <br>👤 ໂດຍ: ${escapeHtml(j.cancelled_by||'-')} · ${j.cancelled_at?new Date(j.cancelled_at).toLocaleString('lo'):''}
+              </div>
+            </div>
+            <button class="btn ok sm" onclick="reopenJO(${j.id});closeJOWizard()" title="ເປີດໃໝ່">🔄 ເປີດໃໝ່</button>
+          </div>
+        </div>
+      ` : ''}
+
       <!-- Step indicator -->
       <div style="display:flex;background:#F8FAFC;border-bottom:1px solid var(--line)">
         ${stepBar}
@@ -7555,9 +7694,10 @@ async function renderJOWorkflow() {
       </div>
 
       <!-- Footer with navigation -->
-      <div class="modal-f" style="display:flex;justify-content:space-between;align-items:center">
-        <div>
+      <div class="modal-f" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
+        <div style="display:flex;gap:6px">
           ${_joWizStep > 1 ? `<button class="btn outline" onclick="changeJOStep(${_joWizStep-1})">← ກັບຄືນ</button>` : ''}
+          <button class="btn danger" onclick="cancelJO(${j.id}, true)" title="ຍົກເລີກ JO">🚫 ຍົກເລີກ JO</button>
         </div>
         <div style="display:flex;gap:8px">
           <button class="btn outline" onclick="closeJOWizard()">💾 ບັນທຶກ + ປິດ</button>
