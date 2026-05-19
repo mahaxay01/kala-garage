@@ -7459,18 +7459,24 @@ async function openJOWorkflow(joId) {
     if (vehicles.length === 0) { toast('ຍັງບໍ່ມີລົດໃນລະບົບ', 'warn'); return; }
     j = {
       jo_id: await genIdAsync('JO', 'joborders', 'jo_id'),
-      vehicle_id: vehicles[0].vehicle_id,
+      vehicle_id: '',  // ✅ ບໍ່ pre-fill — ໃຫ້ user ເລືອກເອງ
+      customer_type:'internal', // 🆕 internal | walkin
+      // Walk-in customer fields
+      customer_name:'', customer_address:'',
+      ext_vehicle_plate:'', ext_vehicle_model:'', ext_vehicle_color:'', ext_vehicle_year:'',
       complaint:'', priority:'normal', status:'open', work_type:'corrective',
       assigned:'', driver:'', km_in:0, diagnosis:'', work_done:'',
       parts_used:'', labor_hours:0, estimated_cost:0, actual_cost:0,
       parts_cost:0, labor_cost:0, outsource_cost:0,
-      date_in: todayISO(), date_promised:'', date_completed:'',
+      date_in: todayISO(), time_in: new Date().toTimeString().slice(0,5),
+      date_promised:'', date_completed:'',
       location:'in_house', payment_method:'company',
       customer_phone:'', customer_note:'', notes:'',
       // Workflow tracking
       wiz_step:1, wiz_step1_done:false, wiz_step2_done:false,
       wiz_step3_done:false, wiz_step4_done:false, wiz_step5_done:false, wiz_step6_done:false,
       fuel_in:'half', condition_in:'', received_by_tech:'',
+      qc_results:{}, qc_notes:'',
       created: todayISO(),
     };
     const newId = await db.joborders.add(j);
@@ -7519,12 +7525,19 @@ async function renderJOWorkflow() {
       <!-- Header -->
       <div class="modal-h" style="background:linear-gradient(135deg,#0F3D7A,#1E40AF)">
         <div style="flex:1">
-          <div style="display:flex;align-items:center;gap:10px">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
             <h3 style="margin:0;font-size:18px">🎯 JO Workflow — ${j.jo_id}</h3>
             <span class="pill" style="background:rgba(255,255,255,.2);color:#fff;font-size:11px">${t('jo_'+j.status)||j.status}</span>
+            ${j.customer_type==='walkin'
+              ? '<span class="pill" style="background:#8B5CF6;color:#fff;font-size:11px">🚪 Walk-in</span>'
+              : '<span class="pill" style="background:rgba(59,130,246,.4);color:#fff;font-size:11px">🏢 Internal</span>'}
           </div>
           <div style="font-size:11px;opacity:.85;margin-top:2px">
-            🚗 ${j.vehicle_id} ${v?'— '+v.type+' ('+v.plate+')':''} · 📅 ${j.date_in}
+            ${j.customer_type==='walkin'
+              ? `👤 ${escapeHtml(j.customer_name||'(ຍັງບໍ່ໄດ້ໃສ່)')} · 🚙 ${escapeHtml(j.ext_vehicle_plate||'-')} ${escapeHtml(j.ext_vehicle_model||'')}`
+              : `🚗 ${j.vehicle_id||'(ຍັງບໍ່ໄດ້ເລືອກ)'}${v?' — '+v.type+' ('+v.plate+')':''}`
+            }
+             · 📅 ${j.date_in||'-'}
             ${j.customer_phone?' · 📞 '+j.customer_phone:''}
           </div>
         </div>
@@ -7575,6 +7588,13 @@ async function changeJOStep(stepId) {
 
 async function completeJOStep(stepId, advance) {
   await saveJOWizardData();
+  // 🆕 ກວດສອບຂໍ້ມູນບັງຄັບ ກ່ອນຍ້າຍ step
+  const j = await db.joborders.get(_joWizData.id);
+  const errors = validateJOStep(stepId, j);
+  if (errors.length > 0) {
+    toast('❌ ກະລຸນາແກ້ໄຂກ່ອນຕໍ່ໄປ:\n• ' + errors.join('\n• '), 'bad');
+    return;
+  }
   _joWizData[`wiz_step${stepId}_done`] = true;
   // ປ່ຽນ status ຂອງ JO ໃຫ້ກົງກັບຂັ້ນຕອນ
   const stepCfg = JO_STEPS.find(s => s.id === stepId);
@@ -7590,11 +7610,44 @@ async function completeJOStep(stepId, advance) {
   await renderJOWorkflow();
 }
 
+// ກວດສອບຂໍ້ມູນບັງຄັບໃນແຕ່ລະຂັ້ນຕອນ
+function validateJOStep(stepId, j) {
+  const errors = [];
+  if (stepId === 1) {
+    if (j.customer_type === 'walkin') {
+      if (!j.customer_name) errors.push('ໃສ່ຊື່ລູກຄ້າ');
+      if (!j.customer_phone) errors.push('ໃສ່ເບີໂທລູກຄ້າ');
+      if (!j.ext_vehicle_plate) errors.push('ໃສ່ປ້າຍລົດ');
+      if (!j.ext_vehicle_model) errors.push('ໃສ່ຍີ່ຫໍ້ / ລຸ້ນລົດ');
+    } else {
+      if (!j.vehicle_id) errors.push('ເລືອກລົດໃນ Fleet');
+    }
+    if (!j.complaint) errors.push('ໃສ່ອາການທີ່ແຈ້ງ');
+    if (!j.received_by_tech) errors.push('ເລືອກຊ່າງຜູ້ຮັບລົດ');
+    if (!j.date_in) errors.push('ໃສ່ວັນທີຮັບລົດ');
+  } else if (stepId === 2) {
+    if (!j.diagnosis) errors.push('ໃສ່ສິ່ງທີ່ພົບ (Diagnosis)');
+    if (!j.assigned) errors.push('ມອບໝາຍຊ່າງຮັບຜິດຊອບ');
+  } else if (stepId === 5) {
+    // QC — ບໍ່ບັງຄັບ ແຕ່ເຕືອນ
+  } else if (stepId === 6) {
+    if (!j.date_completed) errors.push('ໃສ່ວັນທີສຳເລັດ');
+    if ((j.actual_cost||0) <= 0 && j.customer_type === 'walkin') errors.push('ໃສ່ຍອດເງິນທີ່ຮັບ');
+  }
+  return errors;
+}
+
 async function saveJOWizardData() {
   if (!_joWizData) return;
   // Collect ALL field values from current step (use IDs from each render function)
   const fields = [
-    'wiz_km_in','wiz_fuel_in','wiz_condition_in','wiz_received_by','wiz_complaint','wiz_customer_phone','wiz_driver',
+    // Step 1
+    'wiz_vehicle_id','wiz_date_in','wiz_time_in','wiz_km_in','wiz_fuel_in','wiz_condition_in',
+    'wiz_received_by','wiz_complaint','wiz_customer_phone','wiz_customer_phone_internal',
+    'wiz_driver','wiz_work_type','wiz_priority',
+    // Walk-in
+    'wiz_cust_name','wiz_cust_phone','wiz_cust_addr','wiz_ext_plate','wiz_ext_model','wiz_ext_color','wiz_ext_year',
+    // Step 2-6
     'wiz_diagnosis','wiz_estimated','wiz_date_promised','wiz_assigned',
     'wiz_parts_used','wiz_parts_cost',
     'wiz_work_done','wiz_labor_h','wiz_labor_cost',
@@ -7603,8 +7656,12 @@ async function saveJOWizardData() {
   ];
   // Map wiz_xxx → JO field
   const mapping = {
+    wiz_vehicle_id:'vehicle_id', wiz_date_in:'date_in', wiz_time_in:'time_in',
     wiz_km_in:'km_in', wiz_fuel_in:'fuel_in', wiz_condition_in:'condition_in', wiz_received_by:'received_by_tech',
-    wiz_complaint:'complaint', wiz_customer_phone:'customer_phone', wiz_driver:'driver',
+    wiz_complaint:'complaint', wiz_customer_phone:'customer_phone', wiz_customer_phone_internal:'customer_phone',
+    wiz_driver:'driver', wiz_work_type:'work_type', wiz_priority:'priority',
+    wiz_cust_name:'customer_name', wiz_cust_phone:'customer_phone', wiz_cust_addr:'customer_address',
+    wiz_ext_plate:'ext_vehicle_plate', wiz_ext_model:'ext_vehicle_model', wiz_ext_color:'ext_vehicle_color', wiz_ext_year:'ext_vehicle_year',
     wiz_diagnosis:'diagnosis', wiz_estimated:'estimated_cost', wiz_date_promised:'date_promised', wiz_assigned:'assigned',
     wiz_parts_used:'parts_used', wiz_parts_cost:'parts_cost',
     wiz_work_done:'work_done', wiz_labor_h:'labor_hours', wiz_labor_cost:'labor_cost',
@@ -7621,6 +7678,17 @@ async function saveJOWizardData() {
       updates[mapping[fid]] = val;
     }
   }
+  // Save customer type radio
+  const ctype = document.querySelector('input[name="wiz_ctype"]:checked');
+  if (ctype) updates.customer_type = ctype.value;
+
+  // Save QC checkboxes
+  const qcResults = {};
+  document.querySelectorAll('[id^="qc_"]').forEach(cb => {
+    qcResults[cb.id.replace('qc_','')] = cb.checked;
+  });
+  if (Object.keys(qcResults).length > 0) updates.qc_results = qcResults;
+
   await db.joborders.update(_joWizData.id, updates);
   _joWizData = { ..._joWizData, ...updates };
 }
@@ -7628,7 +7696,10 @@ async function saveJOWizardData() {
 // ===== Step 1: ຮັບລົດເຂົ້າ =====
 async function renderJOStep1(j, v) {
   const drivers = await db.drivers.toArray();
+  const vehicles = await db.vehicles.toArray();
   const techs = (await db.tech_profiles.toArray()).filter(t => t.active!==false);
+  const customerType = j.customer_type || 'internal';
+
   return `
     <h3 style="color:var(--primary);margin:0 0 6px;display:flex;align-items:center;gap:8px">
       <span style="background:#3B82F6;color:#fff;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700">1</span>
@@ -7636,8 +7707,75 @@ async function renderJOStep1(j, v) {
     </h3>
     <p style="color:var(--muted);font-size:12px;margin:0 0 14px">ບັນທຶກຂໍ້ມູນເບື້ອງຕົ້ນເມື່ອລົດເຂົ້າອູ່</p>
 
+    <!-- Customer Type Toggle -->
+    <div style="background:linear-gradient(135deg,#F0F9FF,#E0F2FE);padding:10px;border-radius:10px;margin-bottom:14px">
+      <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">ປະເພດລູກຄ້າ *</label>
+      <div style="display:flex;gap:8px;margin-top:6px">
+        <label style="flex:1;display:flex;align-items:center;gap:8px;padding:10px;border:2px solid ${customerType==='internal'?'var(--accent)':'var(--line)'};border-radius:8px;cursor:pointer;background:${customerType==='internal'?'white':'#F8FAFC'}">
+          <input type="radio" name="wiz_ctype" value="internal" ${customerType==='internal'?'checked':''} onchange="toggleJOCustomerType('internal')"/>
+          <div>
+            <div style="font-weight:700">🏢 ລົດບໍລິສັດ (Internal)</div>
+            <small style="color:var(--muted);font-size:11px">ລົດໃນ Fleet KALA</small>
+          </div>
+        </label>
+        <label style="flex:1;display:flex;align-items:center;gap:8px;padding:10px;border:2px solid ${customerType==='walkin'?'#8B5CF6':'var(--line)'};border-radius:8px;cursor:pointer;background:${customerType==='walkin'?'white':'#F8FAFC'}">
+          <input type="radio" name="wiz_ctype" value="walkin" ${customerType==='walkin'?'checked':''} onchange="toggleJOCustomerType('walkin')"/>
+          <div>
+            <div style="font-weight:700;color:#8B5CF6">🚪 ລູກຄ້າພາຍນອກ (Walk-in)</div>
+            <small style="color:var(--muted);font-size:11px">ລົດຂອງລູກຄ້າທ່ົວໄປ</small>
+          </div>
+        </label>
+      </div>
+    </div>
+
+    <!-- Vehicle Selector (Internal) -->
+    <div id="wiz_internal_box" style="display:${customerType==='internal'?'block':'none'}">
+      <div style="display:flex;align-items:center;gap:6px;margin:14px 0 6px;font-size:11px;font-weight:600;color:var(--primary-2);text-transform:uppercase;letter-spacing:.5px">
+        <span>🚗</span>ເລືອກລົດໃນ Fleet<div style="flex:1;height:1px;background:var(--line)"></div>
+      </div>
+      <div class="fld"><label>🚗 ລົດທີ່ເຂົ້າສ້ອມ *</label>
+        <select id="wiz_vehicle_id" onchange="updateJOVehicleFromWiz()" style="font-weight:600">
+          <option value="">— ກະລຸນາເລືອກລົດ —</option>
+          ${vehicles.map(vh => `<option value="${vh.vehicle_id}" ${j.vehicle_id===vh.vehicle_id?'selected':''}>${vh.vehicle_id} — ${vh.type} (${vh.plate||'-'}) ${vh.brand?'· '+vh.brand:''}</option>`).join('')}
+        </select>
+        <small style="font-size:10px;color:var(--muted);margin-top:2px;display:block">💡 ບໍ່ມີຢູ່? <a onclick="window.open('#','_blank');return false" style="color:var(--accent);cursor:pointer;text-decoration:underline">ໄປເພີ່ມລົດໃໝ່</a></small>
+      </div>
+    </div>
+
+    <!-- Walk-in Customer Info -->
+    <div id="wiz_walkin_box" style="display:${customerType==='walkin'?'block':'none'};background:#FAF5FF;border:1px solid #DDD6FE;border-radius:10px;padding:12px;margin-bottom:12px">
+      <div style="font-size:11px;font-weight:700;color:#5B21B6;margin-bottom:8px;text-transform:uppercase">🚪 ຂໍ້ມູນລູກຄ້າ Walk-in *</div>
+      <div class="row">
+        <div class="fld"><label>👤 ຊື່ ນາມສະກຸນ *</label><input id="wiz_cust_name" value="${escapeHtml(j.customer_name||'')}" placeholder="ທ້າວ ສົມສັກ"/></div>
+        <div class="fld"><label>📞 ເບີໂທ *</label><input id="wiz_cust_phone" value="${escapeHtml(j.customer_phone||'')}" placeholder="020-555-xxxx"/></div>
+      </div>
+      <div class="fld"><label>🏠 ທີ່ຢູ່</label><input id="wiz_cust_addr" value="${escapeHtml(j.customer_address||'')}" placeholder="ບ້ານ ເມືອງ ແຂວງ"/></div>
+      <div class="row">
+        <div class="fld"><label>🚙 ປ້າຍລົດ *</label><input id="wiz_ext_plate" value="${escapeHtml(j.ext_vehicle_plate||'')}" placeholder="ປຂ 1234" style="text-transform:uppercase;font-weight:600"/></div>
+        <div class="fld"><label>🚙 ຍີ່ຫໍ້ / ລຸ້ນ *</label><input id="wiz_ext_model" value="${escapeHtml(j.ext_vehicle_model||'')}" placeholder="Toyota Hilux 2018"/></div>
+      </div>
+      <div class="row">
+        <div class="fld"><label>🎨 ສີ</label><input id="wiz_ext_color" value="${escapeHtml(j.ext_vehicle_color||'')}" placeholder="ຂາວ"/></div>
+        <div class="fld"><label>📆 ປີ</label><input id="wiz_ext_year" value="${escapeHtml(j.ext_vehicle_year||'')}" placeholder="2018"/></div>
+      </div>
+    </div>
+
+    <!-- Common Receipt Fields -->
+    <div style="display:flex;align-items:center;gap:6px;margin:14px 0 6px;font-size:11px;font-weight:600;color:var(--primary-2);text-transform:uppercase;letter-spacing:.5px">
+      <span>📋</span>ຂໍ້ມູນການຮັບລົດ<div style="flex:1;height:1px;background:var(--line)"></div>
+    </div>
+
     <div class="row">
-      <div class="fld"><label>📏 km ຕອນເຂົ້າ</label><input id="wiz_km_in" type="number" value="${j.km_in||0}"/></div>
+      <div class="fld"><label>📅 ວັນທີ ແລະ ເວລາ ຮັບເຂົ້າ *</label>
+        <input id="wiz_date_in" type="date" value="${j.date_in||todayISO()}"/>
+      </div>
+      <div class="fld"><label>🕒 ເວລາ</label>
+        <input id="wiz_time_in" type="time" value="${j.time_in||new Date().toTimeString().slice(0,5)}"/>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="fld"><label>📏 km ຕອນເຂົ້າ *</label><input id="wiz_km_in" type="number" min="0" value="${j.km_in||0}"/></div>
       <div class="fld"><label>⛽ ລະດັບນ້ຳມັນ</label><select id="wiz_fuel_in">
         <option value="empty" ${j.fuel_in==='empty'?'selected':''}>E - ຫມົດ</option>
         <option value="quarter" ${j.fuel_in==='quarter'?'selected':''}>¼ - ໜ້ອຍ</option>
@@ -7646,28 +7784,68 @@ async function renderJOStep1(j, v) {
         <option value="full" ${j.fuel_in==='full'?'selected':''}>F - ເຕັມ</option>
       </select></div>
     </div>
-    <div class="fld"><label>📝 ສະພາບລົດຕອນເຂົ້າ</label>
-      <textarea id="wiz_condition_in" rows="2" placeholder="ມີຮອຍຂູດເລັກນ້ອຍ ດ້ານຊ້າຍ, ບໍ່ມີຄວາມເສຍຫາຍຫລັກ...">${escapeHtml(j.condition_in||'')}</textarea>
+
+    <div class="fld"><label>📝 ສະພາບລົດຕອນເຂົ້າ (ຮ່ອງຮອຍ, ການເສຍຫາຍພາຍນອກ)</label>
+      <textarea id="wiz_condition_in" rows="2" placeholder="ມີຮອຍຂູດເລັກນ້ອຍ ດ້ານຊ້າຍ, ໄຟໜ້າຂວາແຕກ ບໍ່ມີຄວາມເສຍຫາຍຫລັກ...">${escapeHtml(j.condition_in||'')}</textarea>
     </div>
-    <div class="row">
-      <div class="fld"><label>👤 ຄົນສົ່ງສ້ອມ</label><select id="wiz_driver">
+
+    <div class="row" id="wiz_driver_row" style="display:${customerType==='internal'?'flex':'none'}">
+      <div class="fld"><label>👤 ຄົນສົ່ງສ້ອມ (ຄົນຂັບ)</label><select id="wiz_driver">
         <option value="">— ບໍ່ໄດ້ລະບຸ —</option>
         ${drivers.map(d => `<option value="${escapeHtml(d.name)}" ${j.driver===d.name?'selected':''}>${escapeHtml(d.name)} (${d.driver_id})</option>`).join('')}
       </select></div>
-      <div class="fld"><label>📞 ເບີຄົນສົ່ງ</label><input id="wiz_customer_phone" value="${escapeHtml(j.customer_phone||'')}" placeholder="020-xxx-xxxx"/></div>
+      <div class="fld"><label>📞 ເບີຕິດຕໍ່</label><input id="wiz_customer_phone_internal" value="${escapeHtml(j.customer_phone||'')}" placeholder="020-xxx-xxxx"/></div>
     </div>
-    <div class="fld"><label>🩺 ອາການທີ່ແຈ້ງ (Complaint)</label>
+
+    <div class="fld"><label>📋 ປະເພດງານ</label>
+      <select id="wiz_work_type">
+        <option value="corrective" ${j.work_type==='corrective'?'selected':''}>🔧 ສ້ອມເສຍຫາຍ (Corrective)</option>
+        <option value="pm" ${j.work_type==='pm'?'selected':''}>📐 PM (ບຳລຸງຮັກສາ)</option>
+        <option value="accident" ${j.work_type==='accident'?'selected':''}>🚨 ອຸບັດເຫດ</option>
+        <option value="warranty" ${j.work_type==='warranty'?'selected':''}>🛡 Warranty</option>
+        <option value="inspection" ${j.work_type==='inspection'?'selected':''}>✅ ກວດໝົດອາຍຸ</option>
+      </select>
+    </div>
+
+    <div class="fld"><label>🚨 ຄວາມເລັ່ງດ່ວນ</label>
+      <select id="wiz_priority">
+        <option value="normal" ${j.priority==='normal'?'selected':''}>🟢 ປົກກະຕິ</option>
+        <option value="high" ${j.priority==='high'?'selected':''}>🟡 ດ່ວນ</option>
+        <option value="critical" ${j.priority==='critical'?'selected':''}>🔴 ດ່ວນທີ່ສຸດ</option>
+      </select>
+    </div>
+
+    <div class="fld"><label>🩺 ອາການທີ່ແຈ້ງ (Complaint) *</label>
       <textarea id="wiz_complaint" rows="3" placeholder="ເຄື່ອງເຮັດສຽງດັງເວລາສະຕາດ, ເບຣກລື່ນ..." style="font-size:13px">${escapeHtml(j.complaint||'')}</textarea>
     </div>
-    <div class="fld"><label>👨‍🔧 ຊ່າງຜູ້ຮັບລົດ</label><select id="wiz_received_by">
+
+    <div class="fld"><label>👨‍🔧 ຊ່າງຜູ້ຮັບລົດ *</label><select id="wiz_received_by">
       <option value="">— ບໍ່ໄດ້ລະບຸ —</option>
       ${techs.map(tc => `<option value="${tc.tech_id}" ${j.received_by_tech===tc.tech_id?'selected':''}>${tc.tech_id} — ${escapeHtml(tc.name)} (${tc.skill_level})</option>`).join('')}
     </select></div>
 
     <div style="background:#EFF6FF;padding:10px 12px;border-radius:6px;font-size:11px;color:var(--muted);margin-top:10px">
-      💡 <strong>ຄຳແນະນຳ:</strong> ບັນທຶກສະພາບລົດໃຫ້ລະອຽດ — ປ້ອງກັນຂໍ້ຖຽງກັນກັບລູກຄ້າພາຍຫລັງ. ຖ່າຍຮູບເພີ່ມເຕີມໃນຂັ້ນຕອນ QC.
+      💡 <strong>ຄຳແນະນຳ:</strong> ຊ່ອງທີ່ມີ * ບັງຄັບໃສ່. ບັນທຶກສະພາບລົດໃຫ້ລະອຽດ — ປ້ອງກັນຂໍ້ຖຽງກັນກັບລູກຄ້າພາຍຫລັງ. ຖ່າຍຮູບເພີ່ມເຕີມໃນຂັ້ນຕອນ QC.
     </div>
   `;
+}
+
+// Toggle JO customer type (Internal/Walkin)
+function toggleJOCustomerType(type) {
+  if ($('#wiz_internal_box')) $('#wiz_internal_box').style.display = type==='internal' ? 'block' : 'none';
+  if ($('#wiz_walkin_box')) $('#wiz_walkin_box').style.display = type==='walkin' ? 'block' : 'none';
+  if ($('#wiz_driver_row')) $('#wiz_driver_row').style.display = type==='internal' ? 'flex' : 'none';
+}
+
+// Update km when vehicle is selected
+async function updateJOVehicleFromWiz() {
+  const vid = $('#wiz_vehicle_id')?.value;
+  if (!vid) return;
+  const vehicles = await db.vehicles.toArray();
+  const v = vehicles.find(x => x.vehicle_id === vid);
+  if (v && $('#wiz_km_in') && (+$('#wiz_km_in').value === 0)) {
+    $('#wiz_km_in').value = v.mileage || 0;
+  }
 }
 
 // ===== Step 2: ການວິໄຈ =====
@@ -7963,7 +8141,7 @@ async function printJOFinalReceipt(joDbId) {
 </style></head><body>
 
 <div class="header">
-  <div class="badge">🧾 ບິນສ້ອມລົດ — JOB ORDER INVOICE</div>
+  <div class="badge">${j.customer_type==='walkin'?'🚪 ບິນສ້ອມລົດ Walk-in':'🧾 ບິນສ້ອມລົດ — JOB ORDER INVOICE'}</div>
   <h1>🛠 KALA Garage</h1>
   <div class="co">ບໍລິສັດ ມະຫາໄຊ ເທຣດດິ້ງ ຈຳກັດ — Mahasai Trading Co., Ltd.</div>
 </div>
@@ -7973,15 +8151,33 @@ async function printJOFinalReceipt(joDbId) {
   <div><strong>📅 ວັນທີ:</strong> ${j.date_completed||todayISO()}</div>
 </div>
 
+${j.customer_type==='walkin' ? `
+<h2>👤 ຂໍ້ມູນລູກຄ້າ</h2>
+<table class="info full">
+  <tr><td>ຊື່ ລູກຄ້າ</td><td><strong>${escapeHtml(j.customer_name||'-')}</strong></td>
+      <td>ເບີໂທ</td><td><strong>${escapeHtml(j.customer_phone||'-')}</strong></td></tr>
+  ${j.customer_address?`<tr><td>ທີ່ຢູ່</td><td colspan="3">${escapeHtml(j.customer_address)}</td></tr>`:''}
+</table>
+
 <h2>🚗 ຂໍ້ມູນລົດ</h2>
 <table class="info full">
-  <tr><td>ລະຫັດລົດ</td><td><strong>${j.vehicle_id}</strong></td>
+  <tr><td>ປ້າຍ</td><td><strong style="font-size:14px">${escapeHtml(j.ext_vehicle_plate||'-')}</strong></td>
+      <td>ຍີ່ຫໍ້ / ລຸ້ນ</td><td>${escapeHtml(j.ext_vehicle_model||'-')}</td></tr>
+  <tr><td>ສີ</td><td>${escapeHtml(j.ext_vehicle_color||'-')}</td>
+      <td>ປີ</td><td>${escapeHtml(j.ext_vehicle_year||'-')}</td></tr>
+  <tr><td>km ຕອນເຂົ້າ</td><td>${fmt(j.km_in||0)}</td>
+      <td>ສະພາບເຂົ້າ</td><td>${escapeHtml(j.condition_in||'-')}</td></tr>
+</table>` : `
+<h2>🚗 ຂໍ້ມູນລົດ (Fleet)</h2>
+<table class="info full">
+  <tr><td>ລະຫັດລົດ</td><td><strong>${j.vehicle_id||'-'}</strong></td>
       <td>ປະເພດ</td><td>${v?escapeHtml(v.type):'-'}</td></tr>
-  <tr><td>ປ້າຍ</td><td>${v?escapeHtml(v.plate):'-'}</td>
+  <tr><td>ປ້າຍ</td><td>${v?escapeHtml(v.plate||'-'):'-'}</td>
       <td>km ຕອນເຂົ້າ</td><td>${fmt(j.km_in||0)}</td></tr>
   <tr><td>ຄົນສົ່ງສ້ອມ</td><td>${escapeHtml(j.driver||'-')}</td>
       <td>ເບີໂທ</td><td>${escapeHtml(j.customer_phone||'-')}</td></tr>
-</table>
+  <tr><td>ສະພາບເຂົ້າ</td><td colspan="3">${escapeHtml(j.condition_in||'-')}</td></tr>
+</table>`}
 
 <h2>🩺 ອາການ + ການວິໄຈ</h2>
 <table class="info full">
