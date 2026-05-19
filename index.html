@@ -271,10 +271,39 @@ const cloud = {
     return this.profile;
   },
 
-  // Login ດ້ວຍ Email + Password
-  async login(email, password) {
+  // ດຶງ email ຈາກ username — ຜ່ານ Postgres RPC (SECURITY DEFINER)
+  async lookupEmailByUsername(username) {
     if (!this.client) {
       if (!this.init()) throw new Error('Cloud Mode ບໍ່ໄດ້ຕັ້ງຄ່າ');
+    }
+    const u = (username||'').trim();
+    if (!u) return null;
+    try {
+      const { data, error } = await this.client.rpc('get_email_by_username', { p_username: u });
+      if (error) {
+        console.warn('[lookupEmailByUsername] RPC error:', error.message);
+        return null;
+      }
+      return data || null;
+    } catch(e) {
+      console.warn('[lookupEmailByUsername] Exception:', e);
+      return null;
+    }
+  },
+
+  // Login ດ້ວຍ Username ຫຼື Email + Password
+  async login(emailOrUsername, password) {
+    if (!this.client) {
+      if (!this.init()) throw new Error('Cloud Mode ບໍ່ໄດ້ຕັ້ງຄ່າ');
+    }
+    let email = (emailOrUsername||'').trim();
+    // ຖ້າບໍ່ມີ "@" — ຖືວ່າເປັນ username → ດຶງ email ມາ
+    if (email && !email.includes('@')) {
+      const found = await this.lookupEmailByUsername(email);
+      if (!found) {
+        throw new Error(`ບໍ່ພົບ Username "${email}" ໃນລະບົບ — ກວດການສະກົດ ຫຼື ໃຊ້ Email ແທນ`);
+      }
+      email = found;
     }
     const { data, error } = await this.client.auth.signInWithPassword({ email, password });
     if (error) throw error;
@@ -8284,13 +8313,19 @@ pages.cloud = async () => {
         <div style="text-align:center;padding:10px 0">
           <div style="font-size:48px">☁️</div>
           <h3 style="margin:6px 0">ເຂົ້າສູ່ລະບົບ KALA Cloud</h3>
-          <p class="muted" style="font-size:12px">ໃຊ້ Email + Password ທີ່ Admin ໄດ້ສ້າງໃຫ້</p>
+          <p class="muted" style="font-size:12px">ໃຊ້ Username (ສັ້ນ) ຫຼື Email + Password</p>
         </div>
-        <div class="fld"><label>📧 Email</label>
-          <input id="login_email" type="email" placeholder="you@kala.la" autocomplete="email" />
+        <div class="fld"><label>👤 Username ຫຼື Email</label>
+          <input id="login_email" type="text" placeholder="admin1, it, sayfa..."
+            autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false"
+            onkeydown="if(event.key==='Enter')document.getElementById('login_pwd').focus()" />
+          <small style="display:block;margin-top:4px;font-size:10px;color:var(--muted)">
+            💡 ໃຊ້ Username ສັ້ນເຊັ່ນ <code>admin1</code>, <code>it</code>, <code>sayfa</code> — ຫຼື Email ເຕັມ
+          </small>
         </div>
         <div class="fld"><label>🔒 Password</label>
-          <input id="login_pwd" type="password" placeholder="••••••••" autocomplete="current-password" />
+          <input id="login_pwd" type="password" placeholder="••••••••" autocomplete="current-password"
+            onkeydown="if(event.key==='Enter')doCloudLogin()" />
         </div>
         <div id="login_error" style="color:var(--bad);font-size:12px;margin:6px 0;display:none"></div>
         <div style="display:flex;gap:6px;margin-top:10px">
@@ -8424,22 +8459,38 @@ async function testCloudConnection() {
 }
 
 async function doCloudLogin() {
-  const email = $('#login_email').value.trim();
+  const input = $('#login_email').value.trim();
   const pwd = $('#login_pwd').value;
   const errEl = $('#login_error');
+  const btn = document.querySelector('button.btn.ok[onclick="doCloudLogin()"]');
   errEl.style.display = 'none';
-  if (!email || !pwd) { errEl.textContent='ກະລຸນາໃສ່ Email + Password'; errEl.style.display='block'; return; }
+  if (!input || !pwd) { errEl.textContent='ກະລຸນາໃສ່ Username/Email + Password'; errEl.style.display='block'; return; }
+
+  // ສະແດງ loading state
+  const oldBtnText = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '⏳ ກຳລັງເຂົ້າສູ່ລະບົບ...'; }
+
   try {
-    await cloud.login(email, pwd);
-    toast('✅ Login ສຳເລັດ — ຍິນດີຕ້ອນຮັບ '+(cloud.profile?.name||email));
+    await cloud.login(input, pwd);
+    toast('✅ Login ສຳເລັດ — ຍິນດີຕ້ອນຮັບ '+(cloud.profile?.name||input));
     // ເປີດ Auto-Sync ທັນທີຫລັງ Login
     try { setupAutoSync(); } catch(e) {}
     try { cloud.subscribeAll(); } catch(e) {}
     try { cloud.subscribeProfileChanges(); } catch(e) {}
     setTimeout(() => pages.cloud(), 600);
   } catch(e) {
-    errEl.textContent = '❌ ' + (e.message||'Login ບໍ່ສຳເລັດ');
+    // ຂໍ້ຄວາມສຳພາສາ — Friendly error messages
+    let msg = e.message || 'Login ບໍ່ສຳເລັດ';
+    if (msg.includes('Invalid login credentials')) {
+      msg = 'Username/Email ຫຼື Password ບໍ່ຖືກຕ້ອງ';
+    } else if (msg.includes('Email not confirmed')) {
+      msg = 'Email ຍັງບໍ່ໄດ້ຢືນຢັນ — ຕິດຕໍ່ IT';
+    } else if (msg.includes('not found in get_email')) {
+      msg = 'ບໍ່ພົບ Username ນີ້';
+    }
+    errEl.textContent = '❌ ' + msg;
     errEl.style.display = 'block';
+    if (btn) { btn.disabled = false; btn.innerHTML = oldBtnText; }
   }
 }
 
