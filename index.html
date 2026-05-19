@@ -218,6 +218,11 @@ td.actions.compact button.btn { padding: 5px 8px; font-size: 12px; min-width: 30
   <header class="topbar">
     <strong style="font-size: 16px;" id="appTitle">ระบบบริหารอู่ซ่อม KALA</strong>
     <div class="spacer"></div>
+    <!-- 🆕 Realtime Sync Indicator -->
+    <div id="realtimeIndicator" onclick="go('cloud')" style="display:none;cursor:pointer;align-items:center;gap:5px;padding:5px 10px;border-radius:14px;font-size:11px;font-weight:600;background:#FEE2E2;color:#991B1B;border:1px solid #FCA5A5" title="ກົດເພື່ອເບິ່ງລາຍລະອຽດ">
+      <span id="rtDot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#94A3B8"></span>
+      <span id="rtText">Realtime: -</span>
+    </div>
     <button class="btn outline sm" onclick="exportData()" id="btnExport">⬇ Export</button>
     <button class="btn outline sm" onclick="document.getElementById('importFile').click()" id="btnImport">⬆ Import</button>
     <input type="file" id="importFile" accept=".json" hidden onchange="importData(event)" />
@@ -610,28 +615,138 @@ const cloud = {
       .subscribe();
   },
 
+  // Realtime status tracking
+  realtimeActive: false,
+  realtimeChannels: [],
+  realtimeEventCount: 0,
+
   // Realtime Subscribe (ປ່ຽນແປງເຫັນທັນທີ)
   subscribeAll() {
     if (!this.client) return;
+    // Unsubscribe previous channels first (avoid duplicates on re-login)
+    this.unsubscribeAll();
+
+    let subscribedCount = 0;
     this.syncTables.forEach(table => {
-      this.client
+      const channel = this.client
         .channel(`changes_${table}`)
         .on('postgres_changes', { event: '*', schema: 'public', table }, async (payload) => {
           const localName = this.localName(table);
           if (!db[localName]) return;
-          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-            try { await db[localName].put(payload.new); } catch(e) {}
-          } else if (payload.eventType === 'DELETE') {
-            try { await db[localName].where('id').equals(payload.old.id).delete(); } catch(e) {}
+
+          // ບໍ່ຕ້ອງ Apply ການປ່ຽນແປງຂອງຕົນເອງກັບຄືນ (ກັນ loop)
+          const isMine = payload.new && payload.new.updated_by === (this.profile?.username);
+
+          try {
+            if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+              await db[localName].put(payload.new);
+            } else if (payload.eventType === 'DELETE') {
+              await db[localName].where('id').equals(payload.old.id).delete();
+            }
+          } catch(e) {}
+
+          // ບັນທຶກ statistics
+          this.realtimeEventCount++;
+          this.lastSyncAt = new Date();
+          this.syncStatus = 'idle';
+
+          // ສະແດງ Toast + Auto-refresh — ສະເພາະການປ່ຽນແປງຈາກຄົນອື່ນ
+          if (!isMine && typeof toast === 'function') {
+            const labels = {
+              vehicles:'ລົດ', joborders:'JO', drivers:'ຄົນຂັບ', tires:'ຢາງ',
+              labor_entries:'ຄ່າແຮງ', service_rates:'ບັນຊີຄ່າແຮງ', tech_profiles:'ໂປຣໄຟລ໌ຊ່າງ',
+              vehicle_intakes:'ໃບຮັບລົດ', vendors:'ຜູ້ຈຳໜ່າຍ', parts:'ອາໄຫລ່',
+              fuel_log:'ບິນນ້ຳມັນ', inspections:'ກວດປະຈຳວັນ', incidents:'ອຸປະຕິເຫດ',
+              purchase_orders:'PO', purchase_requests:'PR',
+              camera_counts:'ບັນທຶກກ້ອງ', customer_audits:'Customer Audit',
+            };
+            const label = labels[table] || table;
+            const actionLabel = {INSERT:'➕ ສ້າງໃໝ່', UPDATE:'✏️ ແກ້ໄຂ', DELETE:'🗑 ລົບ'}[payload.eventType] || '🔄';
+            toast(`🔔 ${actionLabel} ${label}`, 'info');
+
+            // Auto-refresh ໜ້າປະຈຸບັນຫລັງຈາກ 800ms (debounced)
+            if (window._realtimeRefreshTimer) clearTimeout(window._realtimeRefreshTimer);
+            window._realtimeRefreshTimer = setTimeout(() => {
+              try {
+                if (typeof currentPage !== 'undefined' && currentPage && pages[currentPage]) {
+                  pages[currentPage]();
+                }
+              } catch(e) {}
+            }, 800);
           }
+
+          // ອັບເດດ Realtime status indicator
+          try { updateRealtimeIndicator(); } catch(e) {}
         })
-        .subscribe();
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            subscribedCount++;
+            this.realtimeActive = true;
+            console.log(`✅ Realtime: ${table} (${subscribedCount}/${this.syncTables.length})`);
+            try { updateRealtimeIndicator(); } catch(e) {}
+          }
+        });
+      this.realtimeChannels.push(channel);
     });
+  },
+
+  unsubscribeAll() {
+    this.realtimeChannels.forEach(ch => { try { this.client.removeChannel(ch); } catch(e) {} });
+    this.realtimeChannels = [];
+    this.realtimeActive = false;
   },
 };
 
 // ໂຫລດ Config ເລີ່ມຕົ້ນ
 try { cloud.loadConfig(); } catch(e) {}
+
+// ===================== REALTIME INDICATOR =====================
+// ປັບປຸງສະຖານະ Realtime ໃນ Header — ສະແດງສະຖານະ Live
+function updateRealtimeIndicator() {
+  const ind = document.getElementById('realtimeIndicator');
+  const dot = document.getElementById('rtDot');
+  const text = document.getElementById('rtText');
+  if (!ind || !dot || !text) return;
+
+  if (!cloud.enabled || !cloud.user) {
+    ind.style.display = 'none';
+    return;
+  }
+  ind.style.display = 'flex';
+
+  if (cloud.realtimeActive) {
+    ind.style.background = '#D1FAE5';
+    ind.style.color = '#065F46';
+    ind.style.borderColor = '#10B981';
+    dot.style.background = '#10B981';
+    dot.style.boxShadow = '0 0 0 3px rgba(16,185,129,.3)';
+    dot.classList.add('rt-pulse');
+    text.textContent = `Realtime ✓ (${cloud.realtimeEventCount})`;
+    ind.title = `Realtime Sync ເຮັດງານປົກກະຕິ — ໄດ້ຮັບ ${cloud.realtimeEventCount} events`;
+  } else {
+    ind.style.background = '#FEE2E2';
+    ind.style.color = '#991B1B';
+    ind.style.borderColor = '#FCA5A5';
+    dot.style.background = '#EF4444';
+    dot.style.boxShadow = 'none';
+    dot.classList.remove('rt-pulse');
+    text.textContent = 'Realtime: ປິດ';
+    ind.title = 'Realtime ບໍ່ໄດ້ເຮັດງານ — ກົດເພື່ອເບິ່ງ Cloud Sync';
+  }
+}
+
+// CSS Animation ສຳລັບ Realtime pulse
+(function injectRTStyle() {
+  const style = document.createElement('style');
+  style.textContent = `
+    @keyframes rt-pulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.3); opacity: .7; }
+    }
+    .rt-pulse { animation: rt-pulse 1.8s ease-in-out infinite; }
+  `;
+  document.head.appendChild(style);
+})();
 
 // ===================== UPDATE USER BADGE (Header) =====================
 // ປ່ຽນຊື່ + Role + Avatar ໃນ Header ຕາມ Cloud User (ຖ້າ Login ແລ້ວ)
@@ -779,6 +894,21 @@ async function initCloudOnLoad() {
     try { setupAutoSync(); } catch(e) { console.warn('[AutoSync] setup error:', e); }
     try { cloud.subscribeAll(); } catch(e) {}
     try { cloud.subscribeProfileChanges(); } catch(e) {}
+    try { updateRealtimeIndicator(); } catch(e) {}
+
+    // 🆕 Auto Full Sync ຄັ້ງທຳອິດ ຖ້າຍັງບໍ່ເຄີຍ Sync (ໃຫ້ Local ມີຂໍ້ມູນຫລ້າສຸດຈາກ Cloud)
+    const lastFullSync = localStorage.getItem('kala_last_full_sync');
+    if (!lastFullSync || (Date.now() - parseInt(lastFullSync)) > 24*3600*1000) {
+      setTimeout(async () => {
+        try {
+          if (typeof doFullSync === 'function') {
+            console.log('[Cloud] Auto Full Sync ຄັ້ງທຳອິດ...');
+            await doFullSync(true);  // silent mode
+            localStorage.setItem('kala_last_full_sync', Date.now().toString());
+          }
+        } catch(e) { console.warn('[Cloud] Auto Full Sync error:', e); }
+      }, 2000);
+    }
   }
 }
 
@@ -9793,21 +9923,40 @@ pages.cloud = async () => {
 
     <div class="kpi-grid">
       <div class="kpi" style="border-left:4px solid var(--ok)">
-        <div class="label">🟢 ສະຖານະ</div>
+        <div class="label">🟢 ການເຊື່ອມຕໍ່</div>
         <div class="val" style="font-size:18px;color:var(--ok)">ເຊື່ອມຕໍ່ແລ້ວ</div>
         <div class="muted">${profile.role || '-'} ${profile.branch?'• '+profile.branch:''}</div>
       </div>
-      <div class="kpi">
-        <div class="label">📧 Email</div>
-        <div class="val" style="font-size:14px">${cloud.user?.email||'-'}</div>
-        <div class="muted">${profile.username||''}</div>
+      <div class="kpi" style="border-left:4px solid ${cloud.realtimeActive?'#10B981':'#EF4444'}">
+        <div class="label">⚡ Realtime Sync</div>
+        <div class="val" style="font-size:18px;color:${cloud.realtimeActive?'var(--ok)':'var(--bad)'}">
+          ${cloud.realtimeActive?'🟢 ເຮັດງານ':'🔴 ປິດ'}
+        </div>
+        <div class="muted">${cloud.realtimeEventCount||0} events ໄດ້ຮັບ</div>
       </div>
-      <div class="kpi">
-        <div class="label">🔄 Sync ຫຼ້າສຸດ</div>
+      <div class="kpi" style="border-left:4px solid var(--accent)">
+        <div class="label">🔄 Sync ຫລ້າສຸດ</div>
         <div class="val" style="font-size:14px">${lastSync}</div>
         <div class="muted">${cloud.syncStatus}</div>
       </div>
+      <div class="kpi">
+        <div class="label">📧 ຜູ້ໃຊ້</div>
+        <div class="val" style="font-size:13px">${profile.username||'-'}</div>
+        <div class="muted">${cloud.user?.email||''}</div>
+      </div>
     </div>
+
+    ${!cloud.realtimeActive ? `
+      <div class="alert bad" style="font-size:13px">
+        🔴 <strong>Realtime Sync ບໍ່ໄດ້ເຮັດງານ!</strong> — ການປ່ຽນແປງຈາກອຸປະກອນອື່ນຈະບໍ່ມາໂດຍຕົງ.
+        <br>👉 ກົດ "<strong>⚡ ເປີດ Realtime Sync</strong>" ດ້ານລຸ່ມ ຫລື Refresh ໜ້າ (F5).
+      </div>
+    ` : `
+      <div class="alert" style="background:#D1FAE5;color:#065F46;font-size:13px;border-left:4px solid #10B981">
+        🟢 <strong>Realtime Sync ເຮັດງານປົກກະຕິ</strong> — ການປ່ຽນແປງຈາກອຸປະກອນອື່ນຈະປະກົດໃນ 1-2 ວິນາທີ.
+        ${cloud.realtimeEventCount>0?`<br>📊 ໄດ້ຮັບ <strong>${cloud.realtimeEventCount} events</strong> ນັບແຕ່ Login.`:''}
+      </div>
+    `}
 
     <div class="card">
       <h3>🔄 ການ Sync ຂໍ້ມູນ</h3>
@@ -9822,7 +9971,8 @@ pages.cloud = async () => {
         </div>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
-        <button class="btn" onclick="doFullSync()">🔄 Full Sync ໃໝ່</button>
+        <button class="btn" onclick="manualPullSync()" style="background:linear-gradient(135deg,#10B981,#059669)">🔄 ດຶງຂໍ້ມູນຫລ້າສຸດ (Pull)</button>
+        <button class="btn outline" onclick="doFullSync()">🔁 Full Sync ໃໝ່</button>
         <button class="btn outline" onclick="subscribeRealtime()">⚡ ເປີດ Realtime Sync</button>
         <button class="btn outline" onclick="testCloudConnection()">🔍 ທົດສອບການເຊື່ອມຕໍ່</button>
         <div style="flex:1"></div>
@@ -10027,21 +10177,30 @@ async function doCloudLogout() {
   pages.cloud();
 }
 
-async function doFullSync() {
-  if (!cloud.client) { toast('ກະລຸນາ Login ກ່ອນ', 'bad'); return; }
+async function doFullSync(silent) {
+  if (!cloud.client) { if(!silent) toast('ກະລຸນາ Login ກ່ອນ', 'bad'); return; }
   const progressEl = $('#sync_progress');
   const textEl = $('#sync_progress_text');
   const barEl = $('#sync_progress_bar');
-  if (progressEl) progressEl.style.display = 'block';
+  if (progressEl && !silent) progressEl.style.display = 'block';
   try {
     const result = await cloud.fullSync((done, total, table) => {
       if (textEl) textEl.textContent = `Sync ${done}/${total} — ${table}`;
       if (barEl) barEl.style.width = `${(done/total)*100}%`;
     });
-    toast(`✅ Sync ສຳເລັດ — ${result.synced}/${result.total} tables`);
-    setTimeout(() => pages.cloud(), 800);
+    if (!silent) {
+      toast(`✅ Sync ສຳເລັດ — ${result.synced}/${result.total} tables`);
+      setTimeout(() => pages.cloud(), 800);
+    } else {
+      // Silent mode: just refresh current page
+      console.log(`[Cloud] Auto Full Sync done: ${result.synced}/${result.total} tables`);
+      if (typeof currentPage !== 'undefined' && pages[currentPage]) {
+        try { pages[currentPage](); } catch(e) {}
+      }
+    }
   } catch(e) {
-    toast('❌ Sync ລົ້ມເຫລວ: '+e.message, 'bad');
+    if (!silent) toast('❌ Sync ລົ້ມເຫລວ: '+e.message, 'bad');
+    else console.warn('[Cloud] Silent sync failed:', e.message);
   } finally {
     if (progressEl) setTimeout(()=>{progressEl.style.display='none'}, 2000);
   }
@@ -10051,6 +10210,15 @@ function subscribeRealtime() {
   if (!cloud.client) { toast('ກະລຸນາ Login ກ່ອນ', 'bad'); return; }
   cloud.subscribeAll();
   toast('⚡ Realtime Sync ເປີດແລ້ວ — ການປ່ຽນແປງຈະເຫັນທັນທີ');
+  setTimeout(() => updateRealtimeIndicator(), 500);
+}
+
+// 🆕 Manual Pull — ດຶງຂໍ້ມູນຫລ້າສຸດໂດຍບໍ່ Push
+async function manualPullSync() {
+  if (!cloud.client || !cloud.user) { toast('ກະລຸນາ Login ກ່ອນ', 'bad'); return; }
+  toast('🔄 ກຳລັງດຶງຂໍ້ມູນຫລ້າສຸດ...');
+  await doFullSync(true);
+  toast('✅ ດຶງຂໍ້ມູນຫລ້າສຸດສຳເລັດ');
 }
 
 async function previewPushCount() {
