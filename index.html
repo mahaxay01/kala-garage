@@ -1217,6 +1217,49 @@ db.version(2).stores({
   outsource: '++id, jo_id, vendor_id, status',
   settings: 'key',
 });
+db.version(15).stores({
+  vehicles: '++id, vehicle_id, plate, type, branch, status, category_id',
+  inspections: '++id, vehicle_id, date, status, frequency, driver',
+  joborders: '++id, jo_id, vehicle_id, priority, status, created',
+  parts: '++id, code, class, grade, category_id, warehouse, status',
+  partmovements: '++id, part_id, type, date',
+  drivers: '++id, driver_id, name, license_expiry, assigned_vehicle',
+  tires: '++id, tire_id, current_vehicle, position, status, install_km, install_date',
+  tire_history: '++id, tire_id, date, event_type, vehicle_id, position, km',
+  vendors: '++id, vendor_id, name, category_id, province',
+  vendorprices: '++id, vendor_id, part_code, currency, date',
+  tools: '++id, tool_id, name, calib_due, status',
+  outsource: '++id, jo_id, vendor_id, status',
+  fluids: '++id, vehicle_id, type, date, next_due_date',
+  mileage_log: '++id, vehicle_id, date, mileage',
+  categories: '++id, name, type, parent_id',
+  exchange_rates: '++id, currency, rate, valid_from',
+  pm_templates: '++id, vehicle_type, interval_type, interval_value',
+  pm_history: '++id, vehicle_id, template_id, date, mileage',
+  fuel_log: '++id, vehicle_id, date, driver, station',
+  documents: '++id, entity_type, entity_id, doc_type, expiry_date',
+  incidents: '++id, date, vehicle_id, driver_id, severity, status',
+  audit_log: '++id, timestamp, user, action, entity',
+  purchase_requests: '++id, pr_id, vendor_id, status, created, total_lak',
+  purchase_orders: '++id, po_id, vendor_id, status, created, urgency, total_lak',
+  vehicle_pm: '++id, vehicle_id, interval_type, interval_value, active',
+  gps_devices: '++id, vehicle_id, imei, model, platform, status, installed_date',
+  driver_reviews: '++id, driver_id, review_date, reviewer, period, total_score',
+  receipt_inspections: '++id, jo_id, vehicle_id, date, inspector',
+  predelivery_inspections: '++id, jo_id, vehicle_id, date, inspector, approved',
+  users: '++id, username, role, name, active, created',
+  depreciation: '++id, vehicle_id, year, month, value, accumulated',
+  parts_replacements: '++id, vehicle_id, part_type, date, km, cost, jo_id',
+  ai_chat_history: '++id, timestamp, role, content',
+  deleted_items: '++id, deleted_at, deleted_by, store, original_id, summary, restored',
+  price_change_audit: '++id, timestamp, user, entity_type, entity_id, field, old_value, new_value, summary',
+  service_rates: '++id, service_code, service_name, category, vehicle_group, base_charge, skill_required, active',
+  tech_profiles: '++id, tech_id, name, skill_level, commission_pct, walkin_commission_pct, active, branch',
+  labor_entries: '++id, entry_id, date, jo_id, vehicle_id, tech_id, service_code, charge_amount, commission_amount, status, approved_by, customer_type',
+  // ===== NEW v15: Customer Receipts for Walk-in =====
+  customer_receipts: '++id, receipt_id, date, labor_entry_id, customer_name, customer_phone, vehicle_plate, total_amount, signed_at, signed_by_customer',
+  settings: 'key',
+});
 db.version(14).stores({
   vehicles: '++id, vehicle_id, plate, type, branch, status, category_id',
   inspections: '++id, vehicle_id, date, status, frequency, driver',
@@ -12807,20 +12850,33 @@ pages.tech_profiles = async () => {
           <th>ລະຫັດ</th>
           <th>ຊື່</th>
           <th>ທັກສະ</th>
-          <th>% ຄອມມິສຊັ່ນ</th>
+          <th>🏢 ລົດບໍລິສັດ</th>
+          <th>🚪 Walk-in</th>
           <th>ສາຂາ</th>
           <th style="text-align:center">ວຽກເດືອນນີ້</th>
           <th style="text-align:right">ຄອມເດືອນນີ້ (ກີບ)</th>
           <th></th>
         </tr>
         ${techs.map(tc => {
-          const techEntries = monthEntries.filter(e => e.tech_id === tc.tech_id);
-          const totalComm = techEntries.reduce((a,e) => a + (e.commission_amount||0), 0);
+          // ລວມຈາກ tech_id + team_splits[].tech_id
+          const techEntries = monthEntries.filter(e =>
+            e.tech_id === tc.tech_id ||
+            (Array.isArray(e.team_splits) && e.team_splits.some(s => s.tech_id === tc.tech_id))
+          );
+          // ຄຳນວນຄອມຮວມ — ຖ້າຢູ່ໃນທີມ ໃຫ້ໃຊ້ share_amount ຂອງຄົນນັ້ນ
+          const totalComm = techEntries.reduce((a,e) => {
+            if (Array.isArray(e.team_splits) && e.team_splits.length > 0) {
+              const mine = e.team_splits.find(s => s.tech_id === tc.tech_id);
+              return a + (mine?.share_amount || 0);
+            }
+            return a + (e.tech_id === tc.tech_id ? (e.commission_amount||0) : 0);
+          }, 0);
           return `<tr style="${tc.active===false?'opacity:.5':''}">
             <td><strong style="font-family:monospace">${tc.tech_id}</strong></td>
             <td><strong>${escapeHtml(tc.name)}</strong><br><small class="muted">${escapeHtml(tc.specialty||'')}</small></td>
             <td><span class="pill" style="background:${skillColor(tc.skill_level)}33;color:${skillColor(tc.skill_level)};font-weight:700">${tc.skill_level}</span></td>
             <td style="font-weight:700;color:var(--accent)">${tc.commission_pct||0}%</td>
+            <td style="font-weight:700;color:#8B5CF6">${tc.walkin_commission_pct||0}%</td>
             <td>${tc.branch||'-'}</td>
             <td style="text-align:center">${techEntries.length}</td>
             <td style="text-align:right;font-weight:700;color:var(--ok)">${fmt(totalComm)}</td>
@@ -12836,7 +12892,7 @@ pages.tech_profiles = async () => {
 };
 
 async function openTechProfileModal(id) {
-  let tc = { tech_id:'', name:'', skill_level:'L1', commission_pct:10, specialty:'', branch:'ປາກເຊ', hire_date:todayISO(), active:true, notes:'' };
+  let tc = { tech_id:'', name:'', skill_level:'L1', commission_pct:10, walkin_commission_pct:20, specialty:'', branch:'ປາກເຊ', hire_date:todayISO(), active:true, notes:'' };
   if (id) tc = Object.assign(tc, await db.tech_profiles.get(id));
   if (!tc.tech_id) tc.tech_id = await nextTechId();
   const body = `
@@ -12848,7 +12904,13 @@ async function openTechProfileModal(id) {
       <div class="fld"><label>ທັກສະ</label><select id="tc_skill" onchange="updateCommDefault()">
         ${SKILL_LEVELS.map(s => `<option value="${s.id}" data-pct="${s.commission_default}" ${tc.skill_level===s.id?'selected':''}>${s.label}</option>`).join('')}
       </select></div>
-      <div class="fld"><label>% ຄອມມິສຊັ່ນ</label><input id="tc_comm" type="number" step="0.5" value="${tc.commission_pct||10}"/></div>
+      <div class="fld"><label>% ຄອມ — 🏢 ລົດບໍລິສັດ</label><input id="tc_comm" type="number" step="0.5" value="${tc.commission_pct||10}"/></div>
+    </div>
+    <div class="row">
+      <div class="fld"><label>% ຄອມ — 🚪 Walk-in (ສູງກວ່າ)</label><input id="tc_comm_walkin" type="number" step="0.5" value="${tc.walkin_commission_pct||20}"/>
+        <small style="font-size:10px;color:var(--muted)">💡 ລູກຄ້າພາຍນອກ — ມັກຈະ 1.5x ຫາ 2x ຂອງລົດບໍລິສັດ</small>
+      </div>
+      <div class="fld"></div>
     </div>
     <div class="row">
       <div class="fld"><label>ຄວາມຊຳນານ</label><input id="tc_spec" value="${escapeHtml(tc.specialty||'')}" placeholder="ເຄື່ອງຍົນ, ເບຣກ"/></div>
@@ -12874,8 +12936,10 @@ async function openTechProfileModal(id) {
 
 function updateCommDefault() {
   const sel = $('#tc_skill');
-  const pct = sel.options[sel.selectedIndex].getAttribute('data-pct');
+  const pct = +sel.options[sel.selectedIndex].getAttribute('data-pct');
   if ($('#tc_comm')) $('#tc_comm').value = pct;
+  // Walk-in % ຕັ້ງເຮັດສູງກວ່າ 1.5x ໂດຍອັດຕະໂນມັດ (ປັບໄດ້)
+  if ($('#tc_comm_walkin')) $('#tc_comm_walkin').value = Math.round(pct * 1.5);
 }
 
 async function saveTechProfile(id) {
@@ -12884,6 +12948,7 @@ async function saveTechProfile(id) {
     name: $('#tc_name').value.trim(),
     skill_level: $('#tc_skill').value,
     commission_pct: +($('#tc_comm').value)||0,
+    walkin_commission_pct: +($('#tc_comm_walkin')?.value)||0,
     specialty: $('#tc_spec').value,
     branch: $('#tc_branch').value,
     hire_date: $('#tc_hire').value,
@@ -12905,50 +12970,99 @@ async function delTechProfile(id) {
 }
 
 // ===== LABOR ENTRY FORM =====
+// Global temp state for the modal (team split + parts)
+window._leTeam = []; window._leParts = [];
+
 async function openLaborEntryModal(id, opts) {
   opts = opts || {};
   const techs = (await db.tech_profiles.toArray()).filter(t => t.active!==false);
   const services = (await db.service_rates.toArray()).filter(r => r.active!==false);
   const vehicles = await db.vehicles.toArray();
   const jos = await db.joborders.toArray();
+  const parts = await db.parts.toArray();
 
   if (techs.length === 0) { toast('⚠️ ກະລຸນາສ້າງໂປຣໄຟລ໌ຊ່າງກ່ອນ', 'warn'); go('tech_profiles'); return; }
   if (services.length === 0) { toast('⚠️ ກະລຸນາໂຫຼດຄ່າແຮງມາດຕະຖານກ່ອນ', 'warn'); go('service_rates'); return; }
 
   let e = {
     entry_id: '', date: todayISO(),
+    customer_type: 'internal',  // internal | walkin
+    customer_name:'', customer_phone:'', customer_address:'',
+    ext_vehicle_plate:'', ext_vehicle_model:'',
     jo_id: opts.jo_id||'', vehicle_id: opts.vehicle_id||'',
     tech_id: techs[0]?.tech_id||'',
+    is_team: false,
+    team_splits: [],  // [{ tech_id, name, role:'lead'|'helper', share_pct, share_amount }]
+    parts_used: [],   // [{ code, name, qty, unit_price, total }]
     service_code: services[0]?.service_code||'',
     standard_hours: services[0]?.standard_hours||1,
     actual_hours: services[0]?.standard_hours||1,
     charge_amount: services[0]?.base_charge||0,
     charge_adjusted: false,
+    parts_total: 0,
+    grand_total: services[0]?.base_charge||0,
     commission_pct: techs[0]?.commission_pct||0,
     commission_amount: 0,
     status: 'pending', notes: ''
   };
   if (id) e = Object.assign(e, await db.labor_entries.get(id));
   if (!e.entry_id) e.entry_id = await nextLaborEntryId();
-  e.commission_amount = Math.round((e.charge_amount||0) * (e.commission_pct||0) / 100);
+
+  // Init globals from entry data
+  window._leTeam = Array.isArray(e.team_splits) ? e.team_splits.slice() : [];
+  window._leParts = Array.isArray(e.parts_used) ? e.parts_used.slice() : [];
+  window._leTechs = techs;
+  window._leParts_master = parts;
 
   const body = `
-    <div class="alert info" style="font-size:12px">💼 <strong>${e.entry_id}</strong> — ບັນທຶກວຽກສ້ອມ + ຄຳນວນຄ່າແຮງ ແລະ ຄອມມິສຊັ່ນອັດຕະໂນມັດ</div>
+    <div class="alert info" style="font-size:12px">💼 <strong>${e.entry_id}</strong> — ບັນທຶກວຽກສ້ອມ + ຄຳນວນຄ່າແຮງ/ຄອມມິສຊັ່ນອັດຕະໂນມັດ</div>
+
+    <!-- Customer Type Toggle -->
+    <div style="background:linear-gradient(135deg,#F0F9FF,#E0F2FE);padding:10px;border-radius:10px;margin-bottom:12px">
+      <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">ປະເພດລູກຄ້າ</label>
+      <div style="display:flex;gap:8px;margin-top:6px">
+        <label style="flex:1;display:flex;align-items:center;gap:8px;padding:10px;border:2px solid ${e.customer_type==='internal'?'var(--accent)':'var(--line)'};border-radius:8px;cursor:pointer;background:${e.customer_type==='internal'?'white':'#F8FAFC'}">
+          <input type="radio" name="le_ctype" value="internal" ${e.customer_type==='internal'?'checked':''} onchange="toggleCustomerType('internal')"/>
+          <div>
+            <div style="font-weight:700">🏢 ລົດບໍລິສັດ (Internal)</div>
+            <small style="color:var(--muted);font-size:11px">ລົດໃນ Fleet KALA — ໃຊ້ % ຄອມມາດຕະຖານ</small>
+          </div>
+        </label>
+        <label style="flex:1;display:flex;align-items:center;gap:8px;padding:10px;border:2px solid ${e.customer_type==='walkin'?'#8B5CF6':'var(--line)'};border-radius:8px;cursor:pointer;background:${e.customer_type==='walkin'?'white':'#F8FAFC'}">
+          <input type="radio" name="le_ctype" value="walkin" ${e.customer_type==='walkin'?'checked':''} onchange="toggleCustomerType('walkin')"/>
+          <div>
+            <div style="font-weight:700;color:#8B5CF6">🚪 ລູກຄ້າພາຍນອກ (Walk-in)</div>
+            <small style="color:var(--muted);font-size:11px">ລູກຄ້າຈ່າຍເງິນ — ໃຊ້ % ຄອມສູງກວ່າ + ໃບຮັບລົດ</small>
+          </div>
+        </label>
+      </div>
+    </div>
+
+    <!-- Walk-in Customer Fields (hidden when internal) -->
+    <div id="le_walkin_box" style="display:${e.customer_type==='walkin'?'block':'none'};background:#FAF5FF;border:1px solid #DDD6FE;border-radius:10px;padding:12px;margin-bottom:12px">
+      <div style="font-size:11px;font-weight:700;color:#5B21B6;margin-bottom:8px;text-transform:uppercase">🚪 ຂໍ້ມູນລູກຄ້າ Walk-in</div>
+      <div class="row">
+        <div class="fld"><label>👤 ຊື່ລູກຄ້າ</label><input id="le_cust_name" value="${escapeHtml(e.customer_name||'')}" placeholder="ທ້າວ ສົມສັກ"/></div>
+        <div class="fld"><label>📞 ເບີໂທ</label><input id="le_cust_phone" value="${escapeHtml(e.customer_phone||'')}" placeholder="020-555-xxxx"/></div>
+      </div>
+      <div class="fld"><label>🏠 ທີ່ຢູ່ (ບໍ່ບັງຄັບ)</label><input id="le_cust_addr" value="${escapeHtml(e.customer_address||'')}" placeholder="ບ້ານ ເມືອງ ແຂວງ"/></div>
+      <div class="row">
+        <div class="fld"><label>🚙 ປ້າຍລົດ</label><input id="le_ext_plate" value="${escapeHtml(e.ext_vehicle_plate||'')}" placeholder="ປຂ 1234"/></div>
+        <div class="fld"><label>🚙 ຍີ່ຫໍ້ / ລຸ້ນ</label><input id="le_ext_model" value="${escapeHtml(e.ext_vehicle_model||'')}" placeholder="Toyota Hilux 2018"/></div>
+      </div>
+    </div>
 
     <div class="row">
       <div class="fld"><label>📅 ວັນທີ</label><input id="le_date" type="date" value="${e.date}"/></div>
-      <div class="fld"><label>📋 Job Order (ບໍ່ບັງຄັບ)</label><select id="le_jo">
+      <div class="fld" id="le_jo_box" style="display:${e.customer_type==='internal'?'block':'none'}"><label>📋 Job Order</label><select id="le_jo">
         <option value="">— ບໍ່ມີ —</option>
         ${jos.map(j => `<option value="${j.jo_id}" ${e.jo_id===j.jo_id?'selected':''}>${j.jo_id} — ${j.vehicle_id}</option>`).join('')}
       </select></div>
     </div>
 
-    <div class="row">
-      <div class="fld"><label>🚚 ລົດ</label><select id="le_vehicle">
+    <div class="row" id="le_vehicle_row" style="display:${e.customer_type==='internal'?'flex':'none'}">
+      <div class="fld" style="flex:1"><label>🚚 ລົດບໍລິສັດ</label><select id="le_vehicle">
         ${vehicles.map(v => `<option value="${v.vehicle_id}" ${e.vehicle_id===v.vehicle_id?'selected':''}>${v.vehicle_id} — ${v.type}</option>`).join('')}
-      </select></div>
-      <div class="fld"><label>🔧 ຊ່າງ</label><select id="le_tech" onchange="recalcLaborCommission()">
-        ${techs.map(tc => `<option value="${tc.tech_id}" data-pct="${tc.commission_pct||0}" data-name="${escapeHtml(tc.name)}" ${e.tech_id===tc.tech_id?'selected':''}>${tc.tech_id} — ${escapeHtml(tc.name)} (${tc.skill_level})</option>`).join('')}
       </select></div>
     </div>
 
@@ -12961,27 +13075,247 @@ async function openLaborEntryModal(id, opts) {
       <div class="fld"><label>⏱ ຊມ. ໃຊ້ຈິງ</label><input id="le_act_hours" type="number" step="0.25" value="${e.actual_hours}"/></div>
     </div>
 
+    <!-- Team Split Toggle -->
+    <div style="border:1px solid var(--line);border-radius:10px;padding:10px;margin:10px 0">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600">
+        <input type="checkbox" id="le_is_team" ${e.is_team?'checked':''} onchange="toggleTeamSplit()"/>
+        👥 ເຮັດເປັນທີມ (ແບ່ງຄອມມິສຊັ່ນ Lead 60% + Helpers 40%)
+      </label>
+      <div id="le_team_box" style="display:${e.is_team?'block':'none'};margin-top:10px">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:6px">
+          💡 <strong>ຊ່າງຫົວ:</strong> ໄດ້ 60% ຂອງຄອມມິສຊັ່ນ &nbsp;·&nbsp; <strong>ລູກທີມ:</strong> ແບ່ງ 40% ທົ່ວກັນ
+        </div>
+        <div id="le_team_list"></div>
+        <button class="btn sm outline" onclick="addTeamMember()" style="margin-top:6px">+ ເພີ່ມລູກທີມ</button>
+      </div>
+    </div>
+
+    <!-- Solo tech selector (hidden in team mode) -->
+    <div class="fld" id="le_solo_box" style="display:${!e.is_team?'block':'none'}">
+      <label>🔧 ຊ່າງ (Solo)</label>
+      <select id="le_tech" onchange="recalcLaborCommission()">
+        ${techs.map(tc => `<option value="${tc.tech_id}" data-pct="${tc.commission_pct||0}" data-walkin-pct="${tc.walkin_commission_pct||0}" data-name="${escapeHtml(tc.name)}" ${e.tech_id===tc.tech_id?'selected':''}>${tc.tech_id} — ${escapeHtml(tc.name)} (${tc.skill_level})</option>`).join('')}
+      </select>
+    </div>
+
+    <!-- Parts used (optional) -->
+    <div style="border:1px solid var(--line);border-radius:10px;padding:10px;margin:10px 0">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <strong style="font-size:13px">📦 ອາໄຫລ່ທີ່ໃຊ້ (ບໍ່ບັງຄັບ)</strong>
+        <button class="btn sm outline" onclick="addPartUsed()">+ ເພີ່ມອາໄຫລ່</button>
+      </div>
+      <div id="le_parts_list"></div>
+    </div>
+
+    <!-- Pricing summary box -->
     <div style="background:linear-gradient(135deg,#FEF3C7,#FDE68A);padding:12px;border-radius:10px;margin:10px 0">
       <div class="row">
-        <div class="fld"><label>💰 ຄ່າແຮງ (ກີບ) <small style="color:var(--muted)">— ມາດຕະຖານ ຫຼື ປັບໄດ້</small></label>
+        <div class="fld"><label>💰 ຄ່າແຮງ (ກີບ)</label>
           <input id="le_charge" type="number" value="${e.charge_amount}" onchange="recalcLaborCommission()"/>
         </div>
-        <div class="fld"><label>% ຄອມມິສຊັ່ນ <small style="color:var(--muted)">— ຈາກໂປຣໄຟລ໌ຊ່າງ</small></label>
+        <div class="fld"><label>% ຄອມມິສຊັ່ນ <small style="color:var(--muted)" id="le_pct_hint">— ຈາກໂປຣໄຟລ໌ຊ່າງ</small></label>
           <input id="le_comm_pct" type="number" step="0.5" value="${e.commission_pct}" onchange="recalcLaborCommission()"/>
         </div>
       </div>
-      <div style="text-align:center;padding:10px;background:white;border-radius:8px;margin-top:8px">
-        <div style="font-size:11px;color:var(--muted);font-weight:600">💵 ຄອມມິສຊັ່ນຄຳນວນອັດຕະໂນມັດ</div>
-        <div id="le_comm_display" style="font-size:24px;font-weight:800;color:var(--ok);margin-top:4px">${fmt(e.commission_amount)} ກີບ</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center;background:white;border-radius:8px;padding:10px;margin-top:8px">
+        <div>
+          <div style="font-size:10px;color:var(--muted);font-weight:600">💼 ຄ່າແຮງ</div>
+          <div id="le_charge_display" style="font-size:16px;font-weight:700;color:var(--accent)">${fmt(e.charge_amount)}</div>
+        </div>
+        <div>
+          <div style="font-size:10px;color:var(--muted);font-weight:600">📦 ອາໄຫລ່</div>
+          <div id="le_parts_display" style="font-size:16px;font-weight:700;color:var(--accent)">${fmt(e.parts_total||0)}</div>
+        </div>
+        <div style="border-left:2px solid var(--line)">
+          <div style="font-size:10px;color:var(--muted);font-weight:600">💵 ຄອມມິສຊັ່ນ</div>
+          <div id="le_comm_display" style="font-size:18px;font-weight:800;color:var(--ok)">${fmt(e.commission_amount||0)}</div>
+        </div>
+      </div>
+      <div id="le_total_display" style="text-align:center;background:white;border-radius:8px;padding:8px;margin-top:6px;border-top:2px solid var(--accent)">
+        <div style="font-size:10px;color:var(--muted);font-weight:600">💴 ລວມຍອດທັງໝົດ (ຄ່າແຮງ + ອາໄຫລ່)</div>
+        <div id="le_grand_total" style="font-size:22px;font-weight:800;color:var(--primary)">${fmt((e.charge_amount||0)+(e.parts_total||0))} ກີບ</div>
       </div>
     </div>
 
     <div class="fld"><label>📝 ໝາຍເຫດ</label><textarea id="le_notes" placeholder="ລາຍລະອຽດເພີ່ມເຕີມ...">${escapeHtml(e.notes||'')}</textarea></div>
   `;
+
   modal(id?'✏️ ແກ້ໄຂບັນທຶກວຽກ':'+ ບັນທຶກວຽກສ້ອມ', body, `
     <button class="btn outline" onclick="closeModal()">${t('cancel')}</button>
-    <button class="btn ok" onclick="saveLaborEntry(${id||'null'})">${t('save')}</button>`);
+    ${e.customer_type==='walkin' || id ? `<button class="btn outline" onclick="saveLaborEntry(${id||'null'}, true)">🖨 ບັນທຶກ + ພິມໃບຮັບລົດ</button>` : ''}
+    <button class="btn ok" onclick="saveLaborEntry(${id||'null'}, false)">${t('save')}</button>`);
+
+  // Render dynamic lists
+  setTimeout(() => { renderTeamList(); renderPartsList(); recalcLaborCommission(); }, 100);
 }
+
+// Toggle customer type
+function toggleCustomerType(type) {
+  if ($('#le_walkin_box')) $('#le_walkin_box').style.display = type==='walkin' ? 'block' : 'none';
+  if ($('#le_jo_box')) $('#le_jo_box').style.display = type==='internal' ? 'block' : 'none';
+  if ($('#le_vehicle_row')) $('#le_vehicle_row').style.display = type==='internal' ? 'flex' : 'none';
+  // Update commission % hint + use walkin rate
+  recalcLaborCommission();
+  if ($('#le_pct_hint')) $('#le_pct_hint').textContent = type==='walkin' ? '— ໃຊ້ % Walk-in (ສູງກວ່າ)' : '— ຈາກໂປຣໄຟລ໌ຊ່າງ';
+}
+
+// Toggle team mode
+function toggleTeamSplit() {
+  const isTeam = $('#le_is_team').checked;
+  if ($('#le_team_box')) $('#le_team_box').style.display = isTeam ? 'block' : 'none';
+  if ($('#le_solo_box')) $('#le_solo_box').style.display = isTeam ? 'none' : 'block';
+  if (isTeam && window._leTeam.length === 0) {
+    // Auto-add the current solo tech as lead
+    const techSel = $('#le_tech');
+    if (techSel) {
+      const opt = techSel.options[techSel.selectedIndex];
+      window._leTeam = [{ tech_id: techSel.value, name: opt.getAttribute('data-name'), role:'lead' }];
+    }
+  }
+  renderTeamList(); recalcLaborCommission();
+}
+
+// Render team member list with role selector
+function renderTeamList() {
+  const box = $('#le_team_list'); if (!box) return;
+  const team = window._leTeam || [];
+  const techs = window._leTechs || [];
+  if (team.length === 0) { box.innerHTML = '<div style="color:var(--muted);font-size:11px;padding:6px">ຍັງບໍ່ມີສະມາຊິກ — ກົດ + ເພີ່ມລູກທີມ</div>'; return; }
+  box.innerHTML = team.map((m, i) => `
+    <div style="display:flex;gap:6px;align-items:center;background:white;border:1px solid var(--line);padding:6px 8px;border-radius:6px;margin-bottom:4px">
+      <select onchange="window._leTeam[${i}].tech_id=this.value;window._leTeam[${i}].name=this.options[this.selectedIndex].text;recalcLaborCommission()" style="flex:1;padding:5px;border:1px solid var(--line);border-radius:5px;font-size:12px">
+        ${techs.map(tc => `<option value="${tc.tech_id}" ${m.tech_id===tc.tech_id?'selected':''}>${escapeHtml(tc.name)} (${tc.skill_level})</option>`).join('')}
+      </select>
+      <select onchange="setTeamRole(${i}, this.value)" style="padding:5px;border:1px solid var(--line);border-radius:5px;font-size:12px;background:${m.role==='lead'?'#FEF3C7':'#F0F9FF'}">
+        <option value="lead" ${m.role==='lead'?'selected':''}>👑 ຊ່າງຫົວ (60%)</option>
+        <option value="helper" ${m.role==='helper'?'selected':''}>🤝 ລູກທີມ</option>
+      </select>
+      <button class="btn sm icon danger" onclick="removeTeamMember(${i})" title="ລົບ">🗑</button>
+    </div>`).join('');
+}
+
+function addTeamMember() {
+  const techs = window._leTechs || [];
+  if (techs.length === 0) return;
+  // ຫາຊ່າງທີ່ຍັງບໍ່ໄດ້ເລືອກ
+  const used = (window._leTeam||[]).map(m => m.tech_id);
+  const avail = techs.find(tc => !used.includes(tc.tech_id)) || techs[0];
+  // ຄົນທຳອິດເປັນ lead, ຄົນຕໍ່ມາເປັນ helper
+  const role = (window._leTeam||[]).some(m => m.role==='lead') ? 'helper' : 'lead';
+  window._leTeam = (window._leTeam||[]).concat([{ tech_id: avail.tech_id, name: avail.name, role }]);
+  renderTeamList(); recalcLaborCommission();
+}
+
+function removeTeamMember(i) {
+  window._leTeam.splice(i, 1);
+  renderTeamList(); recalcLaborCommission();
+}
+
+function setTeamRole(i, role) {
+  if (role === 'lead') {
+    // ມີ Lead ໄດ້ຄົນດຽວ — ປ່ຽນຄົນອື່ນເປັນ helper
+    window._leTeam.forEach((m, j) => { m.role = (j===i) ? 'lead' : 'helper'; });
+  } else {
+    window._leTeam[i].role = role;
+  }
+  renderTeamList(); recalcLaborCommission();
+}
+
+// Parts used
+function addPartUsed() {
+  const parts = window._leParts_master || [];
+  const first = parts[0];
+  if (!first) { toast('ບໍ່ມີຂໍ້ມູນອາໄຫລ່', 'warn'); return; }
+  window._leParts = (window._leParts||[]).concat([{ code: first.code, name: first.name, qty: 1, unit_price: first.cost||0, total: first.cost||0 }]);
+  renderPartsList(); recalcLaborCommission();
+}
+
+function renderPartsList() {
+  const box = $('#le_parts_list'); if (!box) return;
+  const parts = window._leParts || [];
+  const master = window._leParts_master || [];
+  if (parts.length === 0) { box.innerHTML = '<div style="color:var(--muted);font-size:11px;padding:6px">ບໍ່ມີອາໄຫລ່ — ກົດ + ເພີ່ມຖ້າຕ້ອງການ</div>'; return; }
+  box.innerHTML = `
+    <table style="font-size:12px;width:100%;margin-top:6px">
+      <tr><th>ລະຫັດ/ຊື່</th><th width="60">ຈຳນວນ</th><th width="100">ລາຄາ/ຫົວ</th><th width="100">ລວມ</th><th width="40"></th></tr>
+      ${parts.map((p, i) => `<tr>
+        <td><select onchange="updatePartChoice(${i}, this.value)" style="padding:4px;border:1px solid var(--line);border-radius:4px;font-size:11px;width:100%">
+          ${master.map(m => `<option value="${m.code}" data-name="${escapeHtml(m.name)}" data-price="${m.cost||0}" ${p.code===m.code?'selected':''}>${m.code} — ${escapeHtml(m.name)}</option>`).join('')}
+        </select></td>
+        <td><input type="number" min="1" step="1" value="${p.qty}" onchange="window._leParts[${i}].qty=+this.value;window._leParts[${i}].total=window._leParts[${i}].qty*window._leParts[${i}].unit_price;renderPartsList();recalcLaborCommission()" style="width:100%;padding:4px;border:1px solid var(--line);border-radius:4px;font-size:11px"/></td>
+        <td><input type="number" value="${p.unit_price}" onchange="window._leParts[${i}].unit_price=+this.value;window._leParts[${i}].total=window._leParts[${i}].qty*window._leParts[${i}].unit_price;renderPartsList();recalcLaborCommission()" style="width:100%;padding:4px;border:1px solid var(--line);border-radius:4px;font-size:11px"/></td>
+        <td style="text-align:right;font-weight:600">${fmt(p.total)}</td>
+        <td><button class="btn sm icon danger" onclick="window._leParts.splice(${i},1);renderPartsList();recalcLaborCommission()" title="ລົບ">🗑</button></td>
+      </tr>`).join('')}
+    </table>
+  `;
+}
+
+function updatePartChoice(i, code) {
+  const master = window._leParts_master || [];
+  const m = master.find(x => x.code === code);
+  if (!m) return;
+  const p = window._leParts[i];
+  p.code = code; p.name = m.name; p.unit_price = m.cost||0;
+  p.total = p.qty * p.unit_price;
+  renderPartsList(); recalcLaborCommission();
+}
+
+// Recalculate — solo OR team, with parts, with walkin rate
+function recalcLaborCommission() {
+  const charge = +($('#le_charge')?.value)||0;
+  const isWalkin = (document.querySelector('input[name="le_ctype"]:checked')?.value) === 'walkin';
+  const isTeam = $('#le_is_team')?.checked;
+  const techSel = $('#le_tech');
+
+  // ດຶງ % ຄອມຈາກຊ່າງ (ໃຊ້ Walk-in rate ຖ້າເປັນ walkin)
+  let pctFromTech = 0;
+  if (techSel) {
+    const opt = techSel.options[techSel.selectedIndex];
+    pctFromTech = isWalkin ? +opt.getAttribute('data-walkin-pct') : +opt.getAttribute('data-pct');
+  } else if (isTeam && (window._leTeam||[]).length > 0) {
+    // ໃຊ້ Lead's rate
+    const lead = window._leTeam.find(m => m.role==='lead') || window._leTeam[0];
+    const techs = window._leTechs || [];
+    const tc = techs.find(x => x.tech_id === lead.tech_id);
+    if (tc) pctFromTech = isWalkin ? (tc.walkin_commission_pct||0) : (tc.commission_pct||0);
+  }
+
+  // Sync pct from tech if user hasn't manually edited
+  if ($('#le_comm_pct') && !$('#le_comm_pct').dataset.userEdited) {
+    $('#le_comm_pct').value = pctFromTech;
+  }
+
+  const pct = +($('#le_comm_pct')?.value)||0;
+  const commTotal = Math.round(charge * pct / 100);
+
+  // ຄຳນວນແບ່ງທີມ — Lead 60% + Helpers ແບ່ງ 40% ທົ່ວກັນ
+  if (isTeam && (window._leTeam||[]).length > 0) {
+    const lead = window._leTeam.find(m => m.role==='lead');
+    const helpers = window._leTeam.filter(m => m.role==='helper');
+    if (lead) lead.share_pct = helpers.length > 0 ? 60 : 100;
+    if (lead) lead.share_amount = Math.round(commTotal * (lead.share_pct||0) / 100);
+    if (helpers.length > 0) {
+      const helperPct = 40 / helpers.length;
+      helpers.forEach(h => { h.share_pct = helperPct; h.share_amount = Math.round(commTotal * helperPct / 100); });
+    }
+    renderTeamList();
+  }
+
+  // Parts total
+  const partsTotal = (window._leParts||[]).reduce((a,p) => a + (p.total||0), 0);
+  const grandTotal = charge + partsTotal;
+
+  if ($('#le_charge_display')) $('#le_charge_display').textContent = fmt(charge);
+  if ($('#le_parts_display')) $('#le_parts_display').textContent = fmt(partsTotal);
+  if ($('#le_comm_display')) $('#le_comm_display').textContent = fmt(commTotal);
+  if ($('#le_grand_total')) $('#le_grand_total').textContent = fmt(grandTotal) + ' ກີບ';
+}
+
+// Mark pct as user-edited (don't auto-sync)
+document.addEventListener('input', function(e) {
+  if (e.target && e.target.id === 'le_comm_pct') { e.target.dataset.userEdited = '1'; }
+});
 
 function updateLaborService() {
   const sel = $('#le_service');
@@ -13005,23 +13339,61 @@ function recalcLaborCommission() {
   if ($('#le_comm_display')) $('#le_comm_display').textContent = fmt(comm) + ' ກີບ';
 }
 
-async function saveLaborEntry(id) {
+async function saveLaborEntry(id, andPrint) {
   const techSel = $('#le_tech');
   const svcSel = $('#le_service');
-  const techOpt = techSel.options[techSel.selectedIndex];
   const svcOpt = svcSel.options[svcSel.selectedIndex];
 
+  const customer_type = document.querySelector('input[name="le_ctype"]:checked')?.value || 'internal';
+  const isTeam = $('#le_is_team')?.checked || false;
   const charge = +($('#le_charge').value)||0;
   const pct = +($('#le_comm_pct').value)||0;
   const stdCharge = +svcOpt.getAttribute('data-charge')||0;
+  const partsTotal = (window._leParts||[]).reduce((a,p) => a+(p.total||0), 0);
+  const commTotal = Math.round(charge * pct / 100);
 
+  // ກວດສອບຂໍ້ມູນ
+  if (customer_type === 'walkin') {
+    if (!$('#le_cust_name').value.trim()) { toast('ກະລຸນາໃສ່ຊື່ລູກຄ້າ', 'bad'); return; }
+    if (!$('#le_ext_plate').value.trim()) { toast('ກະລຸນາໃສ່ປ້າຍລົດ', 'bad'); return; }
+  } else {
+    if (!$('#le_vehicle').value) { toast('ກະລຸນາເລືອກລົດ', 'bad'); return; }
+  }
+  if (isTeam) {
+    if ((window._leTeam||[]).length === 0) { toast('ກະລຸນາເພີ່ມສະມາຊິກທີມ', 'bad'); return; }
+    if (!window._leTeam.some(m => m.role==='lead')) { toast('ກະລຸນາກຳນົດ ຊ່າງຫົວ (Lead)', 'bad'); return; }
+  } else {
+    if (!techSel?.value) { toast('ກະລຸນາເລືອກຊ່າງ', 'bad'); return; }
+  }
+
+  // ກຳນົດ tech_id/tech_name ສຳລັບ entry ຫຼັກ (Lead ຖ້າເປັນທີມ)
+  let mainTechId, mainTechName;
+  if (isTeam) {
+    const lead = window._leTeam.find(m => m.role==='lead');
+    mainTechId = lead.tech_id; mainTechName = lead.name;
+  } else {
+    const techOpt = techSel.options[techSel.selectedIndex];
+    mainTechId = techSel.value; mainTechName = techOpt.getAttribute('data-name');
+  }
+
+  const existing = id ? await db.labor_entries.get(id) : null;
   const data = {
-    entry_id: id ? (await db.labor_entries.get(id)).entry_id : await nextLaborEntryId(),
+    entry_id: existing ? existing.entry_id : await nextLaborEntryId(),
     date: $('#le_date').value,
-    jo_id: $('#le_jo').value || null,
-    vehicle_id: $('#le_vehicle').value,
-    tech_id: techSel.value,
-    tech_name: techOpt.getAttribute('data-name'),
+    customer_type,
+    customer_name: customer_type==='walkin' ? $('#le_cust_name').value.trim() : '',
+    customer_phone: customer_type==='walkin' ? $('#le_cust_phone').value.trim() : '',
+    customer_address: customer_type==='walkin' ? $('#le_cust_addr').value.trim() : '',
+    ext_vehicle_plate: customer_type==='walkin' ? $('#le_ext_plate').value.trim() : '',
+    ext_vehicle_model: customer_type==='walkin' ? $('#le_ext_model').value.trim() : '',
+    jo_id: customer_type==='internal' ? ($('#le_jo').value || null) : null,
+    vehicle_id: customer_type==='internal' ? $('#le_vehicle').value : '',
+    tech_id: mainTechId,
+    tech_name: mainTechName,
+    is_team: isTeam,
+    team_splits: isTeam ? window._leTeam.slice() : [],
+    parts_used: (window._leParts||[]).slice(),
+    parts_total: partsTotal,
     service_code: svcSel.value,
     service_name: svcOpt.getAttribute('data-name'),
     category: svcOpt.getAttribute('data-cat'),
@@ -13029,23 +13401,202 @@ async function saveLaborEntry(id) {
     actual_hours: +($('#le_act_hours').value)||0,
     charge_amount: charge,
     charge_adjusted: charge !== stdCharge,
+    grand_total: charge + partsTotal,
     commission_pct: pct,
-    commission_amount: Math.round(charge * pct / 100),
+    commission_amount: commTotal,
     notes: $('#le_notes').value,
-    status: id ? (await db.labor_entries.get(id)).status : 'pending',
+    status: existing ? existing.status : 'pending',
     created_by: (typeof cloud!=='undefined' && cloud.profile?.username) || 'local',
-    created_at: id ? (await db.labor_entries.get(id)).created_at : new Date().toISOString(),
+    created_at: existing ? existing.created_at : new Date().toISOString(),
   };
-  if (!data.vehicle_id || !data.tech_id || !data.service_code) {
-    toast('ກະລຸນາເລືອກລົດ, ຊ່າງ, ບໍລິການ', 'bad'); return;
-  }
-  if (id) await db.labor_entries.update(id, data);
-  else await db.labor_entries.add(data);
-  if (typeof auditLog==='function') auditLog(id?'update':'create', 'labor_entries', null, `${data.entry_id} — ${data.tech_name} — ${fmt(data.commission_amount)} ກີບ`);
-  toast(`✅ ບັນທຶກ ${data.entry_id} — ຄອມມິສຊັ່ນ ${fmt(data.commission_amount)} ກີບ`);
+
+  let savedId;
+  if (id) { await db.labor_entries.update(id, data); savedId = id; }
+  else { savedId = await db.labor_entries.add(data); }
+
+  if (typeof auditLog==='function') auditLog(id?'update':'create', 'labor_entries', savedId,
+    `${data.entry_id} — ${customer_type==='walkin'?'Walk-in: '+data.customer_name:'Internal'} — ${fmt(commTotal)} ກີບ`);
+  toast(`✅ ບັນທຶກ ${data.entry_id} — ຄອມມິສຊັ່ນ ${fmt(commTotal)} ກີບ`);
   closeModal();
-  if (window.location.hash.includes('labor_entries')) pages.labor_entries();
-  else if (window.location.hash.includes('tech_performance')) pages.tech_performance();
+
+  // ພິມໃບຮັບລົດຖ້າເປັນ Walk-in + ຜູ້ໃຊ້ກົດ "ບັນທຶກ + ພິມ"
+  if (andPrint && customer_type === 'walkin') {
+    setTimeout(() => printCustomerReceipt(savedId), 300);
+  }
+
+  // Reset edit flag
+  if ($('#le_comm_pct')) delete $('#le_comm_pct').dataset.userEdited;
+
+  // Refresh page
+  if (currentPage === 'labor_entries') pages.labor_entries();
+  else if (currentPage === 'tech_performance') pages.tech_performance();
+  else if (currentPage === 'commission') pages.commission();
+}
+
+// ============================================================================
+// 🖨 ໃບຮັບລົດ Walk-in — A4 Printable Receipt + Customer Signature
+// ============================================================================
+async function printCustomerReceipt(id) {
+  const e = await db.labor_entries.get(id);
+  if (!e) { toast('ບໍ່ພົບລາຍການ', 'bad'); return; }
+
+  const dateStr = new Date(e.date || todayISO()).toLocaleDateString('lo-LA');
+  const now = new Date().toLocaleString('lo-LA');
+  const parts = e.parts_used || [];
+  const team = e.team_splits || [];
+  const partsTotal = e.parts_total || 0;
+  const grandTotal = e.grand_total || (e.charge_amount + partsTotal);
+
+  // ໃບຮັບລົດ A4 — KALA branded
+  const html = `<!DOCTYPE html>
+<html lang="lo"><head><meta charset="UTF-8">
+<title>ໃບຮັບລົດ ${e.entry_id}</title>
+<style>
+  @page { size: A4; margin: 14mm 18mm; }
+  body { font-family: 'Noto Sans Lao', 'Phetsarath OT', Arial, sans-serif; color:#1F2937; font-size:13px; line-height:1.5; margin:0 }
+  .header { text-align:center; border-bottom:3px double #0F3D7A; padding-bottom:14px; margin-bottom:18px }
+  .header h1 { color:#0F3D7A; font-size:22px; margin:0 0 4px; letter-spacing:1px }
+  .header .co { color:#475569; font-size:13px; margin:0 }
+  .header .addr { color:#94A3B8; font-size:11px; margin-top:4px }
+  .badge { display:inline-block; background:#8B5CF6; color:#fff; padding:4px 14px; border-radius:20px; font-size:11px; font-weight:700; margin-bottom:10px }
+  h2 { color:#0F3D7A; font-size:16px; border-bottom:2px solid #0F3D7A; padding-bottom:4px; margin:14px 0 10px }
+  table { width:100%; border-collapse:collapse; margin:8px 0 }
+  table.info td { padding:5px 8px; border:1px solid #E5E7EB; font-size:12px }
+  table.info td:first-child { background:#F8FAFC; font-weight:600; color:#475569; width:30%; }
+  table.items th { background:#0F3D7A; color:#fff; padding:8px; text-align:left; font-size:11px }
+  table.items td { padding:8px; border-bottom:1px solid #E5E7EB; font-size:12px }
+  table.items td.right { text-align:right; font-weight:600 }
+  .totals { margin-top:10px; background:linear-gradient(135deg,#F0F9FF,#DBEAFE); padding:14px; border-radius:8px; border:2px solid #0F3D7A }
+  .totals .row { display:flex; justify-content:space-between; padding:4px 0; font-size:13px }
+  .totals .grand { font-size:18px; font-weight:800; color:#0F3D7A; border-top:2px solid #0F3D7A; padding-top:8px; margin-top:8px }
+  .sigs { display:grid; grid-template-columns:1fr 1fr 1fr; gap:24px; margin-top:30px; padding-top:14px }
+  .sig { text-align:center; border-top:1.5px solid #475569; padding-top:6px }
+  .sig .role { font-size:11px; color:#475569 }
+  .sig .name { font-size:12px; color:#1F2937; margin-top:2px; min-height:18px }
+  .footer { margin-top:14px; padding-top:8px; border-top:1px dashed #94A3B8; font-size:10px; color:#94A3B8; text-align:center }
+  .note { font-size:11px; color:#78350F; background:#FEF3C7; border-left:3px solid #F59E0B; padding:6px 10px; border-radius:4px; margin:10px 0 }
+  .stamp { position:absolute; right:24mm; top:30mm; transform:rotate(-12deg); border:3px solid #DC2626; color:#DC2626; padding:6px 16px; border-radius:6px; font-weight:800; font-size:14px; opacity:.15 }
+  @media print { body { -webkit-print-color-adjust:exact; print-color-adjust:exact } .no-print{display:none} }
+</style></head><body>
+
+<div class="header">
+  <div class="badge">🚪 ໃບຮັບລົດ Walk-in</div>
+  <h1>🛠 KALA Garage</h1>
+  <div class="co">ບໍລິສັດ ມະຫາໄຊ ເທຣດດິ້ງ ຈຳກັດ — Mahasai Trading Co., Ltd.</div>
+  <div class="addr">ສຳນັກງານໃຫຍ່: ເມືອງປາກເຊ ແຂວງຈຳປາສັກ ສປປ. ລາວ</div>
+</div>
+
+<div style="display:flex;justify-content:space-between;margin-bottom:8px">
+  <div><strong>📄 ເລກທີ:</strong> <span style="font-family:monospace;color:#0F3D7A;font-size:14px;font-weight:700">${e.entry_id}</span></div>
+  <div><strong>📅 ວັນທີ:</strong> ${dateStr}</div>
+</div>
+
+<h2>👤 ຂໍ້ມູນລູກຄ້າ</h2>
+<table class="info">
+  <tr><td>ຊື່ ແລະ ນາມສະກຸນ</td><td><strong>${escapeHtml(e.customer_name||'-')}</strong></td></tr>
+  <tr><td>ເບີໂທ</td><td>${escapeHtml(e.customer_phone||'-')}</td></tr>
+  ${e.customer_address?`<tr><td>ທີ່ຢູ່</td><td>${escapeHtml(e.customer_address)}</td></tr>`:''}
+</table>
+
+<h2>🚗 ຂໍ້ມູນລົດ</h2>
+<table class="info">
+  <tr><td>ປ້າຍລົດ</td><td><strong style="font-size:14px">${escapeHtml(e.ext_vehicle_plate||'-')}</strong></td></tr>
+  <tr><td>ຍີ່ຫໍ້ / ລຸ້ນ</td><td>${escapeHtml(e.ext_vehicle_model||'-')}</td></tr>
+</table>
+
+<h2>🔧 ບໍລິການທີ່ສ້າງ</h2>
+<table class="items">
+  <tr>
+    <th width="120">ລະຫັດ</th>
+    <th>ລາຍລະອຽດ</th>
+    <th width="80">ຊມ.</th>
+    <th width="120">ຄ່າແຮງ (ກີບ)</th>
+  </tr>
+  <tr>
+    <td style="font-family:monospace">${e.service_code}</td>
+    <td><strong>${escapeHtml(e.service_name||'-')}</strong>${e.notes?`<br><small style="color:#64748B">${escapeHtml(e.notes)}</small>`:''}</td>
+    <td>${e.actual_hours||e.standard_hours||0}</td>
+    <td class="right">${fmt(e.charge_amount||0)}</td>
+  </tr>
+</table>
+
+${parts.length > 0 ? `
+<h2>📦 ອາໄຫລ່ທີ່ໃຊ້</h2>
+<table class="items">
+  <tr>
+    <th width="120">ລະຫັດ</th>
+    <th>ຊື່ສິນຄ້າ</th>
+    <th width="60">ຈຳນວນ</th>
+    <th width="100">ລາຄາ/ຫົວ</th>
+    <th width="100">ລວມ (ກີບ)</th>
+  </tr>
+  ${parts.map(p => `<tr>
+    <td style="font-family:monospace">${p.code}</td>
+    <td>${escapeHtml(p.name)}</td>
+    <td style="text-align:center">${p.qty}</td>
+    <td class="right">${fmt(p.unit_price)}</td>
+    <td class="right">${fmt(p.total)}</td>
+  </tr>`).join('')}
+</table>` : ''}
+
+<div class="totals">
+  <div class="row"><span>💼 ຄ່າແຮງ:</span><strong>${fmt(e.charge_amount||0)} ກີບ</strong></div>
+  ${partsTotal>0?`<div class="row"><span>📦 ຄ່າອາໄຫລ່:</span><strong>${fmt(partsTotal)} ກີບ</strong></div>`:''}
+  <div class="row grand"><span>💴 ລວມຍອດທີ່ຕ້ອງຊຳລະ:</span><span>${fmt(grandTotal)} ກີບ</span></div>
+</div>
+
+<div class="note">
+  📌 <strong>ໝາຍເຫດ:</strong> ລາຄາລວມ VAT ແລ້ວ — ບໍລິສັດຮັບປະກັນຄຸນນະພາບງານສ້ອມ 30 ມື້ນັບແຕ່ວັນທີຮັບລົດ.
+  ສຳລັບອາໄຫລ່ ໃຊ້ການຮັບປະກັນຕາມຜູ້ຜະລິດ.
+</div>
+
+<div class="sigs">
+  <div class="sig">
+    <div class="role">ຊ່າງຜູ້ສ້ອມ</div>
+    <div class="name">${escapeHtml(e.tech_name||'-')}</div>
+    ${team.length>0?`<div style="font-size:9px;color:#94A3B8;margin-top:2px">+ທີມ ${team.length} ຄົນ</div>`:''}
+  </div>
+  <div class="sig">
+    <div class="role">ຜູ້ກວດສອບ (Manager)</div>
+    <div class="name">............................</div>
+  </div>
+  <div class="sig">
+    <div class="role">ລູກຄ້າຮັບລົດ</div>
+    <div class="name">${escapeHtml(e.customer_name||'............................')}</div>
+    <div style="font-size:9px;color:#94A3B8;margin-top:2px">ວັນທີ: ____/____/______</div>
+  </div>
+</div>
+
+<div class="footer">
+  ໃບຮັບລົດນີ້ອອກໂດຍລະບົບ KALA Garage Manager · ພິມວັນທີ ${now}<br>
+  ບໍລິສັດ ມະຫາໄຊ ເທຣດດິ້ງ ຈຳກັດ · ໂທ. 020-XXX-XXXX · Email: info@kala.la
+</div>
+
+<div class="no-print" style="text-align:center;margin-top:20px;padding:14px;background:#F8FAFC;border-radius:8px">
+  <button onclick="window.print()" style="background:#0F3D7A;color:#fff;border:none;padding:10px 24px;border-radius:8px;font-size:14px;cursor:pointer;font-weight:600">🖨 ພິມໃບຮັບລົດ</button>
+  <button onclick="window.close()" style="background:#64748B;color:#fff;border:none;padding:10px 24px;border-radius:8px;font-size:14px;cursor:pointer;margin-left:8px">✕ ປິດ</button>
+</div>
+
+</body></html>`;
+
+  const w = window.open('', '_blank');
+  if (!w) { toast('ກະລຸນາອະນຸຍາດ Pop-up', 'warn'); return; }
+  w.document.write(html); w.document.close();
+
+  // ບັນທຶກ customer_receipt record
+  try {
+    const recId = 'CR-' + e.entry_id.replace('LE-','');
+    await db.customer_receipts.put({
+      receipt_id: recId, date: e.date, labor_entry_id: id,
+      customer_name: e.customer_name, customer_phone: e.customer_phone,
+      vehicle_plate: e.ext_vehicle_plate, vehicle_model: e.ext_vehicle_model,
+      total_amount: grandTotal, charge_amount: e.charge_amount,
+      parts_total: partsTotal, service_code: e.service_code,
+      printed_at: new Date().toISOString(),
+      printed_by: (typeof cloud!=='undefined' && cloud.profile?.username) || 'local',
+      signed_at: null, signed_by_customer: null
+    });
+  } catch(err) { console.warn('Save receipt failed:', err); }
 }
 
 // Approve / Reject / Mark Paid
@@ -13091,33 +13642,41 @@ async function delLaborEntry(id) {
 }
 
 // ===== PAGE: Labor Entries (list) =====
-let leFilterStatus = ''; let leFilterTech = ''; let leFilterDate = '';
+let leFilterStatus = ''; let leFilterTech = ''; let leFilterDate = ''; let leFilterCType = '';
 pages.labor_entries = async () => {
   let entries = await db.labor_entries.toArray();
   entries.sort((a,b) => (b.date||'').localeCompare(a.date||''));
   const techs = await db.tech_profiles.toArray();
 
   if (leFilterStatus) entries = entries.filter(e => e.status === leFilterStatus);
-  if (leFilterTech) entries = entries.filter(e => e.tech_id === leFilterTech);
+  if (leFilterTech) entries = entries.filter(e => e.tech_id === leFilterTech || (Array.isArray(e.team_splits) && e.team_splits.some(s => s.tech_id === leFilterTech)));
   if (leFilterDate) entries = entries.filter(e => (e.date||'').startsWith(leFilterDate));
+  if (leFilterCType) entries = entries.filter(e => (e.customer_type||'internal') === leFilterCType);
 
   const stats = { pending:0, approved:0, paid:0, rejected:0 };
   entries.forEach(e => { stats[e.status] = (stats[e.status]||0)+1; });
   const sumCharge = entries.reduce((a,e) => a+(e.charge_amount||0), 0);
   const sumComm = entries.reduce((a,e) => a+(e.commission_amount||0), 0);
+  const sumParts = entries.reduce((a,e) => a+(e.parts_total||0), 0);
+  const walkinCount = entries.filter(e => e.customer_type === 'walkin').length;
 
   $('#main').innerHTML = `
     <div class="crumbs">${t('nav_jobs')||'ວຽກສ້ອມ'} › 💼 ບັນທຶກວຽກ + ຄ່າແຮງ</div>
     <div class="page-title">💼 ບັນທຶກວຽກສ້ອມ + ຄ່າແຮງ <small style="font-weight:400;color:var(--muted);font-size:13px">— ${entries.length} ລາຍການ</small></div>
 
     <div class="kpi-grid">
-      <div class="kpi"><div class="label">📋 ລາຍການລວມ</div><div class="val">${entries.length}</div></div>
+      <div class="kpi"><div class="label">📋 ລາຍການລວມ</div><div class="val">${entries.length}</div><div class="muted">🚪 Walk-in: ${walkinCount}</div></div>
       <div class="kpi"><div class="label">⏳ ລໍຖ້າອະນຸມັດ</div><div class="val" style="color:var(--warn)">${stats.pending||0}</div></div>
-      <div class="kpi"><div class="label">💵 ຄ່າແຮງລວມ (ກີບ)</div><div class="val" style="font-size:18px;color:var(--accent)">${fmt(sumCharge)}</div></div>
+      <div class="kpi"><div class="label">💵 ຄ່າແຮງ + ອາໄຫລ່ (ກີບ)</div><div class="val" style="font-size:18px;color:var(--accent)">${fmt(sumCharge+sumParts)}</div><div class="muted">ແຮງ ${fmt(sumCharge)} · ອາໄຫລ່ ${fmt(sumParts)}</div></div>
       <div class="kpi"><div class="label">💰 ຄອມລວມ (ກີບ)</div><div class="val" style="font-size:18px;color:var(--ok)">${fmt(sumComm)}</div></div>
     </div>
 
     <div class="toolbar" style="flex-wrap:wrap;gap:8px">
+      <select onchange="leFilterCType=this.value;pages.labor_entries()" style="padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px">
+        <option value="">🌐 ທຸກປະເພດ</option>
+        <option value="internal" ${leFilterCType==='internal'?'selected':''}>🏢 ລົດບໍລິສັດ</option>
+        <option value="walkin" ${leFilterCType==='walkin'?'selected':''}>🚪 Walk-in</option>
+      </select>
       <select onchange="leFilterStatus=this.value;pages.labor_entries()" style="padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px">
         <option value="">⚪ ທຸກສະຖານະ</option>
         ${Object.entries(LABOR_STATUS).map(([k,v]) => `<option value="${k}" ${leFilterStatus===k?'selected':''}>${v.label}</option>`).join('')}
@@ -13127,7 +13686,7 @@ pages.labor_entries = async () => {
         ${techs.map(tc => `<option value="${tc.tech_id}" ${leFilterTech===tc.tech_id?'selected':''}>${escapeHtml(tc.name)} (${tc.tech_id})</option>`).join('')}
       </select>
       <input type="month" value="${leFilterDate}" onchange="leFilterDate=this.value;pages.labor_entries()" style="padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px"/>
-      <button class="btn outline" onclick="leFilterStatus='';leFilterTech='';leFilterDate='';pages.labor_entries()">🔄 ລ້າງ Filter</button>
+      <button class="btn outline" onclick="leFilterStatus='';leFilterTech='';leFilterDate='';leFilterCType='';pages.labor_entries()">🔄 ລ້າງ Filter</button>
       <div style="flex:1"></div>
       <button class="btn" onclick="openLaborEntryModal()">+ ບັນທຶກວຽກໃໝ່</button>
     </div>
@@ -13138,9 +13697,10 @@ pages.labor_entries = async () => {
         <tr>
           <th>ລະຫັດ</th>
           <th>ວັນທີ</th>
-          <th>ຊ່າງ</th>
+          <th>ປະເພດ</th>
+          <th>ຊ່າງ / ທີມ</th>
           <th>ບໍລິການ</th>
-          <th>ລົດ</th>
+          <th>ລົດ / ລູກຄ້າ</th>
           <th style="text-align:right">ຄ່າແຮງ</th>
           <th style="text-align:right">ຄອມ</th>
           <th>ສະຖານະ</th>
@@ -13148,19 +13708,41 @@ pages.labor_entries = async () => {
         </tr>
         ${entries.map(e => {
           const st = LABOR_STATUS[e.status] || LABOR_STATUS.pending;
-          return `<tr>
+          const isWalkin = e.customer_type === 'walkin';
+          const isTeam = e.is_team && Array.isArray(e.team_splits) && e.team_splits.length > 0;
+          return `<tr style="${isWalkin?'background:#FAF5FF':''}">
             <td><strong style="font-family:monospace;font-size:11px">${e.entry_id}</strong></td>
             <td>${e.date}</td>
-            <td><strong>${escapeHtml(e.tech_name||'-')}</strong></td>
+            <td>
+              ${isWalkin
+                ? '<span class="pill" style="background:#8B5CF6;color:#fff;font-size:10px">🚪 Walk-in</span>'
+                : '<span class="pill" style="background:#3B82F6;color:#fff;font-size:10px">🏢 ບໍລິສັດ</span>'}
+            </td>
+            <td>
+              ${isTeam ? `
+                <div style="font-weight:700;font-size:11px;color:#0F766E">👥 ທີມ ${e.team_splits.length} ຄົນ</div>
+                ${e.team_splits.map(m => `<div style="font-size:10px;color:var(--muted)">${m.role==='lead'?'👑':'·'} ${escapeHtml(m.name)} <span style="color:var(--ok)">(${fmt(m.share_amount||0)})</span></div>`).join('')}
+              ` : `<strong>${escapeHtml(e.tech_name||'-')}</strong>`}
+            </td>
             <td>
               <strong style="font-size:12px">${escapeHtml(e.service_name||'-')}</strong>
               ${e.category?`<br><span class="pill" style="background:${svcCatColor(e.category)}22;color:${svcCatColor(e.category)};font-size:10px">${svcCatLabel(e.category)}</span>`:''}
+              ${(e.parts_used||[]).length>0?`<br><small style="color:var(--muted);font-size:10px">📦 ${e.parts_used.length} ອາໄຫລ່</small>`:''}
             </td>
-            <td>${e.vehicle_id||'-'}</td>
-            <td style="text-align:right;font-weight:700">${fmt(e.charge_amount||0)}${e.charge_adjusted?`<br><small style="color:var(--warn);font-size:10px">⚠ ປັບແລ້ວ</small>`:''}</td>
+            <td>
+              ${isWalkin
+                ? `<div style="font-weight:600">${escapeHtml(e.customer_name||'-')}</div><small style="color:var(--muted)">${escapeHtml(e.ext_vehicle_plate||'')} ${escapeHtml(e.ext_vehicle_model||'')}</small>`
+                : `<strong>${e.vehicle_id||'-'}</strong>`}
+            </td>
+            <td style="text-align:right">
+              <div style="font-weight:700">${fmt(e.charge_amount||0)}</div>
+              ${(e.parts_total||0)>0?`<small style="color:var(--muted);font-size:10px">+ ${fmt(e.parts_total)} ອາໄຫລ່</small>`:''}
+              ${e.charge_adjusted?`<br><small style="color:var(--warn);font-size:10px">⚠ ປັບແລ້ວ</small>`:''}
+            </td>
             <td style="text-align:right;font-weight:700;color:var(--ok)">${fmt(e.commission_amount||0)}<br><small style="color:var(--muted);font-size:10px">${e.commission_pct||0}%</small></td>
             <td><span class="pill" style="background:${st.bg};color:${st.color}">${st.label}</span></td>
             <td class="actions compact">
+              ${isWalkin ? `<button class="btn sm icon" style="background:#8B5CF6;color:#fff" onclick="printCustomerReceipt(${e.id})" title="ພິມໃບຮັບລົດ">🖨</button>` : ''}
               ${e.status==='pending' && (typeof cloud==='undefined' || cloud.hasRole('owner','manager','it')) ? `
                 <button class="btn sm icon ok" onclick="approveLaborEntry(${e.id})" title="ອະນຸມັດ">✅</button>
                 <button class="btn sm icon danger" onclick="rejectLaborEntry(${e.id})" title="ປະຕິເສດ">❌</button>
