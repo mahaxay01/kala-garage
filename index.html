@@ -11278,6 +11278,9 @@ async function calcActualCostPerKm(vehicleId) {
   const curKm = v?.mileage || 0;
   const result = [];
   let totalCostPerKm = 0;
+  const MIN_INTERVAL_KM = 500;   // 🛡️ ປ້ອງກັນ Outlier — interval ຕ້ອງ >= 500 km
+  const MAX_COST_PER_KM = 50000; // 🛡️ Cap ສູງສຸດ 50,000 ກີບ/km (Sanity check)
+
   for (const part of REPLACEMENT_PARTS) {
     const records = byType[part.key];
     if (records.length === 0) {
@@ -11286,23 +11289,37 @@ async function calcActualCostPerKm(vehicleId) {
     }
     let totalCost = records.reduce((a,r) => a + (r.cost||0), 0);
     let intervals = [];
-    for (let i = 1; i < records.length; i++) intervals.push(records[i].km - records[i-1].km);
+    for (let i = 1; i < records.length; i++) {
+      const diff = records[i].km - records[i-1].km;
+      if (diff >= MIN_INTERVAL_KM) intervals.push(diff);  // Skip suspiciously small intervals
+    }
     const lastRec = records[records.length-1];
     const sinceLast = curKm - lastRec.km;
-    let avgInterval, costPerKm;
+    let avgInterval, costPerKm, suspicious = false;
     if (intervals.length > 0) {
       avgInterval = intervals.reduce((a,b)=>a+b,0) / intervals.length;
       const avgCost = totalCost / records.length;
       costPerKm = avgInterval > 0 ? avgCost / avgInterval : 0;
+    } else if (sinceLast >= MIN_INTERVAL_KM) {
+      avgInterval = sinceLast;
+      costPerKm = lastRec.cost / sinceLast;
     } else {
-      avgInterval = sinceLast > 0 ? sinceLast : null;
-      costPerKm = sinceLast > 0 ? lastRec.cost / sinceLast : 0;
+      // ບໍ່ມີ interval ທີ່ໜ້າເຊື່ອຖື → ບໍ່ຄຳນວນ
+      avgInterval = null;
+      costPerKm = 0;
+      suspicious = records.length > 0;
+    }
+    // 🛡️ Cap ຄ່າສູງສຸດ ປ້ອງກັນ display ບໍ່ປົກກະຕິ
+    if (costPerKm > MAX_COST_PER_KM) {
+      console.warn(`[Depreciation] Outlier capped for ${vehicleId}/${part.key}: ${costPerKm} → ${MAX_COST_PER_KM}`);
+      costPerKm = MAX_COST_PER_KM;
+      suspicious = true;
     }
     totalCostPerKm += costPerKm;
     result.push({
       ...part, count: records.length, totalCost, avgInterval,
       costPerKm, lastKm: lastRec.km, lastDate: lastRec.date,
-      lastCost: lastRec.cost, sinceLast,
+      lastCost: lastRec.cost, sinceLast, suspicious,
     });
   }
   return { items: result, totalCostPerKm, replacements };
@@ -11414,13 +11431,42 @@ pages.depreciation = async () => {
         const smart = await calcCostWithFallback(v);
         const deprRow = rows.find(x => x.v.id === v.id);
         const deprPerKm = deprRow && v.km_per_year > 0 ? deprRow.annualDepr / v.km_per_year : 0;
+        // 🛡️ Outlier Detection
+        const suspicious = (smart.totalCostPerKm > 10000) ||
+                          (smart.items?.some(it => it.suspicious)) ||
+                          (!v.purchase_price && !v.purchase_date && smart.totalCostPerKm > 1000) ||
+                          (!/^[A-Z]{2,3}-\d+/.test(v.vehicle_id) && smart.totalCostPerKm > 1000);
         perVeh.push({
           v, smart, deprPerKm,
           totalPerKm: smart.totalCostPerKm + deprPerKm,
           recordCount: smart.replacements.length,
+          suspicious,
         });
       }
+      const suspiciousVehicles = perVeh.filter(p => p.suspicious);
       return `
+      ${suspiciousVehicles.length > 0 ? `
+        <div class="alert bad" style="font-size:13px;border-left:4px solid #DC2626;background:#FEE2E2;margin-bottom:14px">
+          ⚠️ <strong>ພົບ ${suspiciousVehicles.length} ລົດ ທີ່ຄ່າເສື່ອມຜິດປົກກະຕິ!</strong>
+          <div style="margin-top:6px;font-size:12px">
+            <strong>ສາເຫດທີ່ເປັນໄປໄດ້:</strong>
+            <ul style="margin:4px 0 4px 18px;line-height:1.6">
+              <li>ມີ Record ການປ່ຽນອາໄຫລ່ທີ່ <strong>km ນ້ອຍຫລາຍ</strong> (ເຊັ່ນ km=1) ກັບ <strong>ລາຄາສູງ</strong></li>
+              <li>Vehicle ID ບໍ່ກົງມາດຕະຖານ (ບໍ່ມີ "KL-" prefix) — ອາດເປັນ Test Data</li>
+              <li>ບໍ່ມີ ລາຄາຊື້ / ວັນທີຊື້ — ການຄຳນວນບໍ່ສົມບູນ</li>
+            </ul>
+            <strong style="color:#991B1B">🚨 ລົດທີ່ສົງໄສ:</strong>
+            ${suspiciousVehicles.map(p => `<code style="background:white;padding:3px 8px;border-radius:4px;color:#DC2626;cursor:pointer;font-weight:700;margin-right:4px" onclick="goVehicleDetail(${p.v.id})">${escapeHtml(p.v.vehicle_id)}</code>`).join('')}
+            <br><br>
+            <strong>👉 ການແກ້ໄຂ:</strong>
+            <ol style="margin:4px 0 0 18px;line-height:1.6">
+              <li>ກົດ Vehicle ID ສີແດງດ້ານເທິງ → ກວດຂໍ້ມູນລົດ</li>
+              <li>ໄປໜ້າ <a onclick="go('price_audit')" style="color:#DC2626;cursor:pointer;text-decoration:underline;font-weight:700">"ການປ່ຽນລາຄາ"</a> → ກວດ records ປ່ຽນອາໄຫລ່</li>
+              <li>ລົບ records ທີ່ມີ km ນ້ອຍ (< 500) ຫລື ລາຄາສູງເກີນປົກກະຕິ</li>
+              <li>ຫລື ໃສ່ ລາຄາຊື້ + ວັນທີຊື້ ໃນລົດ</li>
+            </ol>
+          </div>
+        </div>` : ''}
       <div class="card">
         <h3>💰 ຄ່າໃຊ້ຈ່າຍຕໍ່ Km — Cost Per Kilometer
           <button class="btn sm outline" style="float:right" onclick="openLifespanSettings()">⚙️ ຕັ້ງຄ່າອາຍຸ + ລາຄາ</button>
@@ -11467,15 +11513,17 @@ pages.depreciation = async () => {
             <th>10,000 km</th></tr>
           ${perVeh.map(p => {
             const srcColor = p.smart.source === 'actual' ? 'var(--ok)' : p.smart.source === 'same_type' ? 'var(--accent)' : 'var(--muted)';
-            return `<tr>
-              <td><strong style="cursor:pointer;color:var(--accent)" onclick="goVehicleDetail(${p.v.id})">${p.v.vehicle_id}</strong></td>
-              <td>${p.v.type}</td>
+            const rowStyle = p.suspicious ? 'background:#FEE2E2' : '';
+            const warnIcon = p.suspicious ? '<span title="ຄ່າຜິດປົກກະຕິ — ກວດສອບ records" style="color:#DC2626;margin-right:4px">⚠️</span>' : '';
+            return `<tr style="${rowStyle}">
+              <td>${warnIcon}<strong style="cursor:pointer;color:${p.suspicious?'#DC2626':'var(--accent)'}" onclick="goVehicleDetail(${p.v.id})">${escapeHtml(p.v.vehicle_id)}</strong></td>
+              <td>${escapeHtml(p.v.type||'-')}</td>
               <td><span class="pill ${p.recordCount>0?'ok':'gray'}" style="font-size:10px">${p.recordCount} ຄັ້ງ</span></td>
-              <td style="background:#FEF9C3;font-weight:700">${fmt(Math.round(p.smart.totalCostPerKm))}</td>
+              <td style="background:#FEF9C3;font-weight:700;${p.suspicious?'color:#DC2626':''}">${fmt(Math.round(p.smart.totalCostPerKm))}</td>
               <td style="font-size:11px;color:${srcColor}">${p.smart.label}</td>
               <td style="background:#FEE2E2">${fmt(Math.round(p.deprPerKm))}</td>
-              <td style="background:#D1FAE5;font-weight:700;color:#065F46">${fmt(Math.round(p.totalPerKm))}</td>
-              <td>${fmt(Math.round(p.totalPerKm*10000))}</td>
+              <td style="background:#D1FAE5;font-weight:700;color:#065F46;${p.suspicious?'background:#FECACA;color:#991B1B':''}">${fmt(Math.round(p.totalPerKm))}</td>
+              <td style="${p.suspicious?'color:#DC2626;font-weight:700':''}">${fmt(Math.round(p.totalPerKm*10000))}</td>
             </tr>`;
           }).join('')}
         </table>`}
