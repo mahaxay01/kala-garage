@@ -2300,8 +2300,9 @@ const NAV_GROUPS = [
   {
     id:'settings', icon:'⚙️', label:'ຕັ້ງຄ່າ ແລະ ການຄຸ້ມຄອງ',
     items: [
-      { page:'cloud_users', icon:'👥', label:'ຄຸ້ມຄອງ User' },
-      { page:'branches',    icon:'🏢', label:'ສາຂາ (Branches)' },
+      { page:'cloud_users',     icon:'👥', label:'ຄຸ້ມຄອງ User' },
+      { page:'role_management', icon:'🔐', label:'Role + ສິດທິ' },
+      { page:'branches',        icon:'🏢', label:'ສາຂາ (Branches)' },
       { page:'cloud',       icon:'☁️', label:'Cloud Sync' },
       { page:'categories',  icon:'📑', label:'ໝວດ + ກຸ່ມ' },
       { page:'audit',       icon:'📋', label:'Audit Log' },
@@ -16851,6 +16852,269 @@ pages.commission = async () => {
 };
 
 // ===================== ABOUT =====================
+// ============================================================================
+// 🔐 ROLE & PERMISSION MANAGEMENT — ຄຸ້ມຄອງ Role ແລະ ສິດທິ
+// ============================================================================
+// ກຳນົດສິດທິພື້ນຖານທີ່ມີໃນລະບົບ
+const KALA_PERMS = [
+  // Vehicles
+  { id:'vehicles.view',     label:'ເບິ່ງລົດ',         cat:'🚗 ລົດ' },
+  { id:'vehicles.create',   label:'ສ້າງລົດໃໝ່',       cat:'🚗 ລົດ' },
+  { id:'vehicles.edit',     label:'ແກ້ໄຂລົດ',         cat:'🚗 ລົດ' },
+  { id:'vehicles.delete',   label:'ລົບລົດ',           cat:'🚗 ລົດ' },
+  // JO
+  { id:'jo.view',           label:'ເບິ່ງ JO',         cat:'📋 JO' },
+  { id:'jo.create',         label:'ສ້າງ JO',          cat:'📋 JO' },
+  { id:'jo.edit',           label:'ແກ້ໄຂ JO',         cat:'📋 JO' },
+  { id:'jo.cancel',         label:'ຍົກເລີກ JO',       cat:'📋 JO' },
+  { id:'jo.reopen',         label:'ເປີດ JO ໃໝ່',      cat:'📋 JO' },
+  // Labor
+  { id:'labor.view',        label:'ເບິ່ງ Labor Entry', cat:'💼 ຄ່າແຮງ' },
+  { id:'labor.create',      label:'ສ້າງ Labor Entry',  cat:'💼 ຄ່າແຮງ' },
+  { id:'labor.approve',     label:'ອະນຸມັດ Labor',     cat:'💼 ຄ່າແຮງ' },
+  { id:'labor.mark_paid',   label:'Mark Paid ຄອມ',    cat:'💼 ຄ່າແຮງ' },
+  // Inventory
+  { id:'parts.view',        label:'ເບິ່ງສະຕັອກ',      cat:'📦 ສະຕັອກ' },
+  { id:'parts.edit',        label:'ແກ້ໄຂສະຕັອກ',      cat:'📦 ສະຕັອກ' },
+  { id:'pr.create',         label:'ສ້າງ PR',          cat:'📦 ສະຕັອກ' },
+  { id:'pr.approve',        label:'ອະນຸມັດ PR',       cat:'📦 ສະຕັອກ' },
+  { id:'po.create',         label:'ສ້າງ PO',          cat:'📦 ສະຕັອກ' },
+  { id:'po.approve',        label:'ອະນຸມັດ PO',       cat:'📦 ສະຕັອກ' },
+  // Inspection
+  { id:'inspection.create', label:'ກວດປະຈຳວັນ',       cat:'✅ ກວດປະຈຳວັນ' },
+  { id:'fuel.create',       label:'ບັນທຶກນ້ຳມັນ',     cat:'⛽ ນ້ຳມັນ' },
+  // Reports
+  { id:'reports.view',      label:'ເບິ່ງລາຍງານ',      cat:'📊 ລາຍງານ' },
+  { id:'depreciation.view', label:'ເບິ່ງຄ່າເສື່ອມ',   cat:'📉 ຄ່າເສື່ອມ' },
+  // System
+  { id:'users.view',        label:'ເບິ່ງ Users',      cat:'👥 ລະບົບ' },
+  { id:'users.manage',      label:'ສ້າງ/ແກ້ User',    cat:'👥 ລະບົບ' },
+  { id:'branches.manage',   label:'ຄຸ້ມຄອງສາຂາ',     cat:'👥 ລະບົບ' },
+  { id:'audit.view',        label:'ເບິ່ງ Audit Log',  cat:'👥 ລະບົບ' },
+  { id:'settings.edit',     label:'ປ່ຽນຕັ້ງຄ່າລະບົບ',  cat:'👥 ລະບົບ' },
+];
+
+// Default Permissions ສຳລັບແຕ່ລະ Role
+const ROLE_PERMISSIONS = {
+  owner: '*',  // All permissions
+  it: ['vehicles.view','jo.view','labor.view','parts.view','pr.create','pr.approve','users.view','users.manage','branches.manage','audit.view','settings.edit','reports.view'],
+  manager: ['vehicles.view','vehicles.edit','jo.view','jo.create','jo.edit','jo.cancel','jo.reopen','labor.view','labor.approve','parts.view','parts.edit','pr.create','pr.approve','po.create','po.approve','inspection.create','reports.view','depreciation.view'],
+  asset_manager: ['vehicles.view','vehicles.create','vehicles.edit','parts.view','parts.edit','pr.create','pr.approve','po.create','po.approve','reports.view','depreciation.view','branches.manage'],
+  tech_l3: ['vehicles.view','jo.view','jo.create','jo.edit','labor.view','labor.create','parts.view','inspection.create'],
+  tech_l2: ['vehicles.view','jo.view','jo.create','jo.edit','labor.view','labor.create','parts.view'],
+  tech_l1: ['vehicles.view','jo.view','labor.create','parts.view'],
+  driver: ['vehicles.view','inspection.create','fuel.create'],
+  procurement: ['parts.view','parts.edit','pr.create','po.create','vehicles.view'],
+  qc: ['vehicles.view','jo.view','parts.view','inspection.create'],
+  accounting: ['jo.view','labor.view','labor.mark_paid','reports.view','pr.approve','po.approve','depreciation.view'],
+};
+
+// ກວດສິດ User
+function userHasPermission(role, permId) {
+  if (!role) return false;
+  const perms = ROLE_PERMISSIONS[role];
+  if (!perms) return false;
+  if (perms === '*') return true;  // Owner = full access
+  return perms.includes(permId);
+}
+
+// ໜ້າຄຸ້ມຄອງ Role + Permission
+pages.role_management = async () => {
+  const roles = Object.keys(ROLE_LABELS);
+  // ກວດສິດທິ User ປະຈຸບັນ
+  const isOwnerOrIT = (typeof cloud!=='undefined') && (cloud.hasRole('owner','it'));
+  if (!isOwnerOrIT) {
+    $('#main').innerHTML = '<div class="alert bad">❌ ສະເພາະ Owner ແລະ IT ສາມາດເຂົ້າເບິ່ງໜ້ານີ້</div>';
+    return;
+  }
+
+  // ກຸ່ມ Permissions ຕາມໝວດ
+  const byCat = {};
+  KALA_PERMS.forEach(p => { (byCat[p.cat] = byCat[p.cat] || []).push(p); });
+
+  $('#main').innerHTML = `
+    <div class="crumbs">${t('nav_settings')} › 🔐 ຄຸ້ມຄອງ Role ແລະ ສິດທິ</div>
+    <div class="page-title">🔐 Role &amp; Permission Management</div>
+
+    <div class="alert info" style="font-size:13px">
+      💡 ໜ້ານີ້ສະແດງ Role ທັງໝົດ + ສິດທິ. ສະເພາະ Owner/IT ສາມາດເຫັນ + ປ່ຽນ. ການປ່ຽນສິດທິໃຊ້ Effect ທັນທີ.
+    </div>
+
+    <div class="toolbar">
+      <button class="btn" onclick="openPermissionTesterModal()">🔍 ກວດສິດ User</button>
+      <button class="btn outline" onclick="openCustomRoleModal()">+ ສ້າງ Custom Role</button>
+      <button class="btn outline" onclick="pages.role_management()">🔄 Refresh</button>
+    </div>
+
+    <!-- Role Summary -->
+    <div class="card">
+      <h3>📋 ສະຫລຸບ ${roles.length} Roles</h3>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px">
+        ${roles.map(r => {
+          const perms = ROLE_PERMISSIONS[r];
+          const count = perms === '*' ? '∞ ໝົດ' : (perms||[]).length;
+          const color = r==='owner'?'#DC2626':r==='it'?'#475569':r==='manager'?'#EA580C':r==='asset_manager'?'#7C3AED':r.startsWith('tech')?'#14B8A6':r==='driver'?'#2563EB':r==='procurement'?'#7C3AED':r==='qc'?'#0891B2':r==='accounting'?'#16A34A':'#64748B';
+          return `<div onclick="showRoleDetail('${r}')" style="cursor:pointer;border:2px solid ${color};border-radius:10px;padding:12px;background:white;transition:all .2s"
+            onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 6px 16px rgba(0,0,0,.1)'"
+            onmouseout="this.style.transform='';this.style.boxShadow=''">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <strong style="font-size:14px;color:${color}">${ROLE_LABELS[r]||r}</strong>
+              <span class="pill" style="background:${color}33;color:${color};font-weight:700">${count}</span>
+            </div>
+            <small style="color:var(--muted);font-size:11px">ກົດເພື່ອເບິ່ງສິດທິ</small>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+
+    <!-- Permission Matrix -->
+    <div class="card">
+      <h3>📊 Permission Matrix — ສິດທິແຕ່ລະ Role</h3>
+      <p style="font-size:12px;color:var(--muted)">✅ = ມີສິດ &nbsp;|&nbsp; ⬜ = ບໍ່ມີສິດ &nbsp;|&nbsp; ກົດໃນຕາຕະລາງເພື່ອປ່ຽນ</p>
+      <div style="overflow-x:auto">
+        <table style="font-size:11px;min-width:1000px">
+          <tr>
+            <th style="text-align:left;position:sticky;left:0;background:var(--bg-2);z-index:1">ສິດທິ</th>
+            ${roles.map(r => `<th style="text-align:center;writing-mode:vertical-rl;height:120px;white-space:nowrap;font-size:11px">${ROLE_LABELS[r]||r}</th>`).join('')}
+          </tr>
+          ${Object.entries(byCat).map(([cat, perms]) => `
+            <tr style="background:#F8FAFC">
+              <td colspan="${roles.length+1}" style="font-weight:700;color:var(--primary);font-size:12px;padding:6px 8px">${cat}</td>
+            </tr>
+            ${perms.map(p => `<tr>
+              <td style="text-align:left;font-size:11px;position:sticky;left:0;background:white">${p.label}<br><small style="color:var(--muted);font-family:monospace;font-size:9px">${p.id}</small></td>
+              ${roles.map(r => {
+                const has = userHasPermission(r, p.id);
+                return `<td style="text-align:center;cursor:pointer;background:${has?'#D1FAE5':'#F8FAFC'}" onclick="togglePermission('${r}','${p.id}')"
+                  title="${has?'ມີສິດ — ກົດເພື່ອປິດ':'ບໍ່ມີສິດ — ກົດເພື່ອເປີດ'}">
+                  ${has?'<span style="color:#10B981;font-weight:900;font-size:14px">✓</span>':'<span style="color:#CBD5E1">⬜</span>'}
+                </td>`;
+              }).join('')}
+            </tr>`).join('')}
+          `).join('')}
+        </table>
+      </div>
+    </div>
+
+    <div style="margin-top:14px;padding:12px;background:#FEF3C7;border-left:4px solid #F59E0B;border-radius:6px;font-size:12px">
+      ⚠️ <strong>ໝາຍເຫດສຳຄັນ:</strong>
+      <ul style="margin:6px 0 0 18px;line-height:1.7">
+        <li>ການປ່ຽນສິດທິໃນຕາຕະລາງເທິງ ມີຜົນທັນທີ ກັບ User ທຸກຄົນທີ່ມີ Role ນັ້ນ</li>
+        <li>Owner = ສິດສູງສຸດ ບໍ່ສາມາດປ່ຽນໄດ້</li>
+        <li>ການປ່ຽນສິດທິບັນທຶກໃນ Audit Log</li>
+      </ul>
+    </div>
+  `;
+};
+
+// Toggle ສິດທິ Role + Permission
+async function togglePermission(role, permId) {
+  if (role === 'owner') { toast('Owner ມີສິດສູງສຸດ — ບໍ່ສາມາດປ່ຽນ', 'warn'); return; }
+  const perms = ROLE_PERMISSIONS[role];
+  if (perms === '*') { toast('Role ນີ້ມີສິດໝົດ — ບໍ່ສາມາດປ່ຽນ', 'warn'); return; }
+  const arr = perms || [];
+  const idx = arr.indexOf(permId);
+  if (idx >= 0) arr.splice(idx, 1);
+  else arr.push(permId);
+  ROLE_PERMISSIONS[role] = arr;
+  // Save to localStorage ສະນັ້ນຢູ່ Long term
+  try {
+    const overrides = JSON.parse(localStorage.getItem('kala_role_overrides') || '{}');
+    overrides[role] = arr;
+    localStorage.setItem('kala_role_overrides', JSON.stringify(overrides));
+  } catch(e) {}
+  if (typeof auditLog==='function') auditLog('update', 'role_permissions', null, `${role} — ${idx>=0?'❌ remove':'✅ add'} ${permId}`);
+  toast(`✅ ${idx>=0?'ປິດ':'ເປີດ'} ສິດ "${permId}" ສຳລັບ ${ROLE_LABELS[role]}`);
+  pages.role_management();
+}
+
+// ໂຫລດ Role Overrides ຕອນເລີ່ມຕົ້ນ
+(function loadRoleOverrides() {
+  try {
+    const overrides = JSON.parse(localStorage.getItem('kala_role_overrides') || '{}');
+    Object.entries(overrides).forEach(([role, perms]) => {
+      if (role !== 'owner') ROLE_PERMISSIONS[role] = perms;
+    });
+  } catch(e) {}
+})();
+
+// ສະແດງລາຍລະອຽດ Role
+function showRoleDetail(role) {
+  const perms = ROLE_PERMISSIONS[role];
+  const allPerms = perms === '*' ? KALA_PERMS : KALA_PERMS.filter(p => (perms||[]).includes(p.id));
+  const byCat = {};
+  allPerms.forEach(p => { (byCat[p.cat] = byCat[p.cat] || []).push(p); });
+  const body = `
+    <div style="background:linear-gradient(135deg,#EFF6FF,#DBEAFE);padding:14px;border-radius:10px;text-align:center;margin-bottom:14px">
+      <div style="font-size:28px;font-weight:800;color:var(--primary)">${ROLE_LABELS[role]||role}</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:4px">${perms==='*'?'∞ ໝົດ':allPerms.length} ສິດທິ</div>
+    </div>
+    ${Object.entries(byCat).map(([cat, ps]) => `
+      <h4 style="font-size:13px;color:var(--primary);margin:10px 0 6px">${cat}</h4>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
+        ${ps.map(p => `<span class="pill ok" style="font-size:11px">✓ ${p.label}</span>`).join('')}
+      </div>
+    `).join('')}
+  `;
+  modal(`🔐 ສິດທິຂອງ ${ROLE_LABELS[role]||role}`, body, `<button class="btn outline" onclick="closeModal()">ປິດ</button>`);
+}
+
+// ໜ້າຕ່າງກວດສິດ User
+async function openPermissionTesterModal() {
+  const users = (typeof cloud!=='undefined' && cloud.client)
+    ? (await cloud.client.from('user_profiles').select('id,username,name,role,branch').order('username')).data || []
+    : [];
+  if (users.length === 0) { toast('ບໍ່ມີ User ໃນລະບົບ', 'warn'); return; }
+  const body = `
+    <div class="alert info" style="font-size:12px">🔍 ເລືອກ User → ກວດສິດທິທີ່ມີ</div>
+    <div class="fld">
+      <label>👤 ເລືອກ User</label>
+      <select id="pt_user" onchange="showUserPermissions()">
+        <option value="">— ເລືອກ —</option>
+        ${users.map(u => `<option value="${u.role}" data-name="${escapeHtml(u.name||u.username||'')}" data-branch="${escapeHtml(u.branch||'')}">${escapeHtml(u.name||u.username)} — ${ROLE_LABELS[u.role]||u.role} ${u.branch?'('+u.branch+')':''}</option>`).join('')}
+      </select>
+    </div>
+    <div id="pt_result" style="margin-top:12px"></div>
+  `;
+  modal('🔍 ກວດສິດ User', body, `<button class="btn outline" onclick="closeModal()">ປິດ</button>`);
+}
+
+function showUserPermissions() {
+  const sel = $('#pt_user');
+  if (!sel) return;
+  const role = sel.value;
+  const opt = sel.options[sel.selectedIndex];
+  const name = opt.getAttribute('data-name');
+  const branch = opt.getAttribute('data-branch');
+  if (!role) { $('#pt_result').innerHTML = ''; return; }
+  const perms = ROLE_PERMISSIONS[role];
+  const has = perms === '*' ? KALA_PERMS : KALA_PERMS.filter(p => (perms||[]).includes(p.id));
+  const noHas = KALA_PERMS.filter(p => !has.find(h => h.id === p.id));
+  $('#pt_result').innerHTML = `
+    <div style="background:#F0F9FF;padding:10px;border-radius:8px;margin-bottom:10px">
+      <strong>${escapeHtml(name)}</strong> · ${ROLE_LABELS[role]} ${branch?'· '+branch:''}
+      <br><small>ສິດທິລວມ: <strong style="color:var(--ok)">${has.length}</strong> | ບໍ່ມີ: <strong style="color:var(--muted)">${noHas.length}</strong></small>
+    </div>
+    <details open>
+      <summary style="cursor:pointer;font-weight:700;color:var(--ok);padding:6px">✅ ມີສິດທິ (${has.length})</summary>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;padding:8px;background:#D1FAE5;border-radius:6px;font-size:11px">
+        ${has.length===0?'<em style="color:var(--muted)">ບໍ່ມີ</em>':has.map(p => `<span class="pill ok" style="font-size:10px">${p.label}</span>`).join('')}
+      </div>
+    </details>
+    <details style="margin-top:8px">
+      <summary style="cursor:pointer;font-weight:700;color:var(--muted);padding:6px">⬜ ບໍ່ມີສິດທິ (${noHas.length})</summary>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;padding:8px;background:#F8FAFC;border-radius:6px;font-size:11px">
+        ${noHas.length===0?'<em>ບໍ່ມີ — User ນີ້ມີສິດໝົດ</em>':noHas.map(p => `<span class="pill gray" style="font-size:10px">${p.label}</span>`).join('')}
+      </div>
+    </details>
+  `;
+}
+
+// ສ້າງ Custom Role
+function openCustomRoleModal() {
+  toast('💡 ສຳລັບ Custom Role ໃໝ່ — ໃຫ້ໃຊ້ Permission Matrix ປັບແຕ່ລະ Role ໂດຍຕົງ', 'info');
+}
+
 // ============================================================================
 // 🏢 BRANCHES MANAGEMENT — ຄຸ້ມຄອງສາຂາ
 // ============================================================================
