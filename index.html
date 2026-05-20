@@ -189,10 +189,13 @@ td.actions.compact button.btn { padding: 5px 8px; font-size: 12px; min-width: 30
 .fld textarea { resize: vertical; min-height: 60px; }
 .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 /* Toast */
-.toast { position: fixed; bottom: 20px; right: 20px; background: var(--ok); color: #fff; padding: 12px 18px; border-radius: 8px; font-size: 14px; box-shadow: 0 6px 16px rgba(0,0,0,.2); z-index: 200; opacity: 0; transition: opacity .3s, transform .3s; transform: translateY(20px); }
+.toast { position: fixed; bottom: 20px; right: 20px; background: var(--ok); color: #fff; padding: 12px 18px; border-radius: 8px; font-size: 14px; box-shadow: 0 6px 16px rgba(0,0,0,.2); z-index: 200; opacity: 0; transition: opacity .3s, transform .3s; transform: translateY(20px); display:flex; align-items:center; gap:14px; max-width:520px; }
 .toast.show { opacity: 1; transform: translateY(0); }
 .toast.bad { background: var(--bad); }
 .toast.warn { background: var(--warn); }
+.toast .undo-btn { background:rgba(255,255,255,.25); border:1px solid rgba(255,255,255,.5); color:#fff; padding:6px 14px; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap; }
+.toast .undo-btn:hover { background:rgba(255,255,255,.4); }
+.toast .undo-countdown { font-size:11px; opacity:.85; margin-left:auto; }
 .empty { text-align: center; padding: 40px; color: var(--muted); }
 .empty .icon { font-size: 48px; opacity: .3; }
 .alert { padding: 10px 14px; border-radius: 6px; font-size: 13px; margin-bottom: 10px; }
@@ -1364,7 +1367,7 @@ async function softDelete(store, id, summaryFn) {
     const stg = JSON.parse(localStorage.getItem('kala_settings') || '{}');
     const summary = typeof summaryFn === 'function' ? summaryFn(rec) :
                     typeof summaryFn === 'string' ? summaryFn : `${store}#${id}`;
-    await db.deleted_items.add({
+    const deletedId = await db.deleted_items.add({
       deleted_at: new Date().toISOString(),
       deleted_by: stg.user_name || 'ສາຍຟ້າ',
       role: currentRole, store, original_id: id, summary,
@@ -1372,8 +1375,31 @@ async function softDelete(store, id, summaryFn) {
     });
     await auditLog('delete', store, id, summary);
     await db[store].delete(id);
+    // 🔙 ສະແດງ Toast Undo ໃຫ້ກັບຄືນໄດ້ໃນ 8 ວິນາທີ
+    toastUndo(`🗑 ລຶບແລ້ວ — ${summary.slice(0,40)}`, async () => {
+      await restoreDeleted(deletedId);
+      // Refresh ໜ້າປະຈຸບັນ
+      if (currentPage && pages[currentPage]) await pages[currentPage]();
+    });
     return true;
   } catch (e) { console.error('Soft delete failed:', e); toast('ລຶບບໍ່ສຳເລັດ: '+e.message, 'bad'); return false; }
+}
+
+// 🔙 ສ້າງ/ແກ້ໄຂ ກັບ Toast Undo
+// store: ຊື່ Dexie table, savedId: ID ທີ່ບັນທຶກ, oldData: ຂໍ້ມູນເກົ່າ (null = ສ້າງໃໝ່), summary: ສະຫຼຸບ
+async function showSaveUndo(store, savedId, oldData, summary) {
+  toastUndo(`💾 ບັນທຶກ — ${(summary||store).slice(0,40)}`, async () => {
+    try {
+      if (oldData) {
+        // ແກ້ໄຂ → ກັບໄປຄ່າເກົ່າ
+        await db[store].update(savedId, oldData);
+      } else {
+        // ສ້າງໃໝ່ → ລຶບ
+        await db[store].delete(savedId);
+      }
+      if (currentPage && pages[currentPage]) await pages[currentPage]();
+    } catch (e) { console.error('Undo save failed:', e); throw e; }
+  });
 }
 
 async function restoreDeleted(deletedId) {
@@ -1992,8 +2018,54 @@ db.version(3).stores({
 // ===================== UTIL =====================
 function $(sel) { return document.querySelector(sel); }
 function toast(msg, type='ok') {
-  const el = $('#toast'); el.textContent = msg; el.className = 'toast show ' + type;
-  setTimeout(() => el.classList.remove('show'), 2400);
+  const el = $('#toast');
+  // Clear any pending undo
+  if (window._toastTimer) { clearTimeout(window._toastTimer); }
+  if (window._toastInterval) { clearInterval(window._toastInterval); }
+  el.innerHTML = `<span>${msg}</span>`;
+  el.className = 'toast show ' + type;
+  window._toastTimer = setTimeout(() => el.classList.remove('show'), 2400);
+}
+
+// 🔙 Toast with Undo button — ສະແດງ Toast ພ້ອມປຸ່ມ Undo ປະມານ 8 ວິນາທີ
+// undoFn: ຟັງຊັນທີ່ຈະຖືກເອີ້ນຖ້າຜູ້ໃຊ້ກົດ Undo
+function toastUndo(msg, undoFn, duration = 8000) {
+  const el = $('#toast');
+  if (window._toastTimer) { clearTimeout(window._toastTimer); }
+  if (window._toastInterval) { clearInterval(window._toastInterval); }
+  let remaining = Math.round(duration / 1000);
+  el.innerHTML = `
+    <span>${msg}</span>
+    <button class="undo-btn" id="toastUndoBtn">↩️ ກັບຄືນ</button>
+    <span class="undo-countdown" id="toastCountdown">${remaining}s</span>`;
+  el.className = 'toast show info';
+  el.style.background = '#1F2937';
+  // Countdown
+  window._toastInterval = setInterval(() => {
+    remaining--;
+    const cd = document.getElementById('toastCountdown');
+    if (cd) cd.textContent = remaining + 's';
+    if (remaining <= 0) clearInterval(window._toastInterval);
+  }, 1000);
+  // Undo handler
+  document.getElementById('toastUndoBtn').onclick = async () => {
+    clearTimeout(window._toastTimer);
+    clearInterval(window._toastInterval);
+    el.classList.remove('show');
+    el.style.background = '';
+    try {
+      await undoFn();
+      toast('↩️ ກັບຄືນສຳເລັດ', 'ok');
+    } catch (e) {
+      console.error('Undo failed:', e);
+      toast('❌ ກັບຄືນບໍ່ສຳເລັດ: ' + e.message, 'bad');
+    }
+  };
+  // Auto-dismiss after duration
+  window._toastTimer = setTimeout(() => {
+    el.classList.remove('show');
+    el.style.background = '';
+  }, duration);
 }
 function modal(title, body, footer) {
   $('#modalContent').innerHTML = `
@@ -13945,33 +14017,81 @@ async function askAI() {
 }
 
 // ===================== RECYCLE BIN — Restore deleted records =====================
+// Filter state — persists during page navigation
+window._recycleFilter = window._recycleFilter || { store:'', q:'', date:'' };
+window._recycleSelected = window._recycleSelected || new Set();
+
 pages.recycle = async () => {
   const items = (await db.deleted_items.toArray()).sort((a,b)=>(b.deleted_at||'').localeCompare(a.deleted_at||''));
-  const active = items.filter(i => !i.restored);
+  let active = items.filter(i => !i.restored);
   const restored = items.filter(i => i.restored);
+  // ນັບຕາມປະເພດ (ກ່ອນ Filter)
+  const storeCounts = {};
+  active.forEach(it => { storeCounts[it.store] = (storeCounts[it.store]||0)+1; });
+  const storeList = Object.keys(storeCounts).sort();
+  // Apply filters
+  const f = window._recycleFilter;
+  if (f.store) active = active.filter(i => i.store === f.store);
+  if (f.q) {
+    const q = f.q.toLowerCase();
+    active = active.filter(i => (i.summary||'').toLowerCase().includes(q) || (i.deleted_by||'').toLowerCase().includes(q));
+  }
+  if (f.date) active = active.filter(i => (i.deleted_at||'').startsWith(f.date));
   const totalI = active.length;
   const pageRes = paginate(active, 'recycle');
+  const selCount = window._recycleSelected.size;
+  // ມີ Local-only items (ບໍ່ໄດ້ໃຊ້ softDelete)?
   $('#main').innerHTML = `
     <div class="crumbs">${t('nav_settings')} › ຖັງຂີ້ເຫຍື້ອ</div>
-    <div class="page-title">🗑 ຖັງຂີ້ເຫຍື້ອ — ບັນທຶກການລຶບ (ກູ້ຄືນໄດ້)</div>
-    <div class="alert info">💡 ທຸກການລຶບໃນລະບົບ ຈະຖືກບັນທຶກໄວ້ນີ້ — ສາມາດ <strong>ກູ້ຄືນ</strong> ໄດ້. ມີແຕ່ Admin ສາມາດລຶບແບບຖາວອນ.</div>
-    <div class="kpi-grid">
-      <div class="kpi"><div class="label">ລາຍການລຶບ</div><div class="val">${active.length}</div></div>
-      <div class="kpi"><div class="label">ກູ້ຄືນແລ້ວ</div><div class="val" style="color:var(--ok)">${restored.length}</div></div>
-      <div class="kpi"><div class="label">ລວມທັງໝົດ</div><div class="val">${items.length}</div></div>
+    <div class="page-title">🗑 ຖັງຂີ້ເຫຍື້ອ — ກູ້ຄືນຫຼາຍລາຍການພ້ອມກັນ
+      <small style="font-weight:400;color:var(--muted);font-size:13px">— ${active.length}/${items.length-restored.length} ລາຍການ (Filter)</small>
     </div>
+    <div class="alert info">💡 <strong>ໃໝ່:</strong> ກວດກ່ອງເພື່ອເລືອກຫຼາຍລາຍການ → ກົດ "ກູ້ຄືນທີ່ເລືອກ" ໃນເທິງ. ກົດ <strong>👁 ເບິ່ງລາຍລະອຽດ</strong> ກ່ອນກູ້ຄືນ.</div>
+
+    <div class="kpi-grid">
+      <div class="kpi"><div class="label">ລາຍການລຶບ</div><div class="val">${items.length-restored.length}</div></div>
+      <div class="kpi"><div class="label">ກູ້ຄືນແລ້ວ</div><div class="val" style="color:var(--ok)">${restored.length}</div></div>
+      <div class="kpi" style="${selCount>0?'border-left:4px solid var(--accent)':''}"><div class="label">ເລືອກໄວ້</div><div class="val" style="color:${selCount>0?'var(--accent)':'var(--muted)'}">${selCount}</div></div>
+      <div class="kpi"><div class="label">ປະເພດ</div><div class="val">${storeList.length}</div></div>
+    </div>
+
+    <div class="toolbar" style="flex-wrap:wrap;gap:8px;align-items:center">
+      <label style="font-size:13px;font-weight:500">ປະເພດ:</label>
+      <select onchange="window._recycleFilter.store=this.value; pages.recycle()" style="padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px">
+        <option value="">📂 ທຸກປະເພດ (${items.length-restored.length})</option>
+        ${storeList.map(s => `<option value="${s}" ${f.store===s?'selected':''}>${s} (${storeCounts[s]})</option>`).join('')}
+      </select>
+      <input type="search" placeholder="🔍 ຄົ້ນຫາສະຫຼຸບ/ຜູ້ລຶບ..." value="${escapeHtml(f.q)}"
+        oninput="window._recycleFilter.q=this.value;clearTimeout(window._rft);window._rft=setTimeout(()=>pages.recycle(),300)"
+        style="padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;min-width:200px"/>
+      <input type="date" value="${f.date}" onchange="window._recycleFilter.date=this.value;pages.recycle()"
+        style="padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px"/>
+      <button class="btn outline" onclick="window._recycleFilter={store:'',q:'',date:''};window._recycleSelected=new Set();pages.recycle()">🔄 ລ້າງ Filter</button>
+      <div style="flex:1"></div>
+      ${selCount > 0 ? `
+        <button class="btn ok" onclick="doBulkRestore()">↩️ ກູ້ຄືນທີ່ເລືອກ (${selCount})</button>
+        ${isAdmin() ? `<button class="btn danger" onclick="doBulkPurge()">🗑 ລຶບຖາວອນ (${selCount})</button>` : ''}
+        <button class="btn outline" onclick="window._recycleSelected=new Set();pages.recycle()">✖ ຍົກເລີກເລືອກ</button>
+      ` : ''}
+    </div>
+
     <div class="card" style="padding:0">
-      ${active.length === 0 ? '<div class="empty" style="padding:30px"><div class="icon">🗑</div><p>ບໍ່ມີລາຍການລຶບ</p></div>' : `
+      ${active.length === 0 ? '<div class="empty" style="padding:30px"><div class="icon">🗑</div><p>ບໍ່ມີລາຍການລຶບທີ່ກົງ Filter</p></div>' : `
       <table>
-        <tr><th>ວັນທີລຶບ</th><th>ໂດຍ</th><th>ປະເພດ</th><th>ສະຫຼຸບ</th><th></th></tr>
-        ${pageRes.items.map(it => `<tr>
-          <td>${new Date(it.deleted_at).toLocaleString('lo')}</td>
+        <tr>
+          <th style="width:30px"><input type="checkbox" id="recycleSelectAll" onchange="toggleAllRecycle(this.checked)" ${pageRes.items.every(i=>window._recycleSelected.has(i.id))?'checked':''}/></th>
+          <th>ວັນທີລຶບ</th><th>ໂດຍ</th><th>ປະເພດ</th><th>ສະຫຼຸບ</th><th style="text-align:right">ການເຮັດງານ</th>
+        </tr>
+        ${pageRes.items.map(it => `<tr style="${window._recycleSelected.has(it.id)?'background:var(--accent-light)':''}">
+          <td><input type="checkbox" ${window._recycleSelected.has(it.id)?'checked':''} onchange="toggleRecycleSelect(${it.id},this.checked)"/></td>
+          <td style="font-size:11px">${new Date(it.deleted_at).toLocaleString('lo')}</td>
           <td>${escapeHtml(it.deleted_by||'-')}<div class="muted" style="font-size:11px">${it.role||''}</div></td>
           <td><span class="pill gray">${it.store}</span></td>
           <td style="font-size:12px">${escapeHtml(it.summary||'').slice(0,80)}</td>
-          <td class="actions">
+          <td class="actions" style="white-space:nowrap;text-align:right">
+            <button class="btn sm outline" onclick="previewRecycled(${it.id})" title="ເບິ່ງລາຍລະອຽດ">👁</button>
             <button class="btn sm ok" onclick="doRestore(${it.id})">↩️ ກູ້ຄືນ</button>
-            ${isAdmin()?`<button class="btn sm danger" onclick="doPurge(${it.id})">🗑 ລຶບຖາວອນ</button>`:''}
+            ${isAdmin()?`<button class="btn sm danger" onclick="doPurge(${it.id})">🗑</button>`:''}
           </td>
         </tr>`).join('')}
       </table>
@@ -13992,6 +14112,85 @@ pages.recycle = async () => {
     </div>` : ''}
   `;
 };
+
+// 👁 ເບິ່ງລາຍລະອຽດກ່ອນກູ້ຄືນ
+async function previewRecycled(id) {
+  const item = await db.deleted_items.get(id);
+  if (!item) { toast('ບໍ່ພົບລາຍການ','bad'); return; }
+  let dataObj = {};
+  try { dataObj = JSON.parse(item.data); } catch(e) {}
+  // ສ້າງຕາຕະລາງ field=value
+  const rows = Object.entries(dataObj).map(([k,v]) => {
+    let display = v;
+    if (v && typeof v === 'object') display = JSON.stringify(v, null, 2);
+    if (typeof v === 'string' && v.length > 200) display = v.slice(0,200) + '...';
+    return `<tr><td style="font-weight:600;width:160px">${escapeHtml(k)}</td><td style="font-size:12px;font-family:monospace;word-break:break-all">${escapeHtml(String(display||''))}</td></tr>`;
+  }).join('');
+  modal(`👁 ລາຍລະອຽດກ່ອນກູ້ຄືນ — ${item.store}`, `
+    <div class="alert info" style="font-size:12px;margin-bottom:10px">
+      <strong>ສະຫຼຸບ:</strong> ${escapeHtml(item.summary||'-')}<br>
+      <strong>ລຶບເມື່ອ:</strong> ${new Date(item.deleted_at).toLocaleString('lo')} ໂດຍ <strong>${escapeHtml(item.deleted_by||'-')}</strong>
+    </div>
+    <h4 style="color:var(--primary-2);font-size:13px;margin:10px 0 6px">📦 ຂໍ້ມູນເຕັມ</h4>
+    <div style="max-height:400px;overflow-y:auto">
+      <table style="font-size:12px">${rows}</table>
+    </div>
+  `, `
+    <button class="btn outline" onclick="closeModal()">ປິດ</button>
+    <button class="btn ok" onclick="closeModal();doRestore(${id})">↩️ ກູ້ຄືນລາຍການນີ້</button>
+    ${isAdmin()?`<button class="btn danger" onclick="closeModal();doPurge(${id})">🗑 ລຶບຖາວອນ</button>`:''}
+  `);
+}
+
+function toggleRecycleSelect(id, checked) {
+  if (checked) window._recycleSelected.add(id);
+  else window._recycleSelected.delete(id);
+  pages.recycle();
+}
+async function toggleAllRecycle(checked) {
+  const items = (await db.deleted_items.toArray()).filter(i => !i.restored);
+  const f = window._recycleFilter;
+  let filtered = items;
+  if (f.store) filtered = filtered.filter(i => i.store === f.store);
+  if (f.q) { const q = f.q.toLowerCase(); filtered = filtered.filter(i => (i.summary||'').toLowerCase().includes(q) || (i.deleted_by||'').toLowerCase().includes(q)); }
+  if (f.date) filtered = filtered.filter(i => (i.deleted_at||'').startsWith(f.date));
+  const pageRes = paginate(filtered, 'recycle');
+  pageRes.items.forEach(it => {
+    if (checked) window._recycleSelected.add(it.id);
+    else window._recycleSelected.delete(it.id);
+  });
+  pages.recycle();
+}
+
+async function doBulkRestore() {
+  const ids = Array.from(window._recycleSelected);
+  if (ids.length === 0) return;
+  if (!confirm(`ກູ້ຄືນ ${ids.length} ລາຍການ?`)) return;
+  let ok = 0, fail = 0;
+  for (const id of ids) {
+    try { if (await restoreDeleted(id)) ok++; else fail++; } catch(e) { fail++; }
+  }
+  window._recycleSelected = new Set();
+  toast(`✅ ກູ້ຄືນ ${ok} ລາຍການ${fail>0?` (ບໍ່ສຳເລັດ ${fail})`:''}`, fail>0?'warn':'ok');
+  pages.recycle();
+}
+
+async function doBulkPurge() {
+  if (!isAdmin()) { toast('Admin ເທົ່ານັ້ນ','bad'); return; }
+  const ids = Array.from(window._recycleSelected);
+  if (ids.length === 0) return;
+  if (!confirm(`⚠️ ລຶບຖາວອນ ${ids.length} ລາຍການ? ບໍ່ສາມາດກູ້ຄືນໄດ້ອີກ!`)) return;
+  let ok = 0;
+  for (const id of ids) {
+    const item = await db.deleted_items.get(id);
+    await db.deleted_items.delete(id);
+    if (item) await auditLog('purge', item.store, item.original_id, `Bulk purged: ${item.summary}`);
+    ok++;
+  }
+  window._recycleSelected = new Set();
+  toast(`🗑 ລຶບຖາວອນ ${ok} ລາຍການແລ້ວ`);
+  pages.recycle();
+}
 
 async function doRestore(id) {
   if (!confirm('ກູ້ຄືນລາຍການນີ້?')) return;
