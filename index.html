@@ -1471,6 +1471,53 @@ db.version(2).stores({
   outsource: '++id, jo_id, vendor_id, status',
   settings: 'key',
 });
+db.version(18).stores({
+  vehicles: '++id, vehicle_id, plate, type, branch, status, category_id',
+  inspections: '++id, vehicle_id, date, status, frequency, driver',
+  joborders: '++id, jo_id, vehicle_id, priority, status, created',
+  parts: '++id, code, class, grade, category_id, warehouse, status',
+  partmovements: '++id, part_id, type, date',
+  drivers: '++id, driver_id, name, license_expiry, assigned_vehicle',
+  tires: '++id, tire_id, current_vehicle, position, status, install_km, install_date',
+  tire_history: '++id, tire_id, date, event_type, vehicle_id, position, km',
+  vendors: '++id, vendor_id, name, category_id, province',
+  vendorprices: '++id, vendor_id, part_code, currency, date',
+  tools: '++id, tool_id, name, calib_due, status',
+  outsource: '++id, jo_id, vendor_id, status',
+  fluids: '++id, vehicle_id, type, date, next_due_date',
+  mileage_log: '++id, vehicle_id, date, mileage',
+  categories: '++id, name, type, parent_id',
+  exchange_rates: '++id, currency, rate, valid_from',
+  pm_templates: '++id, vehicle_type, interval_type, interval_value',
+  pm_history: '++id, vehicle_id, template_id, date, mileage',
+  fuel_log: '++id, vehicle_id, date, driver, station',
+  documents: '++id, entity_type, entity_id, doc_type, expiry_date',
+  incidents: '++id, date, vehicle_id, driver_id, severity, status',
+  audit_log: '++id, timestamp, user, action, entity',
+  purchase_requests: '++id, pr_id, vendor_id, status, created, total_lak',
+  purchase_orders: '++id, po_id, vendor_id, status, created, urgency, total_lak',
+  vehicle_pm: '++id, vehicle_id, interval_type, interval_value, active',
+  gps_devices: '++id, vehicle_id, imei, model, platform, status, installed_date',
+  driver_reviews: '++id, driver_id, review_date, reviewer, period, total_score',
+  receipt_inspections: '++id, jo_id, vehicle_id, date, inspector',
+  predelivery_inspections: '++id, jo_id, vehicle_id, date, inspector, approved',
+  users: '++id, username, role, name, active, created',
+  depreciation: '++id, vehicle_id, year, month, value, accumulated',
+  parts_replacements: '++id, vehicle_id, part_type, date, km, cost, jo_id',
+  ai_chat_history: '++id, timestamp, role, content',
+  deleted_items: '++id, deleted_at, deleted_by, store, original_id, summary, restored',
+  price_change_audit: '++id, timestamp, user, entity_type, entity_id, field, old_value, new_value, summary',
+  service_rates: '++id, service_code, service_name, category, vehicle_group, base_charge, skill_required, active',
+  tech_profiles: '++id, tech_id, name, skill_level, commission_pct, walkin_commission_pct, active, branch',
+  labor_entries: '++id, entry_id, date, jo_id, vehicle_id, tech_id, service_code, charge_amount, commission_amount, status, approved_by, customer_type, intake_id',
+  customer_receipts: '++id, receipt_id, date, labor_entry_id, customer_name, customer_phone, vehicle_plate, total_amount, signed_at, signed_by_customer',
+  vehicle_intakes: '++id, intake_id, date, customer_phone, vehicle_plate, pickup_code, status, received_by_tech_id, linked_entry_id, delivered_at',
+  camera_counts: '++id, date, vehicles_in, vehicles_out, recorded_by',
+  customer_audits: '++id, audit_id, labor_entry_id, customer_phone, audit_date, called_at, response, satisfaction, received_receipt, called_by, notes',
+  // ===== NEW v18: Branches Management =====
+  branches: '++id, branch_id, name, province, address, manager, active',
+  settings: 'key',
+});
 db.version(17).stores({
   vehicles: '++id, vehicle_id, plate, type, branch, status, category_id',
   inspections: '++id, vehicle_id, date, status, frequency, driver',
@@ -2254,6 +2301,7 @@ const NAV_GROUPS = [
     id:'settings', icon:'⚙️', label:'ຕັ້ງຄ່າ ແລະ ການຄຸ້ມຄອງ',
     items: [
       { page:'cloud_users', icon:'👥', label:'ຄຸ້ມຄອງ User' },
+      { page:'branches',    icon:'🏢', label:'ສາຂາ (Branches)' },
       { page:'cloud',       icon:'☁️', label:'Cloud Sync' },
       { page:'categories',  icon:'📑', label:'ໝວດ + ກຸ່ມ' },
       { page:'audit',       icon:'📋', label:'Audit Log' },
@@ -9563,11 +9611,24 @@ function saveRates(rates) { localStorage.setItem('kala_rates', JSON.stringify(ra
 
 // ===================== CLOUD USERS MANAGEMENT (Admin) =====================
 const ROLE_LABELS = {
-  owner: '👑 Owner', manager: '🛠 Manager', tech_l3: '🔧 Tech L3 (Senior)', tech_l2: '🔧 Tech L2',
+  owner: '👑 Owner', manager: '🛠 Manager',
+  asset_manager: '🏠 ຫົວໜ້າຊັບສິນ',
+  tech_l3: '🔧 Tech L3 (Senior)', tech_l2: '🔧 Tech L2',
   tech_l1: '🔧 Tech L1 (Apprentice)', driver: '🚗 Driver', procurement: '📦 Procurement',
   qc: '✅ QC', accounting: '💰 Accounting', it: '💻 IT',
 };
-const BRANCH_OPTIONS = ['ປາກເຊ','ປາກຊ່ອງ','ໂຂງ','ອັດຕະປື','ສາລະວັນ','ສະຫວັນນະເຂດ','ເຊໂນ','ວຽງຈັນ'];
+// 🆕 BRANCH_OPTIONS ດຽວນີ້ດຶງຈາກ Database (ສ້າງສາຂາໄດ້) — ຄ່າ default ໃຊ້ໃນກໍລະນີ DB ຍັງບໍ່ໂຫລດ
+let BRANCH_OPTIONS = ['ປາກເຊ','ປາກຊ່ອງ','ໂຂງ','ອັດຕະປື','ສາລະວັນ','ສະຫວັນນະເຂດ','ເຊໂນ','ວຽງຈັນ'];
+// Reload Branches ຈາກ DB ໃນຕອນເລີ່ມຕົ້ນແອັປ
+async function refreshBranchOptions() {
+  try {
+    if (typeof getActiveBranches === 'function') {
+      const fromDB = await getActiveBranches();
+      if (fromDB.length > 0) BRANCH_OPTIONS = fromDB;
+    }
+  } catch(e) { console.warn('refreshBranchOptions:', e); }
+}
+setTimeout(refreshBranchOptions, 2000);
 
 pages.cloud_users = async () => {
   if (!cloud.user) {
@@ -16790,6 +16851,173 @@ pages.commission = async () => {
 };
 
 // ===================== ABOUT =====================
+// ============================================================================
+// 🏢 BRANCHES MANAGEMENT — ຄຸ້ມຄອງສາຂາ
+// ============================================================================
+async function seedBranches() {
+  if ((await db.branches.count()) > 0) return;
+  const defaults = [
+    { branch_id:'BR-001', name:'ປາກເຊ',         province:'ຈຳປາສັກ', address:'ສຳນັກງານໃຫຍ່ ເມືອງປາກເຊ', manager:'', active:true, is_hq:true },
+    { branch_id:'BR-002', name:'ປາກຊ່ອງ',      province:'ຈຳປາສັກ', address:'ເມືອງປາກຊ່ອງ', manager:'', active:true },
+    { branch_id:'BR-003', name:'ໂຂງ',          province:'ຈຳປາສັກ', address:'ເມືອງໂຂງ', manager:'', active:true },
+    { branch_id:'BR-004', name:'ອັດຕະປື',       province:'ອັດຕະປື', address:'ເມືອງສາມັກຄີໄຊ', manager:'', active:true },
+    { branch_id:'BR-005', name:'ສາລະວັນ',       province:'ສາລະວັນ', address:'ເມືອງສາລະວັນ', manager:'', active:true },
+    { branch_id:'BR-006', name:'ສະຫວັນນະເຂດ',   province:'ສະຫວັນນະເຂດ', address:'ສະຫວັນນະເຂດ', manager:'', active:true },
+    { branch_id:'BR-007', name:'ເຊໂນ',         province:'ສະຫວັນນະເຂດ', address:'ເຊໂນ', manager:'', active:true },
+    { branch_id:'BR-008', name:'ວຽງຈັນ',       province:'ນະຄອນຫລວງວຽງຈັນ', address:'ນະຄອນຫລວງ', manager:'', active:true },
+  ];
+  await db.branches.bulkPut(defaults);
+}
+
+pages.branches = async () => {
+  await seedBranches();
+  const branches = (await db.branches.toArray()).sort((a,b) => (a.branch_id||'').localeCompare(b.branch_id||''));
+  const vehicles = await db.vehicles.toArray();
+  const techs = await db.tech_profiles.toArray();
+  const drivers = await db.drivers.toArray();
+
+  const stats = branches.map(b => ({
+    ...b,
+    vehicleCount: vehicles.filter(v => v.branch === b.name).length,
+    techCount: techs.filter(t => t.branch === b.name).length,
+    driverCount: drivers.filter(d => (d.branch||'') === b.name).length,
+  }));
+
+  $('#main').innerHTML = `
+    <div class="crumbs">${t('nav_settings')} › 🏢 ສາຂາ</div>
+    <div class="page-title">🏢 ຄຸ້ມຄອງສາຂາ <small style="font-weight:400;color:var(--muted);font-size:13px">— ${branches.length} ສາຂາ</small></div>
+
+    <div class="alert info" style="font-size:13px">
+      💡 ສ້າງ + ແກ້ໄຂສາຂາ — ໃຊ້ໃນຟອມລົດ, ໂປຣໄຟລ໌ຊ່າງ, User Management. <strong>ສະເພາະ Owner + IT</strong> ສາມາດແກ້ໄຂ.
+    </div>
+
+    <div class="toolbar">
+      <button class="btn" onclick="openBranchModal()">+ ເພີ່ມສາຂາໃໝ່</button>
+      <button class="btn outline" onclick="pages.branches()">🔄 Refresh</button>
+    </div>
+
+    <div class="card" style="padding:0">
+      <table>
+        <tr>
+          <th>ລະຫັດ</th>
+          <th>ຊື່ສາຂາ</th>
+          <th>ແຂວງ</th>
+          <th>ທີ່ຢູ່</th>
+          <th>ຫົວໜ້າສາຂາ</th>
+          <th style="text-align:center">🚗 ລົດ</th>
+          <th style="text-align:center">🔧 ຊ່າງ</th>
+          <th style="text-align:center">🚗 ຄົນຂັບ</th>
+          <th>ສະຖານະ</th>
+          <th></th>
+        </tr>
+        ${stats.map(b => `<tr style="${b.active===false?'opacity:.5':''}">
+          <td><strong>${b.branch_id}</strong>${b.is_hq?'<br><span class="pill" style="background:#FEF3C7;color:#92400E;font-size:10px">🏛 HQ</span>':''}</td>
+          <td><strong>${escapeHtml(b.name)}</strong></td>
+          <td>${escapeHtml(b.province||'-')}</td>
+          <td style="font-size:11px;color:var(--muted)">${escapeHtml(b.address||'-')}</td>
+          <td>${escapeHtml(b.manager||'-')}</td>
+          <td style="text-align:center;font-weight:700">${b.vehicleCount}</td>
+          <td style="text-align:center;font-weight:700">${b.techCount}</td>
+          <td style="text-align:center;font-weight:700">${b.driverCount}</td>
+          <td>${b.active!==false?'<span class="pill ok">🟢 Active</span>':'<span class="pill bad">🔴 Inactive</span>'}</td>
+          <td class="actions compact">
+            <button class="btn sm icon outline" onclick="openBranchModal(${b.id})" title="ແກ້ໄຂ">✏️</button>
+            ${!b.is_hq?`<button class="btn sm icon danger" onclick="delBranch(${b.id})" title="ລົບ">🗑</button>`:''}
+          </td>
+        </tr>`).join('')}
+      </table>
+    </div>
+
+    <div style="margin-top:14px;padding:10px 14px;background:#FEF3C7;border-left:4px solid #F59E0B;border-radius:6px;font-size:12px">
+      ⚠️ <strong>ໝາຍເຫດ:</strong> ສາຂາ HQ (Headquarters) ບໍ່ສາມາດລົບໄດ້. ຖ້າປິດສາຂາ → ໃຊ້ "Inactive" ແທນລົບ.
+    </div>
+  `;
+};
+
+async function openBranchModal(id) {
+  let b = { branch_id:'', name:'', province:'', address:'', manager:'', active:true, is_hq:false, phone:'', notes:'' };
+  if (id) b = await db.branches.get(id);
+  if (!b.branch_id) {
+    const all = await db.branches.toArray();
+    const nums = all.map(x => parseInt((x.branch_id||'').replace(/\D/g,''))||0);
+    b.branch_id = 'BR-' + String((nums.length?Math.max(...nums):0)+1).padStart(3,'0');
+  }
+  const body = `
+    <div class="row">
+      <div class="fld"><label>ລະຫັດສາຂາ</label><input id="b_id" value="${b.branch_id}"/></div>
+      <div class="fld"><label>ຊື່ສາຂາ *</label><input id="b_name" value="${escapeHtml(b.name)}" placeholder="ປາກເຊ"/></div>
+    </div>
+    <div class="row">
+      <div class="fld"><label>🗺 ແຂວງ</label><input id="b_province" value="${escapeHtml(b.province||'')}" placeholder="ຈຳປາສັກ"/></div>
+      <div class="fld"><label>📞 ເບີໂທສາຂາ</label><input id="b_phone" value="${escapeHtml(b.phone||'')}" placeholder="030-xxxxxx"/></div>
+    </div>
+    <div class="fld"><label>🏠 ທີ່ຢູ່</label><input id="b_address" value="${escapeHtml(b.address||'')}" placeholder="ບ້ານ ເມືອງ"/></div>
+    <div class="fld"><label>👤 ຫົວໜ້າສາຂາ</label><input id="b_manager" value="${escapeHtml(b.manager||'')}" placeholder="ຊື່ + ນາມສະກຸນ"/></div>
+    <div class="fld"><label>📝 ໝາຍເຫດ</label><textarea id="b_notes">${escapeHtml(b.notes||'')}</textarea></div>
+    <div class="row">
+      <div class="fld">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+          <input type="checkbox" id="b_active" ${b.active!==false?'checked':''}/>
+          🟢 ເປີດໃຊ້ງານ
+        </label>
+      </div>
+      <div class="fld">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+          <input type="checkbox" id="b_hq" ${b.is_hq?'checked':''}/>
+          🏛 ສຳນັກງານໃຫຍ່ (HQ) — ບໍ່ໃຫ້ລົບ
+        </label>
+      </div>
+    </div>
+  `;
+  modal(id?'✏️ ແກ້ໄຂສາຂາ':'+ ເພີ່ມສາຂາໃໝ່', body, `
+    <button class="btn outline" onclick="closeModal()">${t('cancel')}</button>
+    <button class="btn ok" onclick="saveBranch(${id||'null'})">${t('save')}</button>`);
+}
+
+async function saveBranch(id) {
+  const data = {
+    branch_id: $('#b_id').value.trim(),
+    name: $('#b_name').value.trim(),
+    province: $('#b_province').value.trim(),
+    address: $('#b_address').value.trim(),
+    phone: $('#b_phone').value.trim(),
+    manager: $('#b_manager').value.trim(),
+    notes: $('#b_notes').value,
+    active: $('#b_active').checked,
+    is_hq: $('#b_hq').checked,
+  };
+  if (!data.name) { toast('ກະລຸນາໃສ່ຊື່ສາຂາ', 'bad'); return; }
+  if (id) await db.branches.update(id, data);
+  else await db.branches.add(data);
+  if (typeof auditLog==='function') auditLog(id?'update':'create', 'branches', null, `${data.branch_id} — ${data.name}`);
+  toast(id?'✅ ບັນທຶກສຳເລັດ':'✅ ສ້າງສາຂາໃໝ່ສຳເລັດ');
+  closeModal(); pages.branches();
+}
+
+async function delBranch(id) {
+  const b = await db.branches.get(id);
+  if (b?.is_hq) { toast('ບໍ່ສາມາດລົບສຳນັກງານໃຫຍ່', 'bad'); return; }
+  // ກວດເບິ່ງວ່າມີຄົນ/ລົດ ໃຊ້ສາຂານີ້ບໍ
+  const vehs = (await db.vehicles.toArray()).filter(v => v.branch === b.name);
+  if (vehs.length > 0) {
+    if (!confirm(`⚠️ ສາຂາ "${b.name}" ມີລົດ ${vehs.length} ຄັນ ກຳລັງໃຊ້. ລົບແທ້ບໍ?`)) return;
+  } else {
+    if (!confirm(`ລົບສາຂາ "${b.name}"?`)) return;
+  }
+  await db.branches.delete(id);
+  toast('🗑 ລົບສຳເລັດ');
+  pages.branches();
+}
+
+// 🆕 Helper — ດຶງ Branches ຈາກ DB (ໃຊ້ແທນ BRANCH_OPTIONS hardcoded)
+async function getActiveBranches() {
+  await seedBranches();
+  return (await db.branches.toArray())
+    .filter(b => b.active !== false)
+    .sort((a,b) => a.branch_id.localeCompare(b.branch_id))
+    .map(b => b.name);
+}
+
 pages.about = async () => {
   $('#main').innerHTML = `
     <div class="crumbs">${t('nav_about')}</div>
