@@ -223,6 +223,7 @@ td.actions.compact button.btn { padding: 5px 8px; font-size: 12px; min-width: 30
       <span id="rtDot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#94A3B8"></span>
       <span id="rtText">Realtime: -</span>
     </div>
+    <button id="pwaInstallBtn" onclick="installPWA()" class="btn sm" style="display:none;background:linear-gradient(135deg,#10B981,#059669);color:#fff;font-weight:700" title="ຕິດຕັ້ງ KALA App ໃນອຸປະກອນ">📥 ຕິດຕັ້ງ App</button>
     <button class="btn outline sm" onclick="exportData()" id="btnExport">⬇ Export</button>
     <button class="btn outline sm" onclick="document.getElementById('importFile').click()" id="btnImport">⬆ Import</button>
     <input type="file" id="importFile" accept=".json" hidden onchange="importData(event)" />
@@ -1042,7 +1043,7 @@ cloud.logout = async function() {
       letter-spacing: 1px;
     }
     body.locked-no-cloud #main::after {
-      content: 'ບໍລິສັດ ມະຫາໄຊ ເທຣດດິ້ງ ຈຳກັດ';
+      content: 'ມະຫາໄຊ ວັດສະດຸ ( ມະຫາໄຊ ເທຣດດິ້ງ )';
       display: block;
       text-align: center;
       color: rgba(255,255,255,0.8);
@@ -7407,7 +7408,7 @@ function printBlankInspection(frequency) {
     </style></head><body>
     <div class="header">
       <h1>${frequency==='weekly'?'📆 ຟອມກວດປະຈຳອາທິດ':'📅 ຟອມກວດປະຈຳວັນ'} — Pre-Trip Inspection</h1>
-      <div style="font-size:12px;opacity:.9">KALA — ບໍລິສັດ ມະຫາໄຊ ເທຣດດິ້ງ ຈຳກັດ</div>
+      <div style="font-size:12px;opacity:.9">KALA — ມະຫາໄຊ ວັດສະດຸ ( ມະຫາໄຊ ເທຣດດິ້ງ )</div>
     </div>
     <div class="instr">📋 <strong>ຄຳແນະນຳ:</strong> ໂຊເຟີຕ້ອງກວດ <strong>ກ່ອນອອກລົດ</strong> ທຸກວັນ. ບ່ອນທີ່ <strong>ບໍ່ຜ່ານ</strong> → ບໍ່ໃຫ້ໃຊ້ລົດ ແລະ ແຈ້ງຫົວໜ້າ. ຖ່າຍຮູບສະພາບລົດ + ສິ່ງທີ່ບໍ່ຜ່ານ → ສົ່ງເຂົ້າ Line ໃຫ້ພະນັກງານບັນທຶກ</div>
     <div class="info">
@@ -8498,7 +8499,7 @@ async function printJOFinalReceipt(joDbId) {
 <div class="header">
   <div class="badge">${j.customer_type==='walkin'?'🚪 ບິນສ້ອມລົດ Walk-in':'🧾 ບິນສ້ອມລົດ — JOB ORDER INVOICE'}</div>
   <h1>🛠 KALA Garage</h1>
-  <div class="co">ບໍລິສັດ ມະຫາໄຊ ເທຣດດິ້ງ ຈຳກັດ — Mahasai Trading Co., Ltd.</div>
+  <div class="co">ມະຫາໄຊ ວັດສະດຸ ( ມະຫາໄຊ ເທຣດດິ້ງ ) — MAHAXAY Trading.co.,Ltd.</div>
 </div>
 
 <div style="display:flex;justify-content:space-between;margin-bottom:8px">
@@ -8602,7 +8603,7 @@ ${partsLines.length > 0 ? `
 
 <div class="footer">
   ບິນອອກໂດຍລະບົບ KALA Garage Manager · ພິມ ${now}<br>
-  ບໍລິສັດ ມະຫາໄຊ ເທຣດດິ້ງ ຈຳກັດ · ໂທ. 020-XXX-XXXX
+  ມະຫາໄຊ ວັດສະດຸ ( ມະຫາໄຊ ເທຣດດິ້ງ ) · ໂທ. 020-XXX-XXXX
 </div>
 
 <div class="no-print" style="text-align:center;margin-top:20px;padding:14px;background:#F8FAFC;border-radius:8px">
@@ -10380,7 +10381,7 @@ pages.settings = async () => {
     <div class="card">
       <h3>🏢 ${t('company_info')}</h3>
       <div class="row">
-        <div class="fld"><label>${t('company_name')}</label><input id="set_company_name" value="${escapeHtml(stg.company_name || 'ບໍລິສັດ ມະຫາໄຊ ເທຣດດິ້ງ ຈຳກັດ (KALA)')}"/></div>
+        <div class="fld"><label>${t('company_name')}</label><input id="set_company_name" value="${escapeHtml(stg.company_name || 'ມະຫາໄຊ ວັດສະດຸ ( ມະຫາໄຊ ເທຣດດິ້ງ ) (KALA)')}"/></div>
         <div class="fld"><label>${t('company_tax_id')}</label><input id="set_tax_id" value="${escapeHtml(stg.tax_id || '')}"/></div>
       </div>
       <div class="row">
@@ -10910,7 +10911,7 @@ function printBlankPOForm() {
     </style></head><body>
     <div class="header">
       <h1 style="font-size:20px;margin:0">🧾 ໃບສັ່ງຊື້ — Purchase Order (ເປົ່າ)</h1>
-      <div style="font-size:12px;opacity:.9">KALA — ບໍລິສັດ ມະຫາໄຊ ເທຣດດິ້ງ ຈຳກັດ</div>
+      <div style="font-size:12px;opacity:.9">KALA — ມະຫາໄຊ ວັດສະດຸ ( ມະຫາໄຊ ເທຣດດິ້ງ )</div>
     </div>
     <div class="info">
       <div class="info-box"><h4>👥 ຂໍ້ມູນ Vendor</h4>
@@ -12102,7 +12103,7 @@ function printBlankTireRotationForm() {
       @media print{.no-print{display:none}}
     </style></head><body>
     <div class="header"><h1>🔄 ຟອມສະຫຼັບຕຳແໜ່ງຢາງ — Tire Rotation</h1>
-    <div style="font-size:12px;opacity:.9">KALA — ບໍລິສັດ ມະຫາໄຊ ເທຣດດິ້ງ ຈຳກັດ</div></div>
+    <div style="font-size:12px;opacity:.9">KALA — ມະຫາໄຊ ວັດສະດຸ ( ມະຫາໄຊ ເທຣດດິ້ງ )</div></div>
     <div class="info">
       <div><strong>ວັນທີ</strong><div class="line"></div></div>
       <div><strong>ລົດ (ID+ປ້າຍ)</strong><div class="line"></div></div>
@@ -12151,7 +12152,7 @@ function printBlankTireRemovalForm() {
       @media print{.no-print{display:none}}
     </style></head><body>
     <div class="header"><h1 style="font-size:18px">🚫 ຟອມຖອດຢາງອອກ — Tire Removal</h1>
-    <div style="font-size:12px;opacity:.9">KALA — ບໍລິສັດ ມະຫາໄຊ ເທຣດດິ້ງ ຈຳກັດ</div></div>
+    <div style="font-size:12px;opacity:.9">KALA — ມະຫາໄຊ ວັດສະດຸ ( ມະຫາໄຊ ເທຣດດິ້ງ )</div></div>
     <div class="info">
       <div><strong>ວັນທີຖອດ</strong><div class="line"></div></div>
       <div><strong>ຊ່າງຜູ້ຖອດ</strong><div class="line"></div></div>
@@ -12771,7 +12772,7 @@ async function printPO(id) {
       <div style="display:flex;justify-content:space-between;align-items:start">
         <div>
           <h1>${isExpress?'🚨 ໃບສັ່ງຊື້ ດ່ວນ':'🧾 ໃບສັ່ງຊື້'} — Purchase Order</h1>
-          <div style="font-size:12px;opacity:.9;margin-top:4px">KALA — ບໍລິສັດ ມະຫາໄຊ ເທຣດດິ້ງ ຈຳກັດ</div>
+          <div style="font-size:12px;opacity:.9;margin-top:4px">KALA — ມະຫາໄຊ ວັດສະດຸ ( ມະຫາໄຊ ເທຣດດິ້ງ )</div>
           ${isExpress?'<div class="urgent-stamp">⚡ EXPRESS — ດ່ວນ</div>':''}
         </div>
         <div style="text-align:right">
@@ -15251,7 +15252,7 @@ async function printIntakeReceipt(id) {
   <div class="header">
     <div class="badge">🛡️ ໃບຮັບລົດເຂົ້າສ້ອມ — VEHICLE INTAKE RECEIPT</div>
     <h1>🛠 KALA Garage</h1>
-    <div class="co">ບໍລິສັດ ມະຫາໄຊ ເທຣດດິ້ງ ຈຳກັດ — Mahasai Trading Co., Ltd.</div>
+    <div class="co">ມະຫາໄຊ ວັດສະດຸ ( ມະຫາໄຊ ເທຣດດິ້ງ ) — MAHAXAY Trading.co.,Ltd.</div>
     <div class="addr">ສຳນັກງານໃຫຍ່: ເມືອງປາກເຊ ແຂວງຈຳປາສັກ ສປປ. ລາວ</div>
   </div>
 
@@ -16147,7 +16148,7 @@ async function printCustomerReceipt(id) {
 <div class="header">
   <div class="badge">🚪 ໃບຮັບລົດ Walk-in</div>
   <h1>🛠 KALA Garage</h1>
-  <div class="co">ບໍລິສັດ ມະຫາໄຊ ເທຣດດິ້ງ ຈຳກັດ — Mahasai Trading Co., Ltd.</div>
+  <div class="co">ມະຫາໄຊ ວັດສະດຸ ( ມະຫາໄຊ ເທຣດດິ້ງ ) — MAHAXAY Trading.co.,Ltd.</div>
   <div class="addr">ສຳນັກງານໃຫຍ່: ເມືອງປາກເຊ ແຂວງຈຳປາສັກ ສປປ. ລາວ</div>
 </div>
 
@@ -16234,7 +16235,7 @@ ${parts.length > 0 ? `
 
 <div class="footer">
   ໃບຮັບລົດນີ້ອອກໂດຍລະບົບ KALA Garage Manager · ພິມວັນທີ ${now}<br>
-  ບໍລິສັດ ມະຫາໄຊ ເທຣດດິ້ງ ຈຳກັດ · ໂທ. 020-XXX-XXXX · Email: info@kala.la
+  ມະຫາໄຊ ວັດສະດຸ ( ມະຫາໄຊ ເທຣດດິ້ງ ) · ໂທ. 020-XXX-XXXX · Email: info@kala.la
 </div>
 
 <div class="no-print" style="text-align:center;margin-top:20px;padding:14px;background:#F8FAFC;border-radius:8px">
@@ -16936,20 +16937,81 @@ function dismissInstallBanner() {
   if (b) b.remove();
 }
 async function installPWA() {
-  if (!deferredInstall) {
-    // Detect platform and show instructions
-    const ua = navigator.userAgent.toLowerCase();
-    let msg = 'Browser ບໍ່ຮອງຮັບການຕິດຕັ້ງ Auto. ກະລຸນາໃຊ້:\n';
-    if (ua.includes('iphone') || ua.includes('ipad')) msg += '📱 iOS Safari: ກົດ Share → "Add to Home Screen"';
-    else if (ua.includes('android')) msg += '📱 Android: ກົດ Menu (⋮) → "Add to Home Screen"';
-    else msg += '💻 Desktop: Chrome/Edge → ໄອຄອນຕິດຕັ້ງໃນ URL Bar';
-    alert(msg);
+  // ກວດເບິ່ງວ່າຕິດຕັ້ງແລ້ວບໍ
+  if (window.matchMedia('(display-mode: standalone)').matches) {
+    toast('✅ ກຳລັງໃຊ້ App ຕິດຕັ້ງແລ້ວ — ບໍ່ຕ້ອງຕິດຕັ້ງອີກ', 'ok'); return;
+  }
+
+  if (deferredInstall) {
+    // Browser ຮອງຮັບ — ໂຊ Native Prompt
+    deferredInstall.prompt();
+    const { outcome } = await deferredInstall.userChoice;
+    if (outcome === 'accepted') toast('🎉 ຕິດຕັ້ງ KALA App ສຳເລັດ!', 'ok');
+    deferredInstall = null;
+    const btn = document.getElementById('pwaInstallBtn');
+    if (btn) btn.style.display = 'none';
     return;
   }
-  deferredInstall.prompt();
-  const { outcome } = await deferredInstall.userChoice;
-  if (outcome === 'accepted') toast('ຕິດຕັ້ງສຳເລັດ', 'ok');
-  deferredInstall = null;
+
+  // Browser ບໍ່ຮອງຮັບ → ສະແດງຄຳແນະນຳ
+  const ua = navigator.userAgent.toLowerCase();
+  let platform = 'desktop', icon = '💻', title = 'Computer (Desktop)';
+  let steps = [];
+  if (ua.includes('iphone') || ua.includes('ipad')) {
+    platform = 'ios'; icon = '📱'; title = 'iPhone / iPad (Safari)';
+    steps = [
+      'ເປີດ KALA Garage ໃນ <strong>Safari</strong> (ບໍ່ໃຊ່ Chrome)',
+      'ກົດປຸ່ມ <strong>Share</strong> ⬆ (ດ້ານລຸ່ມຂອງໜ້າຈໍ)',
+      'ເລື່ອນລົງ → ກົດ <strong>"Add to Home Screen"</strong>',
+      'ກົດ <strong>"Add"</strong> → ໄອຄອນ KALA ປະກົດໃນຫນ້າຈໍຫລັກ'
+    ];
+  } else if (ua.includes('android')) {
+    platform = 'android'; icon = '📱'; title = 'Android (Chrome)';
+    steps = [
+      'ເປີດ KALA Garage ໃນ <strong>Chrome</strong>',
+      'ກົດເມນູ ⋮ (3 ຈຸດດ້ານເທິງຂວາ)',
+      'ກົດ <strong>"Install app"</strong> ຫລື <strong>"Add to Home screen"</strong>',
+      'ກົດ <strong>"Install"</strong> → ໄອຄອນປະກົດໃນ Home Screen'
+    ];
+  } else {
+    platform = 'desktop'; icon = '💻'; title = 'Computer Desktop';
+    steps = [
+      'ເປີດ KALA Garage ໃນ <strong>Chrome</strong> ຫລື <strong>Edge</strong>',
+      'ມຸມຂວາເທິງ URL bar → ກວດໄອຄອນ <strong>⊕ ຫຼື 📥</strong>',
+      'ກົດໄອຄອນ → Popup ປະກົດ',
+      'ກົດ <strong>"Install"</strong> → KALA App ປະກົດໃນ Desktop + Start Menu'
+    ];
+  }
+
+  const body = `
+    <div style="text-align:center;padding:10px 0;background:linear-gradient(135deg,#EFF6FF,#DBEAFE);border-radius:10px;margin-bottom:12px">
+      <div style="font-size:48px">${icon}</div>
+      <h3 style="margin:6px 0;color:var(--primary)">ຕິດຕັ້ງ KALA App</h3>
+      <p style="color:var(--muted);font-size:12px">${title}</p>
+    </div>
+
+    <div style="background:white;border:2px solid var(--accent);border-radius:10px;padding:14px">
+      <strong style="color:var(--primary);font-size:14px">📋 ຂັ້ນຕອນຕິດຕັ້ງ ${steps.length} ຂັ້ນ:</strong>
+      <ol style="margin:10px 0 0 22px;line-height:2;font-size:13px">
+        ${steps.map(s => `<li>${s}</li>`).join('')}
+      </ol>
+    </div>
+
+    <div style="background:#D1FAE5;border-left:4px solid #10B981;padding:10px 14px;border-radius:6px;margin-top:12px;font-size:12px">
+      ✅ <strong>ຂໍ້ດີຫລັງຕິດຕັ້ງ:</strong>
+      <ul style="margin:6px 0 0 18px;line-height:1.7">
+        <li>ບໍ່ຕ້ອງເປີດ Browser ທຸກຄັ້ງ</li>
+        <li>ໃຊ້ໄດ້ໂດຍບໍ່ມີ Internet (ຂໍ້ມູນ Local)</li>
+        <li>ໄອຄອນຢູ່ Desktop / Home Screen</li>
+        <li>ໂຫລດໄວກວ່າ — ບໍ່ຕ້ອງລໍຖ້າ</li>
+      </ul>
+    </div>
+
+    <div style="background:#FEF3C7;border-left:4px solid #F59E0B;padding:10px 14px;border-radius:6px;margin-top:8px;font-size:11px;color:#78350F">
+      ⚠️ <strong>ໝາຍເຫດ:</strong> ຕ້ອງເປີດ KALA Garage ຢ່າງໜ້ອຍ 1 ຄັ້ງກ່ອນຕິດຕັ້ງ — Browser ຕ້ອງຮັບຮູ້ Manifest
+    </div>
+  `;
+  modal('📥 ວິທີຕິດຕັ້ງ KALA App', body, `<button class="btn ok" onclick="closeModal()">ເຂົ້າໃຈແລ້ວ</button>`);
 }
 
 // Service Worker — inline via Blob URL for offline support of subsequent visits
