@@ -4126,8 +4126,8 @@ async function openMileageModal() {
       <div class="fld"><label>${t('add_date')}</label><input id="m_date" type="date" value="${todayISO()}" /></div>
       <div class="fld"><label>${t('add_driver')}</label><input id="m_driver" /></div>
     </div>
-    <div class="fld"><label>${t('nav_vehicles')}</label><select id="m_vehicle" onchange="autoFillMileage()">
-      ${vehicles.map(v => `<option value="${v.vehicle_id}" data-km="${v.mileage||0}" data-hr="${v.hour||0}">${v.vehicle_id} — ${v.type} (ປັດຈຸບັນ: ${fmt(v.mileage||0)} km)</option>`).join('')}
+    <div class="fld"><label>${t('nav_vehicles')} (ປ້າຍ — ID)</label><select id="m_vehicle" onchange="autoFillMileage()">
+      ${vehicles.map(v => `<option value="${v.vehicle_id}" data-km="${v.mileage||0}" data-hr="${v.hour||0}"><strong>${v.plate||'-'}</strong> — ${v.vehicle_id} — ${v.type||'-'} (${fmt(v.mileage||0)} km)</option>`).join('')}
     </select></div>
     <div class="row">
       <div class="fld"><label>Mileage (km) <small style="color:var(--muted)">— ຈະອັບເດດເຂົ້າທະບຽນລົດອັດຕະໂນມັດ</small></label><input id="m_mileage" type="number" /></div>
@@ -6185,42 +6185,78 @@ pages.fuel = async () => {
     <div class="alert info" style="margin-top:14px">💡 km/L ຕ້ອງເຕີມເຕັມຖັງສອງຄັ້ງຕິດກັນຈຶ່ງຄຳນວນໄດ້ ສີແດງ = ຕ່ຳກວ່າ 6 km/L (ສ່ຽງເສຍຫາຍ ຫຼື Fuel Theft)</div>
   `;
 };
+// 🆕 Helper: ສ້າງ Vehicle Option ໂດຍສະແດງ ປ້າຍ — ID — ປະເພດ (ພະນັກງານຈື່ປ້າຍລົດ)
+function vehicleOptionLabel(v) {
+  const plate = v.plate || '-';
+  return `${plate} — ${v.vehicle_id} (${v.type||'-'})`;
+}
+function vehicleOptions(vehicles, selectedId) {
+  return vehicles.map(v =>
+    `<option value="${v.vehicle_id}" data-km="${v.mileage||0}" data-fuel-type="${v.fuel_type||''}" ${selectedId===v.vehicle_id?'selected':''}>${vehicleOptionLabel(v)}</option>`
+  ).join('');
+}
+
 async function openFuelModal(id) {
   const vehicles = await db.vehicles.toArray();
   if (vehicles.length === 0) { toast(t('no_data'), 'warn'); return; }
   let f = { date: todayISO(), vehicle_id: vehicles[0].vehicle_id, driver:'', station:'', km_at_fill:0,
-    liters:0, price_per_liter:0, total_cost:0, currency:'LAK', is_full:true, notes:'' };
+    liters:0, price_per_liter:0, total_cost:0, currency:'LAK', is_full:true, fuel_type:'', notes:'' };
   if (id) f = await db.fuel_log.get(id);
+  // Auto-detect fuel_type from vehicle ຖ້າຍັງບໍ່ໄດ້ໃສ່
+  if (!f.fuel_type) {
+    const sel = vehicles.find(v => v.vehicle_id === f.vehicle_id);
+    if (sel?.fuel_type) f.fuel_type = sel.fuel_type;
+  }
   const body = `
     <div class="row">
       <div class="fld"><label>ວັນທີ</label><input id="fu_date" type="date" value="${f.date}"/></div>
-      <div class="fld"><label>ລົດ</label><select id="fu_vehicle">
-        ${vehicles.map(v => `<option value="${v.vehicle_id}" data-km="${v.mileage||0}" ${f.vehicle_id===v.vehicle_id?'selected':''}>${v.vehicle_id} — ${v.type}</option>`).join('')}
+      <div class="fld"><label>🚗 ລົດ (ປ້າຍ — ID)</label><select id="fu_vehicle" onchange="updateFuelVehicleInfo()">
+        ${vehicleOptions(vehicles, f.vehicle_id)}
       </select></div>
     </div>
     <div class="row">
-      <div class="fld"><label>ຄົນຂັບ</label><input id="fu_driver" value="${escapeHtml(f.driver||'')}"/></div>
+      <div class="fld"><label>👤 ຄົນຂັບ</label><input id="fu_driver" value="${escapeHtml(f.driver||'')}"/></div>
       <div class="fld"><label>${t('fld_station')}</label><input id="fu_station" value="${escapeHtml(f.station||'')}" placeholder="PTT, Caltex, Shell..."/></div>
     </div>
     <div class="row">
-      <div class="fld"><label>${t('fld_km_at_fill')}</label><input id="fu_km" type="number" value="${f.km_at_fill||0}"/></div>
-      <div class="fld"><label>${t('fld_liters')}</label><input id="fu_liters" type="number" step="0.1" value="${f.liters||0}" oninput="calcFuelTotal()"/></div>
-    </div>
-    <div class="row">
-      <div class="fld"><label>${t('fld_price_per_liter')}</label><input id="fu_price" type="number" value="${f.price_per_liter||0}" oninput="calcFuelTotal()"/></div>
-      <div class="fld"><label>${t('fld_total_cost')}</label><input id="fu_total" type="number" value="${f.total_cost||0}"/></div>
-    </div>
-    <div class="row">
-      <div class="fld"><label>${t('fld_currency')}</label><select id="fu_cur">${CURRENCIES.map(c => `<option ${f.currency===c?'selected':''}>${c}</option>`).join('')}</select></div>
-      <div class="fld"><label>ປະເພດ</label><select id="fu_full">
-        <option value="true" ${f.is_full?'selected':''}>🔴 ${t('fuel_full_tank')}</option>
-        <option value="false" ${!f.is_full?'selected':''}>⚪ ${t('fuel_partial')}</option>
+      <div class="fld"><label>⛽ ປະເພດເຊື້ອໄຟ</label><select id="fu_type">
+        <option value="">— ບໍ່ໄດ້ລະບຸ —</option>
+        <option value="diesel" ${f.fuel_type==='diesel'?'selected':''}>🛢 ກາຊວນ (Diesel)</option>
+        <option value="benzine" ${f.fuel_type==='benzine'?'selected':''}>⛽ ແອັດຊັງ (Benzine 91/95)</option>
+        <option value="e10" ${f.fuel_type==='e10'?'selected':''}>🌿 E10 (Gasohol)</option>
+        <option value="e20" ${f.fuel_type==='e20'?'selected':''}>🌿 E20</option>
+        <option value="lpg" ${f.fuel_type==='lpg'?'selected':''}>💨 LPG</option>
       </select></div>
+      <div class="fld"><label>${t('fld_km_at_fill')}</label><input id="fu_km" type="number" value="${f.km_at_fill||0}"/></div>
     </div>
+    <div class="row">
+      <div class="fld"><label>${t('fld_liters')}</label><input id="fu_liters" type="number" step="0.1" value="${f.liters||0}" oninput="calcFuelTotal()"/></div>
+      <div class="fld"><label>${t('fld_price_per_liter')}</label><input id="fu_price" type="number" value="${f.price_per_liter||0}" oninput="calcFuelTotal()"/></div>
+    </div>
+    <div class="row">
+      <div class="fld"><label>${t('fld_total_cost')}</label><input id="fu_total" type="number" value="${f.total_cost||0}"/></div>
+      <div class="fld"><label>${t('fld_currency')}</label><select id="fu_cur">${CURRENCIES.map(c => `<option ${f.currency===c?'selected':''}>${c}</option>`).join('')}</select></div>
+    </div>
+    <div class="fld"><label>ປະເພດການເຕີມ</label><select id="fu_full">
+      <option value="true" ${f.is_full?'selected':''}>🔴 ${t('fuel_full_tank')}</option>
+      <option value="false" ${!f.is_full?'selected':''}>⚪ ${t('fuel_partial')}</option>
+    </select></div>
     <div class="fld"><label>${t('fld_notes')}</label><textarea id="fu_notes">${escapeHtml(f.notes||'')}</textarea></div>
   `;
   modal((id?t('edit'):t('add_fuel')), body, `<button class="btn outline" onclick="closeModal()">${t('cancel')}</button>
     <button class="btn ok" onclick="saveFuel(${id||'null'})">${t('save')}</button>`);
+}
+
+// Auto-fill fuel_type ຈາກ vehicle
+async function updateFuelVehicleInfo() {
+  const sel = $('#fu_vehicle');
+  if (!sel) return;
+  const vid = sel.value;
+  const v = (await db.vehicles.where('vehicle_id').equals(vid).toArray())[0];
+  if (v) {
+    if (v.fuel_type && $('#fu_type') && !$('#fu_type').value) $('#fu_type').value = v.fuel_type;
+    if (v.mileage && $('#fu_km') && (+$('#fu_km').value === 0)) $('#fu_km').value = v.mileage;
+  }
 }
 function calcFuelTotal() {
   const liters = parseFloat($('#fu_liters')?.value) || 0;
@@ -6230,7 +6266,7 @@ function calcFuelTotal() {
 async function saveFuel(id) {
   const data = {
     date: $('#fu_date').value, vehicle_id: $('#fu_vehicle').value, driver: $('#fu_driver').value,
-    station: $('#fu_station').value,
+    station: $('#fu_station').value, fuel_type: $('#fu_type')?.value || '',
     km_at_fill: parseInt($('#fu_km').value)||0, liters: parseFloat($('#fu_liters').value)||0,
     price_per_liter: parseFloat($('#fu_price').value)||0, total_cost: parseFloat($('#fu_total').value)||0,
     currency: $('#fu_cur').value, is_full: $('#fu_full').value === 'true', notes: $('#fu_notes').value
@@ -7095,6 +7131,17 @@ async function openVehicleModal(id) {
     <h3 style="color:var(--primary-2);font-size:13px;margin:14px 0 6px;border-bottom:1px dashed var(--line);padding-bottom:4px">⛽ ມາດຕະຖານປະສິດທິພາບ ສະເພາະຄັນນີ້</h3>
     <small class="muted" style="font-size:11px">ລົດແຕ່ລະຄັນສະພາບບໍ່ຄືກັນ — ກຳນົດເກນສະເພາະຄັນເພື່ອປະເມີນຄົນຂັບ. ຖ້າປະຫວ່າງເປົ່າ ຈະໃຊ້ມາດຕະຖານທົ່ວໄປ</small>
     <div class="row">
+      <div class="fld"><label>⛽ ປະເພດເຊື້ອໄຟ</label><select id="v_fuel_type">
+        <option value="">— ບໍ່ໄດ້ລະບຸ —</option>
+        <option value="diesel" ${v.fuel_type==='diesel'?'selected':''}>🛢 ກາຊວນ (Diesel)</option>
+        <option value="benzine" ${v.fuel_type==='benzine'?'selected':''}>⛽ ແອັດຊັງ (Benzine 91/95)</option>
+        <option value="e10" ${v.fuel_type==='e10'?'selected':''}>🌿 E10 (Gasohol)</option>
+        <option value="e20" ${v.fuel_type==='e20'?'selected':''}>🌿 E20</option>
+        <option value="lpg" ${v.fuel_type==='lpg'?'selected':''}>💨 LPG</option>
+      </select></div>
+      <div class="fld"></div>
+    </div>
+    <div class="row">
       <div class="fld"><label>🎯 Km/L ເປົ້າໝາຍ (Max)</label><input id="v_fuel_max" type="number" step="0.1" value="${v.fuel_max||''}" placeholder="ເຊັ່ນ 12 ສຳລັບກະບະ"/></div>
       <div class="fld"><label>⚠️ Km/L ຕ່ຳສຸດທີ່ຍອມຮັບ (Min)</label><input id="v_fuel_min" type="number" step="0.1" value="${v.fuel_min||''}" placeholder="ເຊັ່ນ 7"/></div>
     </div>
@@ -7136,6 +7183,7 @@ async function saveVehicle(id) {
     driver_phone: $('#v_driver_phone')?.value||'',
     assigned_date: $('#v_assigned_date')?.value||'',
     unit_note: $('#v_unit_note')?.value||'',
+    fuel_type: $('#v_fuel_type')?.value||'',
     fuel_max: parseFloat($('#v_fuel_max')?.value)||null,
     fuel_min: parseFloat($('#v_fuel_min')?.value)||null,
     km_per_year: parseInt($('#v_km_year')?.value)||null,
@@ -7280,8 +7328,8 @@ async function openInspectionModal() {
       <div class="fld"><label>${t('add_date')}</label><input id="i_date" type="date" value="${todayISO()}" /></div>
     </div>
     <div class="row">
-      <div class="fld"><label>${t('add_vehicle_select')}</label><select id="i_vehicle" onchange="loadVehKm()">
-        ${vehicles.map(v => `<option value="${v.vehicle_id}">${v.vehicle_id} — ${v.type} ${v.plate}</option>`).join('')}
+      <div class="fld"><label>${t('add_vehicle_select')} (ປ້າຍ — ID)</label><select id="i_vehicle" onchange="loadVehKm()">
+        ${vehicles.map(v => `<option value="${v.vehicle_id}"><strong>${v.plate||'-'}</strong> — ${v.vehicle_id} — ${v.type||'-'}</option>`).join('')}
       </select></div>
       <div class="fld"><label>📏 km ປັດຈຸບັນ</label><input id="i_km" type="number" value="${vehicles[0]?.mileage||0}"/></div>
     </div>
@@ -8089,10 +8137,10 @@ async function renderJOStep1(j, v) {
       <div style="display:flex;align-items:center;gap:6px;margin:14px 0 6px;font-size:11px;font-weight:600;color:var(--primary-2);text-transform:uppercase;letter-spacing:.5px">
         <span>🚗</span>ເລືອກລົດໃນ Fleet<div style="flex:1;height:1px;background:var(--line)"></div>
       </div>
-      <div class="fld"><label>🚗 ລົດທີ່ເຂົ້າສ້ອມ *</label>
+      <div class="fld"><label>🚗 ລົດທີ່ເຂົ້າສ້ອມ * <small style="color:var(--muted);font-weight:400">— ປ້າຍ ⇒ ID ⇒ ປະເພດ</small></label>
         <select id="wiz_vehicle_id" onchange="updateJOVehicleFromWiz()" style="font-weight:600">
           <option value="">— ກະລຸນາເລືອກລົດ —</option>
-          ${vehicles.map(vh => `<option value="${vh.vehicle_id}" ${j.vehicle_id===vh.vehicle_id?'selected':''}>${vh.vehicle_id} — ${vh.type} (${vh.plate||'-'}) ${vh.brand?'· '+vh.brand:''}</option>`).join('')}
+          ${vehicles.map(vh => `<option value="${vh.vehicle_id}" ${j.vehicle_id===vh.vehicle_id?'selected':''}><strong>${vh.plate||'-'}</strong> — ${vh.vehicle_id} — ${vh.type||'-'} ${vh.brand?'· '+vh.brand:''}</option>`).join('')}
         </select>
         <small style="font-size:10px;color:var(--muted);margin-top:2px;display:block">💡 ບໍ່ມີຢູ່? <a onclick="window.open('#','_blank');return false" style="color:var(--accent);cursor:pointer;text-decoration:underline">ໄປເພີ່ມລົດໃໝ່</a></small>
       </div>
@@ -11227,6 +11275,52 @@ async function delReplacement(id) {
 }
 
 // Calc cost/km with smart fallback: own history → same-type avg → global Settings
+// 🆕 ຄຳນວນຄ່ານ້ຳມັນຈິງ/km ຈາກ fuel_log ປະຫວັດການເຕີມນ້ຳມັນ
+async function calcFuelCostPerKm(vehicleId) {
+  const logs = (await db.fuel_log.where('vehicle_id').equals(vehicleId).toArray())
+    .sort((a,b) => (a.km_at_fill||0) - (b.km_at_fill||0));
+  if (logs.length < 2) {
+    return { costPerKm: 0, kmPerLiter: 0, fuelType: '', totalCost: 0, totalKm: 0, count: logs.length, source: 'insufficient' };
+  }
+  // ດຶງ km ໄລຍະທີ່ໃຊ້ + ນ້ຳມັນທີ່ໃຊ້ + ຄ່າທີ່ໃຊ້
+  // ໃຊ້ສະເພາະ records ທີ່ Full Tank ສຳລັບການຄຳນວນ Km/L ໃຫ້ແມ່ນຍຳ
+  const fullLogs = logs.filter(l => l.is_full !== false);
+  const useLogs = fullLogs.length >= 2 ? fullLogs : logs;
+
+  // ການຄຳນວນ:
+  // ໄລຍະທາງ = km_at_fill (ສຸດທ້າຍ) - km_at_fill (ທຳອິດ)
+  // ນ້ຳມັນທີ່ໃຊ້ = ລວມ liters ຈາກ record 2 ຫາ ສຸດທ້າຍ (ບໍ່ນັບ tank ທຳອິດ)
+  // ຄ່າທີ່ໃຊ້ = ລວມ total_cost ຈາກ record 2 ຫາ ສຸດທ້າຍ
+  const first = useLogs[0];
+  const last = useLogs[useLogs.length - 1];
+  const totalKm = (last.km_at_fill||0) - (first.km_at_fill||0);
+  if (totalKm < 100) return { costPerKm: 0, kmPerLiter: 0, fuelType: '', totalCost: 0, totalKm, count: useLogs.length, source: 'too_short' };
+  let totalLiters = 0, totalCost = 0;
+  for (let i = 1; i < useLogs.length; i++) {
+    totalLiters += (useLogs[i].liters||0);
+    totalCost += (useLogs[i].total_cost||0);
+  }
+  // Sanity: ບໍ່ໃຫ້ cost/km ສູງເກີນ 50,000 ກີບ/km
+  let costPerKm = totalKm > 0 ? totalCost / totalKm : 0;
+  if (costPerKm > 50000) costPerKm = 0;  // ຂໍ້ມູນຜິດ → ບໍ່ນັບ
+  const kmPerLiter = totalLiters > 0 ? totalKm / totalLiters : 0;
+  // ດຶງປະເພດເຊື້ອໄຟສ່ວນຫລາຍ
+  const fuelTypes = useLogs.map(l => l.fuel_type).filter(Boolean);
+  const fuelType = fuelTypes.length > 0
+    ? fuelTypes.sort((a,b) => fuelTypes.filter(v=>v===a).length - fuelTypes.filter(v=>v===b).length).pop()
+    : '';
+  return { costPerKm, kmPerLiter, fuelType, totalCost, totalKm, totalLiters, count: useLogs.length, source: 'actual' };
+}
+
+const FUEL_TYPE_LABELS = {
+  diesel: '🛢 Diesel',
+  benzine: '⛽ Benzine',
+  e10: '🌿 E10',
+  e20: '🌿 E20',
+  lpg: '💨 LPG',
+  '': '— ບໍ່ລະບຸ —'
+};
+
 async function calcCostWithFallback(vehicle) {
   const own = await calcActualCostPerKm(vehicle.vehicle_id);
   if (own.replacements.length >= 3) {
@@ -11429,6 +11523,7 @@ pages.depreciation = async () => {
       const perVeh = [];
       for (const v of vehicles) {
         const smart = await calcCostWithFallback(v);
+        const fuelData = await calcFuelCostPerKm(v.vehicle_id);
         const deprRow = rows.find(x => x.v.id === v.id);
         const deprPerKm = deprRow && v.km_per_year > 0 ? deprRow.annualDepr / v.km_per_year : 0;
         // 🛡️ Outlier Detection
@@ -11437,8 +11532,8 @@ pages.depreciation = async () => {
                           (!v.purchase_price && !v.purchase_date && smart.totalCostPerKm > 1000) ||
                           (!/^[A-Z]{2,3}-\d+/.test(v.vehicle_id) && smart.totalCostPerKm > 1000);
         perVeh.push({
-          v, smart, deprPerKm,
-          totalPerKm: smart.totalCostPerKm + deprPerKm,
+          v, smart, deprPerKm, fuel: fuelData,
+          totalPerKm: smart.totalCostPerKm + deprPerKm + fuelData.costPerKm,
           recordCount: smart.replacements.length,
           suspicious,
         });
@@ -11504,29 +11599,49 @@ pages.depreciation = async () => {
         </h4>
         <div class="alert info" style="font-size:11px">💡 <strong style="color:var(--ok)">ຈິງ</strong> ຄິດຈາກປະຫວັດການປ່ຽນທີ່ບັນທຶກໄວ້. <strong style="color:var(--accent)">ປະມານ</strong> ໃຊ້ມາດຕະຖານທົ່ວໄປຈາກ Settings ສຳລັບລົດທີ່ຍັງບໍ່ມີຂໍ້ມູນ</div>
         ${perVeh.length === 0 ? '<div class="muted" style="font-size:12px">ຍັງບໍ່ມີຂໍ້ມູນ</div>' : `
-        <table>
-          <tr><th>ລົດ</th><th>ປະເພດ</th><th>ບັນທຶກ</th>
-            <th style="background:#FEF3C7">ຄ່າອາໄຫລ່/km</th>
-            <th>ແຫຼ່ງຂໍ້ມູນ</th>
+        <table style="font-size:12px">
+          <tr>
+            <th>ລົດ (ປ້າຍ)</th>
+            <th>ປະເພດ</th>
+            <th style="background:#FEF9C3">ອາໄຫລ່/km</th>
             <th style="background:#FEE2E2">ເສື່ອມ/km</th>
+            <th style="background:#DBEAFE">⛽ ນ້ຳມັນ/km</th>
+            <th style="background:#DBEAFE;font-size:10px">Km/L</th>
             <th style="background:#10B981;color:#fff">ລວມ/km</th>
-            <th>10,000 km</th></tr>
+            <th>10,000 km</th>
+            <th style="font-size:10px">ແຫລ່ງຂໍ້ມູນ</th>
+          </tr>
           ${perVeh.map(p => {
             const srcColor = p.smart.source === 'actual' ? 'var(--ok)' : p.smart.source === 'same_type' ? 'var(--accent)' : 'var(--muted)';
             const rowStyle = p.suspicious ? 'background:#FEE2E2' : '';
-            const warnIcon = p.suspicious ? '<span title="ຄ່າຜິດປົກກະຕິ — ກວດສອບ records" style="color:#DC2626;margin-right:4px">⚠️</span>' : '';
+            const warnIcon = p.suspicious ? '<span title="ຄ່າຜິດປົກກະຕິ" style="color:#DC2626;margin-right:4px">⚠️</span>' : '';
+            const fuelLabel = p.fuel.source === 'actual'
+              ? `<small style="color:#1E40AF;font-weight:600">${FUEL_TYPE_LABELS[p.fuel.fuelType]||p.fuel.fuelType||'-'}</small>`
+              : `<small style="color:#94A3B8">ບໍ່ມີຂໍ້ມູນ</small>`;
+            const kmPerL = p.fuel.kmPerLiter > 0
+              ? `<strong>${p.fuel.kmPerLiter.toFixed(1)}</strong>`
+              : '<span style="color:#CBD5E1">—</span>';
             return `<tr style="${rowStyle}">
-              <td>${warnIcon}<strong style="cursor:pointer;color:${p.suspicious?'#DC2626':'var(--accent)'}" onclick="goVehicleDetail(${p.v.id})">${escapeHtml(p.v.vehicle_id)}</strong></td>
-              <td>${escapeHtml(p.v.type||'-')}</td>
-              <td><span class="pill ${p.recordCount>0?'ok':'gray'}" style="font-size:10px">${p.recordCount} ຄັ້ງ</span></td>
+              <td>${warnIcon}<strong style="cursor:pointer;color:${p.suspicious?'#DC2626':'var(--accent)'}" onclick="goVehicleDetail(${p.v.id})">${escapeHtml(p.v.plate||'-')}</strong>
+                <br><small style="color:var(--muted);font-size:10px">${escapeHtml(p.v.vehicle_id)}</small></td>
+              <td style="font-size:11px">${escapeHtml(p.v.type||'-')}</td>
               <td style="background:#FEF9C3;font-weight:700;${p.suspicious?'color:#DC2626':''}">${fmt(Math.round(p.smart.totalCostPerKm))}</td>
-              <td style="font-size:11px;color:${srcColor}">${p.smart.label}</td>
               <td style="background:#FEE2E2">${fmt(Math.round(p.deprPerKm))}</td>
-              <td style="background:#D1FAE5;font-weight:700;color:#065F46;${p.suspicious?'background:#FECACA;color:#991B1B':''}">${fmt(Math.round(p.totalPerKm))}</td>
-              <td style="${p.suspicious?'color:#DC2626;font-weight:700':''}">${fmt(Math.round(p.totalPerKm*10000))}</td>
+              <td style="background:#DBEAFE;font-weight:700;color:#1E40AF">
+                ${p.fuel.costPerKm > 0 ? fmt(Math.round(p.fuel.costPerKm)) : '<span style="color:#94A3B8">—</span>'}
+                <br>${fuelLabel}
+              </td>
+              <td style="background:#DBEAFE;text-align:center">${kmPerL}</td>
+              <td style="background:#D1FAE5;font-weight:700;color:#065F46;font-size:13px;${p.suspicious?'background:#FECACA;color:#991B1B':''}">${fmt(Math.round(p.totalPerKm))}</td>
+              <td style="font-weight:600;${p.suspicious?'color:#DC2626':''}">${fmt(Math.round(p.totalPerKm*10000))}</td>
+              <td style="font-size:10px;color:${srcColor}">${p.smart.label}${p.fuel.count>0?`<br><small style="color:#1E40AF">⛽ ${p.fuel.count} ບິນ</small>`:''}</td>
             </tr>`;
           }).join('')}
-        </table>`}
+        </table>
+        <div class="alert" style="background:#DBEAFE;border-left:3px solid #3B82F6;font-size:11px;margin-top:8px">
+          ⛽ <strong>ຄ່ານ້ຳມັນ/km:</strong> ດຶງຈາກປະຫວັດ "ບິນນ້ຳມັນ" ຂອງລົດໂດຍຕົງ — ໃຫ້ບັນທຶກໃຫ້ສະໝ່ຳສະເໝີ ຈິ່ງເຫັນຄ່າທີ່ແມ່ນຍຳ
+          <br>📊 <strong>Km/L:</strong> ໄລຍະທາງ ÷ ນ້ຳມັນ — ໂຊຄວາມສິ້ນເປືອງເຊື້ອໄຟຂອງລົດ
+        </div>`}
         <div class="alert" style="background:#FEF3C7;border-left-color:var(--warn);font-size:11px;margin-top:10px">
           ⚠️ <strong>ບໍ່ນັບລວມ:</strong> ນ້ຳມັນເຊື້ອໄຟ, ການສ້ອມເສຍຫາຍບໍ່ໄດ້ວາງແຜນ, ປະກັນໄພ, ຄ່າທະບຽນ
         </div>
@@ -14707,8 +14822,8 @@ async function openLaborEntryModal(id, opts) {
     </div>
 
     <div class="row" id="le_vehicle_row" style="display:${e.customer_type==='internal'?'flex':'none'}">
-      <div class="fld" style="flex:1"><label>🚚 ລົດບໍລິສັດ</label><select id="le_vehicle">
-        ${vehicles.map(v => `<option value="${v.vehicle_id}" ${e.vehicle_id===v.vehicle_id?'selected':''}>${v.vehicle_id} — ${v.type}</option>`).join('')}
+      <div class="fld" style="flex:1"><label>🚚 ລົດບໍລິສັດ (ປ້າຍ — ID)</label><select id="le_vehicle">
+        ${vehicles.map(v => `<option value="${v.vehicle_id}" ${e.vehicle_id===v.vehicle_id?'selected':''}><strong>${v.plate||'-'}</strong> — ${v.vehicle_id} — ${v.type||'-'}</option>`).join('')}
       </select></div>
     </div>
 
