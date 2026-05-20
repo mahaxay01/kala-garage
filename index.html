@@ -2315,6 +2315,24 @@ const NAV_GROUPS = [
   },
 ];
 
+// 🔒 ໜ້າທີ່ສະຫງວນ — ບົດບາດທີ່ສາມາດເບິ່ງ (ໃຊ້ cloud.hasRole)
+const ADMIN_ONLY_PAGES = {
+  'audit':            ['owner','it'],
+  'role_management':  ['owner','it'],
+  'data_storage':     ['owner','it'],
+  'bulk_import':      ['owner','it','manager'],
+  'cloud_users':      ['owner','it','manager'],
+  'branches':         ['owner','it','asset_manager'],
+  'recycle':          ['owner','it'],
+};
+function canSeePage(page) {
+  const allowedRoles = ADMIN_ONLY_PAGES[page];
+  if (!allowedRoles) return true;  // ໜ້າທົ່ວໄປ — ທຸກຄົນເຫັນໄດ້
+  // ບໍ່ໄດ້ Login → ໃຫ້ເຫັນຊົ່ວຄາວ (Local Mode)
+  if (typeof cloud==='undefined' || !cloud.profile) return true;
+  return allowedRoles.includes(cloud.profile.role);
+}
+
 function renderNav() {
   // ໂຫຼດສະຖານະການຍຸບກຸ່ມ
   const collapsed = JSON.parse(localStorage.getItem('kala_nav_collapsed') || '{}');
@@ -2328,10 +2346,13 @@ function renderNav() {
   `;
 
   NAV_GROUPS.forEach(grp => {
+    // Filter items by permission
+    const visibleItems = grp.items.filter(it => canSeePage(it.page));
+    if (visibleItems.length === 0) return;  // ກຸ່ມຫວ່າງ → ບໍ່ສະແດງ
     if (grp.pinned) {
       // Pinned items — no header, always visible
       html += '<div class="nav-pinned">';
-      grp.items.forEach(it => {
+      visibleItems.forEach(it => {
         html += `<a data-page="${it.page}" data-label="${it.label}" class="pinned"><span>${it.icon}</span><span class="label">${it.label}</span></a>`;
       });
       html += '</div>';
@@ -2343,10 +2364,10 @@ function renderNav() {
             <span class="chev">▼</span>
             <span style="font-size:13px">${grp.icon}</span>
             <span>${grp.label}</span>
-            <span class="count">${grp.items.length}</span>
+            <span class="count">${visibleItems.length}</span>
           </div>
           <div class="nav-items">
-            ${grp.items.map(it => `<a data-page="${it.page}" data-label="${it.label}"><span>${it.icon}</span><span class="label">${it.label}</span></a>`).join('')}
+            ${visibleItems.map(it => `<a data-page="${it.page}" data-label="${it.label}"><span>${it.icon}</span><span class="label">${it.label}</span></a>`).join('')}
           </div>
         </div>
       `;
@@ -2409,6 +2430,13 @@ function filterNav(query) {
 
 let currentPage = 'dashboard';
 async function go(page) {
+  // 🔒 ກວດສິດທິກ່ອນເຂົ້າໜ້າ
+  if (!canSeePage(page)) {
+    toast('🚫 ບໍ່ມີສິດເຂົ້າໜ້ານີ້ — ສະຫງວນສິດສະເພາະບົດບາດທີ່ກຳນົດ', 'bad');
+    if (page === currentPage) currentPage = 'dashboard';
+    if (pages.dashboard) await pages.dashboard();
+    return;
+  }
   currentPage = page;
   document.querySelectorAll('aside.side a').forEach(a => a.classList.toggle('active', a.dataset.page === page));
   if (page === 'vehicle_detail') { await renderVehicleDetail(); }
@@ -3566,10 +3594,16 @@ async function renderVehicleDetail() {
   const jos = (await db.joborders.where('vehicle_id').equals(v.vehicle_id).toArray()).sort((a,b)=>b.created.localeCompare(a.created));
   const insps = (await db.inspections.where('vehicle_id').equals(v.vehicle_id).toArray()).sort((a,b)=>b.date.localeCompare(a.date));
   const tires = (await db.tires.where('current_vehicle').equals(v.vehicle_id).toArray());
+  // 💼 ດຶງ Labor Entries ສະເພາະຄັນນີ້
+  const labor = (await db.labor_entries.where('vehicle_id').equals(v.vehicle_id).toArray())
+    .sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   const today = todayISO();
   const pmDays = v.nextPM ? daysBetween(today, v.nextPM) : null;
-  // Cost calculation — for now use placeholder; real implementation would aggregate from JC
-  const totalCost = jos.length * 1500000;  // approximation
+  // 💰 ຄຳນວນຄ່າໃຊ້ຈ່າຍຈິງຈາກ Labor Entries (ຄ່າແຮງ + ອາໄຫລ່)
+  const totalLabor = labor.reduce((s,l)=>s+(l.charge_amount||0),0);
+  const totalParts = labor.reduce((s,l)=>s+(l.parts_total||0),0);
+  const totalCommission = labor.reduce((s,l)=>s+(l.commission_amount||0),0);
+  const totalCost = totalLabor + totalParts;
   const cpk = v.mileage > 0 ? Math.round(totalCost / v.mileage) : 0;
 
   $('#main').innerHTML = `
@@ -3585,9 +3619,9 @@ async function renderVehicleDetail() {
       <div class="kpi"><div class="label">${t('fld_status')}</div><div class="val" style="font-size:20px;color:${v.status==='active'?'var(--ok)':v.status==='repair'?'var(--bad)':'var(--warn)'}">${t('status_'+v.status)}</div><div class="muted">${v.branch}</div></div>
       <div class="kpi"><div class="label">${t('fld_mileage')}</div><div class="val">${fmt(v.mileage||0)}</div><div class="muted">${v.hour?v.hour+' ຊມ':'km'}</div></div>
       <div class="kpi"><div class="label">${t('kpi_pm_due')}</div><div class="val" style="color:${pmDays===null?'var(--muted)':pmDays<0?'var(--bad)':pmDays<=7?'var(--warn)':'var(--ok)'}">${v.nextPM||'-'}</div><div class="muted">${pmDays!==null?(pmDays<0?(pmDays*-1)+' '+t('days_overdue'):pmDays+' '+t('days_left')):''}</div></div>
-      <div class="kpi"><div class="label">${t('total_jo')}</div><div class="val">${jos.length}</div><div class="muted">${jos.filter(j=>j.status!=='done').length} ເປີດຢູ່</div></div>
-      <div class="kpi"><div class="label">${t('total_cost')}</div><div class="val">${fmt(totalCost)}</div><div class="muted">ກີບ ໂດຍປະມານ</div></div>
-      <div class="kpi"><div class="label">${t('avg_cpk')}</div><div class="val">${fmt(cpk)}</div><div class="muted">ກີບ/ກມ</div></div>
+      <div class="kpi"><div class="label">${t('total_jo')}</div><div class="val">${jos.length}</div><div class="muted">${jos.filter(j=>j.status!=='done').length} ເປີດຢູ່ • 💼 ${labor.length} Labor</div></div>
+      <div class="kpi"><div class="label">${t('total_cost')}</div><div class="val">${fmt(totalCost)}</div><div class="muted">ກີບ • 💼${fmt(totalLabor)} + 📦${fmt(totalParts)}</div></div>
+      <div class="kpi"><div class="label">${t('avg_cpk')}</div><div class="val">${fmt(cpk)}</div><div class="muted">ກີບ/ກມ (ຈິງ)</div></div>
     </div>
 
     ${v.current_unit || v.assigned_driver ? `
@@ -3666,6 +3700,35 @@ async function renderVehicleDetail() {
           <td style="color:${tr.tread<3?'var(--bad)':tr.tread<5?'var(--warn)':'var(--ok)'};font-weight:600">${tr.tread} mm</td>
           <td><span class="pill ${tr.status==='active'?'ok':'gray'}">${t('tire_'+tr.status)}</span></td>
         </tr>`).join('')}
+      </table>`}
+    </div>
+
+    <div class="card">
+      <h3>💼 ປະຫວັດການບັນທຶກວຽກສ້ອມ + ຄ່າແຮງ (Labor Entries) <small style="font-weight:400;color:var(--muted);font-size:12px">— ${labor.length} ລາຍການ</small>
+        <button class="btn sm ok" style="float:right" onclick="openLaborEntryModalForVehicle('${v.vehicle_id}')">+ ບັນທຶກວຽກໃໝ່</button>
+      </h3>
+      ${labor.length === 0 ? `<div class="empty"><div class="icon">💼</div><p>ຍັງບໍ່ມີບັນທຶກວຽກສ້ອມສຳລັບລົດຄັນນີ້ — ບັນທຶກໄດ້ທີ່ໜ້າ "ບັນທຶກວຽກ + ຄ່າແຮງ"</p></div>` : `
+      <div class="kpi-grid" style="margin-bottom:10px">
+        <div class="kpi"><div class="label">💼 ຄ່າແຮງລວມ</div><div class="val" style="color:var(--accent)">${fmt(totalLabor)}</div><div class="muted">ກີບ</div></div>
+        <div class="kpi"><div class="label">📦 ຄ່າອາໄຫລ່ລວມ</div><div class="val" style="color:var(--warn)">${fmt(totalParts)}</div><div class="muted">ກີບ</div></div>
+        <div class="kpi"><div class="label">💰 ລວມທັງໝົດ</div><div class="val" style="color:var(--bad)">${fmt(totalCost)}</div><div class="muted">ກີບ</div></div>
+        <div class="kpi"><div class="label">🎁 ຄອມມິສຊັ່ນຊ່າງ</div><div class="val" style="color:var(--info)">${fmt(totalCommission)}</div><div class="muted">ກີບ</div></div>
+      </div>
+      <table style="font-size:12.5px">
+        <tr><th>ວັນທີ</th><th>ເລກທີ</th><th>ບໍລິການ</th><th>ຊ່າງ</th><th style="text-align:right">ຄ່າແຮງ</th><th style="text-align:right">ອາໄຫລ່</th><th style="text-align:right">ລວມ</th><th>JO</th><th>ສະຖານະ</th><th></th></tr>
+        ${labor.slice(0,30).map(l => `<tr>
+          <td>${l.date||'-'}</td>
+          <td><strong style="font-family:monospace;font-size:11px">${l.entry_id||'-'}</strong></td>
+          <td>${escapeHtml(l.service_name||'-')}${l.is_team?'<br><small class="muted">👥 ທີມ '+(l.team_splits?.length||0)+' ຄົນ</small>':''}</td>
+          <td>${escapeHtml(l.tech_name||'-')}</td>
+          <td style="text-align:right;font-weight:600;color:var(--accent)">${fmt(l.charge_amount||0)}</td>
+          <td style="text-align:right;color:var(--warn)">${fmt(l.parts_total||0)}</td>
+          <td style="text-align:right;font-weight:700;color:var(--bad)">${fmt(l.grand_total||(l.charge_amount||0)+(l.parts_total||0))}</td>
+          <td>${l.jo_id?`<small style="font-family:monospace">${l.jo_id}</small>`:'-'}</td>
+          <td><span class="pill ${l.status==='approved'?'ok':l.status==='pending'?'warn':l.status==='paid'?'info':'gray'}">${l.status||'pending'}</span></td>
+          <td class="actions"><button class="btn sm outline" onclick="openLaborEntryModal(${l.id})">${t('edit')}</button></td>
+        </tr>`).join('')}
+        ${labor.length > 30 ? `<tr><td colspan="10" style="text-align:center;color:var(--muted);font-style:italic;font-size:11px">ສະແດງ 30/${labor.length} — ໄປໜ້າ "ບັນທຶກວຽກ + ຄ່າແຮງ" ເພື່ອເບິ່ງທັງໝົດ</td></tr>` : ''}
       </table>`}
     </div>
 
@@ -5115,6 +5178,20 @@ async function openVendorReport(vendor_id) {
 
 // ===================== AUDIT LOG =====================
 pages.audit = async () => {
+  // 🔒 ຈຳກັດສິດ: ສະເພາະ Owner ແລະ IT Admin ເທົ່ານັ້ນ — ບໍ່ໃຫ້ Manager ຫຼື ບົດບາດອື່ນເຫັນ
+  if (typeof cloud!=='undefined' && cloud.profile && !cloud.hasRole('owner','it')) {
+    $('#main').innerHTML = `
+      <div class="crumbs">${t('nav_settings')} › ${t('nav_audit')}</div>
+      <div class="page-title">🔒 Audit Log</div>
+      <div class="card" style="background:#FEE2E2;border-left:4px solid #EF4444;padding:20px;text-align:center">
+        <div style="font-size:48px">🚫</div>
+        <h3 style="color:#B91C1C;margin:10px 0">ບໍ່ມີສິດເຂົ້າເຖິງ</h3>
+        <p style="color:#7F1D1D;margin:0">Audit Log ສະຫງວນສິດສະເພາະ <strong>Owner</strong> ແລະ <strong>IT Admin</strong> ເທົ່ານັ້ນ.</p>
+        <p style="color:#7F1D1D;margin:6px 0 0;font-size:13px">ບົດບາດປະຈຸບັນ: <span class="pill warn">${cloud.profile.role}</span> — ບໍ່ສາມາດເບິ່ງ ຫຼື ສ້າງລາຍການກວດສອບໄດ້</p>
+        <button class="btn outline" style="margin-top:14px" onclick="go('dashboard')">← ກັບໄປໜ້າຫຼັກ</button>
+      </div>`;
+    return;
+  }
   let logs = (await db.audit_log.toArray()).sort((a,b)=>b.timestamp.localeCompare(a.timestamp));
   const range = getDateRange('audit');
   logs = logs.filter(l => {
@@ -9460,8 +9537,9 @@ async function adjustStock(id, delta) {
 async function openPartModal(id) {
   const cats = (await db.categories.where('type').equals('parts').toArray());
   const vendors = await db.vendors.toArray();
-  let p = { code:'', name:'', class:'B', grade:'oem_equiv', category_id:'', warehouse:'main', stock:0, min:0, max:10, unit:'ໜ່ວຍ', cost:0, photo:'' };
-  if (id) p = await db.parts.get(id);
+  const rates = getRates();
+  let p = { code:'', name:'', class:'B', grade:'oem_equiv', category_id:'', warehouse:'main', stock:0, min:0, max:10, unit:'ໜ່ວຍ', cost:0, currency:'LAK', exchange_rate:1, cost_lak:0, photo:'' };
+  if (id) p = Object.assign(p, await db.parts.get(id));
   window._photoBuffers['part_photo'] = p.photo ? [p.photo] : [];
   const body = `
     <div class="row">
@@ -9496,23 +9574,59 @@ async function openPartModal(id) {
     </div>
     <div class="row">
       <div class="fld"><label>${t('fld_max')}</label><input id="p_max" type="number" value="${p.max}" /></div>
-      <div class="fld"><label>${t('fld_cost')} (ກີບ - ລາຄາມາດຕະຖານ)</label><input id="p_cost" type="number" value="${p.cost||0}" /></div>
+      <div class="fld"><label>${t('fld_unit')} (ໜ່ວຍນັບ)</label><input id="p_unit2" value="${p.unit}" disabled style="opacity:.6"/></div>
+    </div>
+    <div class="card" style="background:#FFFBEB;border-left:4px solid #F59E0B;padding:10px;margin:8px 0">
+      <h4 style="margin:0 0 8px;color:#92400E;font-size:13px">💰 ລາຄາມາດຕະຖານ — ຮອງຮັບ 4 ສະກຸນ</h4>
+      <div class="row">
+        <div class="fld"><label>ລາຄາ</label><input id="p_cost_raw" type="number" value="${p.cost||0}" oninput="calcPartLAK()"/></div>
+        <div class="fld"><label>ສະກຸນເງິນ</label><select id="p_currency" onchange="updatePartRate();calcPartLAK()">
+          ${CURRENCIES.map(c => `<option value="${c}" ${(p.currency||'LAK')===c?'selected':''}>${c}</option>`).join('')}
+        </select></div>
+      </div>
+      <div class="row">
+        <div class="fld"><label>ອັດຕາແລກປ່ຽນ <small style="color:var(--muted)">(1 ໜ່ວຍ = ? ກີບ)</small></label>
+          <input id="p_rate" type="number" value="${p.exchange_rate||1}" oninput="calcPartLAK()"/></div>
+        <div class="fld"><label>ມູນຄ່າຄຳນວນ (ກີບ) <small style="color:var(--ok)">— Auto</small></label>
+          <input id="p_cost_lak" type="number" value="${p.cost_lak||p.cost||0}" readonly style="background:var(--bg-2);font-weight:700;color:var(--ok)"/></div>
+      </div>
+      <small style="font-size:11px;color:#92400E">💡 ສະກຸນເງິນ 4 ສະກຸນ: LAK (ກີບ), THB (ບາດ), USD (ໂດລາ), CNY (ຢວນ) — ລະບົບແປງເປັນກີບອັດຕະໂນມັດ</small>
     </div>
     ${initPhotoUploader('part_photo', p.photo ? [p.photo] : [])}
   `;
   modal((id?t('edit'):t('add_part'))+' — '+t('nav_inv'), body, `<button class="btn outline" onclick="closeModal()">${t('cancel')}</button>
     <button class="btn ok" onclick="savePart(${id||'null'})">${t('save')}</button>`);
+  // Init currency rate
+  setTimeout(() => { calcPartLAK(); }, 50);
+}
+// Update default rate ເມື່ອປ່ຽນສະກຸນເງິນ ໃນ Part Modal
+function updatePartRate() {
+  const cur = $('#p_currency')?.value;
+  if (cur && $('#p_rate')) $('#p_rate').value = (DEFAULT_RATES[cur] != null ? DEFAULT_RATES[cur] : 1);
+}
+function calcPartLAK() {
+  const raw = parseFloat($('#p_cost_raw')?.value) || 0;
+  const r = parseFloat($('#p_rate')?.value) || 1;
+  if ($('#p_cost_lak')) $('#p_cost_lak').value = Math.round(raw * r);
 }
 async function savePart(id) {
   const photos = getPhotos('part_photo');
+  const rawCost = parseFloat($('#p_cost_raw')?.value)||0;
+  const currency = $('#p_currency')?.value || 'LAK';
+  const rate = parseFloat($('#p_rate')?.value)||1;
+  const costLAK = Math.round(rawCost * rate);
   const data = { code: $('#p_code').value, name: $('#p_name').value, class: $('#p_class').value,
     grade: $('#p_grade').value, category_id: $('#p_cat').value, warehouse: $('#p_wh').value,
     stock: parseInt($('#p_stock').value)||0, min: parseInt($('#p_min').value)||0, max: parseInt($('#p_max').value)||10,
-    unit: $('#p_unit').value, cost: parseInt($('#p_cost').value)||0,
+    unit: $('#p_unit').value,
+    cost: rawCost,           // ລາຄາໃນສະກຸນຕົ້ນສະບັບ
+    currency: currency,
+    exchange_rate: rate,
+    cost_lak: costLAK,       // ມູນຄ່າທຽບເຄຍ ກີບ (ໃຊ້ສຳລັບການຄຳນວນ)
     photo: photos[0] || '' };
   if (id) {
     const oldPart = await db.parts.get(id);
-    if (oldPart && oldPart.cost !== data.cost) await logPriceChange('parts', id, 'cost', oldPart.cost, data.cost, oldPart.created_at);
+    if (oldPart && oldPart.cost_lak !== costLAK) await logPriceChange('parts', id, 'cost_lak', oldPart.cost_lak||oldPart.cost, costLAK, oldPart.created_at);
     await db.parts.update(id, data);
   } else { await db.parts.add(data); }
   closeModal(); toast(t('saved')); pages.inv();
@@ -14775,6 +14889,10 @@ async function delTechProfile(id) {
 // Global temp state for the modal (team split + parts)
 window._leTeam = []; window._leParts = [];
 
+// Wrapper — ເປີດ Labor Entry Modal ໂດຍ Pre-fill vehicle_id (ໃຊ້ໃນ Vehicle Detail Page)
+async function openLaborEntryModalForVehicle(vehicleId) {
+  await openLaborEntryModal(null, { vehicle_id: vehicleId });
+}
 async function openLaborEntryModal(id, opts) {
   opts = opts || {};
   const techs = (await db.tech_profiles.toArray()).filter(t => t.active!==false);
