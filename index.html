@@ -667,7 +667,7 @@ const cloud = {
               fuel_log:'ບິນນ້ຳມັນ', inspections:'ກວດປະຈຳວັນ', incidents:'ອຸປະຕິເຫດ',
               purchase_orders:'PO', purchase_requests:'PR',
               camera_counts:'ບັນທຶກກ້ອງ', customer_audits:'Customer Audit',
-              fluids:'ບັນທຶກນ້ຳມັນຫລໍ່ລື່ນ', mileage_log:'ບັນທຶກໄມຍ໌', categories:'ໝວດ',
+              fluids:'ບັນທຶກນ້ຳມັນຫລໍ່ລື່ນ', mileage_log:'ບັນທຶກເລກໄມ', categories:'ໝວດ',
               pm_templates:'ແມ່ແບບ PM', vehicle_pm:'PM ລົດ', pm_history:'ປະຫວັດ PM',
               receipt_inspections:'ໃບກວດຮັບ', predelivery_inspections:'ໃບກວດສົ່ງມອບ',
               parts_replacements:'ປະຫວັດປ່ຽນອາໄຫລ່', driver_reviews:'ປະເມີນຄົນຂັບ',
@@ -1087,7 +1087,7 @@ const I18N = {
     nav_about: "เกี่ยวกับระบบ",
     add_vehicle: "+ เพิ่มรถ", add_jo: "+ เปิดใบสั่งงานใหม่", add_part: "+ เพิ่มอะไหล่", add_inspection: "+ บันทึกตรวจประจำวัน",
     fld_id: "รหัสรถ", fld_plate: "ทะเบียน", fld_type: "ประเภท", fld_brand: "ยี่ห้อ/รุ่น", fld_year: "ปี", fld_branch: "สาขา",
-    fld_status: "สถานะ", fld_mileage: "Mileage (km)", fld_hour: "Hour Meter", fld_complaint: "อาการ", fld_priority: "ความด่วน",
+    fld_status: "สถานะ", fld_mileage: "ເລກໄມ (km)", fld_hour: "Hour Meter", fld_complaint: "อาการ", fld_priority: "ความด่วน",
     fld_assigned: "ช่างที่มอบหมาย", fld_notes: "หมายเหตุ", fld_part_code: "รหัสอะไหล่", fld_part_name: "ชื่ออะไหล่",
     fld_class: "ABC Class", fld_stock: "Stock ปัจจุบัน", fld_min: "Min", fld_max: "Max", fld_unit: "หน่วย", fld_cost: "ราคา (LAK)",
     save: "บันทึก", cancel: "ยกเลิก", delete: "ลบ", edit: "แก้ไข", view: "ดู", close: "ปิด",
@@ -1144,7 +1144,7 @@ const I18N = {
     nav_about: "ກ່ຽວກັບລະບົບ",
     add_vehicle: "+ ເພີ່ມລົດ", add_jo: "+ ເປີດໃບສັ່ງສ້ອມໃໝ່", add_part: "+ ເພີ່ມອາໄຫລ່", add_inspection: "+ ບັນທຶກກວດປະຈຳວັນ",
     fld_id: "ລະຫັດລົດ", fld_plate: "ທະບຽນ", fld_type: "ປະເພດ", fld_brand: "ຍີ່ຫໍ້/ລຸ້ນ", fld_year: "ປີ", fld_branch: "ສາຂາ",
-    fld_status: "ສະຖານະ", fld_mileage: "Mileage (km)", fld_hour: "Hour Meter", fld_complaint: "ອາການ", fld_priority: "ຄວາມດ່ວນ",
+    fld_status: "ສະຖານະ", fld_mileage: "ເລກໄມ (km)", fld_hour: "Hour Meter", fld_complaint: "ອາການ", fld_priority: "ຄວາມດ່ວນ",
     fld_assigned: "ຊ່າງທີ່ມອບໝາຍ", fld_notes: "ໝາຍເຫດ", fld_part_code: "ລະຫັດອາໄຫລ່", fld_part_name: "ຊື່ອາໄຫລ່",
     fld_class: "ABC Class", fld_stock: "Stock ປັດຈຸບັນ", fld_min: "Min", fld_max: "Max", fld_unit: "ໜ່ວຍ", fld_cost: "ລາຄາ (ກີບ)",
     save: "ບັນທຶກ", cancel: "ຍົກເລີກ", delete: "ລຶບ", edit: "ແກ້ໄຂ", view: "ເບິ່ງ", close: "ປິດ",
@@ -1180,8 +1180,8 @@ const I18N = {
     fld_quoted_price: "ລາຄາສະເໜີ", fld_actual_price: "ລາຄາຈິງ", fld_quality_check: "QC ຫຼັງສ້ອມ",
     outsource_quoted: "ສະເໜີລາຄາ", outsource_sent: "ສົ່ງສ້ອມແລ້ວ", outsource_done: "ສຳເລັດ + QC ຜ່ານ", outsource_reject: "QC ບໍ່ຜ່ານ",
     create_jo_from_pm: "ສ້າງ JO PM", create_jo_from_pm_done: "ສ້າງ JO PM ສຳເລັດ",
-    nav_fluids: "ຕິດຕາມນ້ຳມັນ", nav_mileage: "ບັນທຶກ Mileage",
-    add_fluid: "+ ບັນທຶກປ່ຽນ", add_mileage: "+ ບັນທຶກ Mileage",
+    nav_fluids: "ຕິດຕາມນ້ຳມັນ", nav_mileage: "ບັນທຶກເລກໄມ",
+    add_fluid: "+ ບັນທຶກປ່ຽນ", add_mileage: "+ ບັນທຶກເລກໄມ",
     fluid_engine_oil: "ນ້ຳມັນເຄື່ອງ", fluid_gear_oil: "ນ້ຳມັນເກຍ", fluid_brake: "ນ້ຳມັນເບຣກ",
     fluid_coolant: "ນ້ຳຢາໝໍ້ນ້ຳ (Coolant)", fluid_hydraulic: "ນ້ຳມັນ Hydraulic", fluid_ps: "ນ້ຳມັນ Power Steering",
     fluid_atf: "ATF (ເກຍອັດຕະໂນມັດ)", fluid_grease: "ຈາລະບີ",
@@ -1190,8 +1190,8 @@ const I18N = {
     fld_batch: "Batch / Lot", fld_technician: "ຊ່າງ",
     fluid_status: "ສະຖານະນ້ຳມັນ", section_fluids: "ສະຖານະນ້ຳມັນ",
     fluid_ok: "ປົກກະຕິ", fluid_soon: "ໃກ້ປ່ຽນ", fluid_overdue: "ເກີນກຳນົດ",
-    section_tire_layout: "ຜັງຢາງ", section_mileage_trend: "ແນວໂນ້ມ Mileage",
-    log_mileage_now: "ບັນທຶກ Mileage ມື້ນີ້",
+    section_tire_layout: "ຜັງຢາງ", section_mileage_trend: "ແນວໂນ້ມ ເລກໄມ",
+    log_mileage_now: "ບັນທຶກເລກໄມ ມື້ນີ້",
     // Tire upgrade
     filter_by_vehicle: "ກອງຕາມລົດ", all_vehicles: "ລົດທັງໝົດ", view_tire: "ເບິ່ງລາຍລະອຽດ",
     tire_diagram_for: "ຜັງຢາງຂອງ",
@@ -1261,7 +1261,7 @@ const I18N = {
     // Fuel
     nav_fuel: "ຕິດຕາມການເຕີມນ້ຳມັນ", add_fuel: "+ ບັນທຶກເຕີມນ້ຳມັນ",
     fld_station: "ປ້ຳນ້ຳມັນ", fld_liters: "ປະລິມານ (L)", fld_price_per_liter: "ລາຄາ/ລິດ",
-    fld_total_cost: "ມູນຄ່າລວມ", fld_km_at_fill: "Mileage ຕອນເຕີມ",
+    fld_total_cost: "ມູນຄ່າລວມ", fld_km_at_fill: "ເລກໄມ ຕອນເຕີມ",
     fuel_efficiency: "ປະສິດທິພາບ (km/L)",
     fuel_full_tank: "ເຕີມເຕັມຖັງ", fuel_partial: "ເຕີມບາງສ່ວນ",
     // Documents
@@ -1304,7 +1304,7 @@ const I18N = {
     score_incident_penalty: "ຫັກຄະແນນຕໍ່ອຸປະຕິເຫດ", score_compliance_days: "ມື້ສຳລັບຄຳນວນ Compliance",
     score_weight_fuel: "ນ້ຳໜັກ ປະສິດທິພາບນ້ຳມັນ (%)", score_weight_compliance: "ນ້ຳໜັກ Daily Check (%)",
     score_weight_safety: "ນ້ຳໜັກ ຄວາມປອດໄພ (%)",
-    predict_due_in: "ຈະຄົບ PM ໃນ", predict_days: "ມື້", predict_based_on: "ຄຳນວນຈາກ Mileage Trend",
+    predict_due_in: "ຈະຄົບ PM ໃນ", predict_days: "ມື້", predict_based_on: "ຄຳນວນຈາກ Trend ເລກໄມ",
     days_to_stockout: "ມື້ກ່ອນ Stock ໝົດ", avg_daily_usage: "ສະເລ່ຍໃຊ້/ມື້",
     suggested_reorder: "ປະລິມານທີ່ແນະນຳໃຫ້ສັ່ງ",
     gps_status: "ສະຖານະການເຊື່ອມຕໍ່",
@@ -2185,7 +2185,7 @@ const NAV_GROUPS = [
       { page:'driver_perf', icon:'🏆', label:'ຄະແນນຄົນຂັບ' },
       { page:'daily',       icon:'✅', label:'ກວດປະຈຳວັນ' },
       { page:'fuel',        icon:'⛽', label:'ບິນນ້ຳມັນ' },
-      { page:'mileage',     icon:'📏', label:'ບັນທຶກ Mileage' },
+      { page:'mileage',     icon:'📏', label:'ບັນທຶກເລກໄມ' },
       { page:'tires',       icon:'⚙️', label:'ຈັດການຢາງ' },
       { page:'incidents',   icon:'🚨', label:'ອຸປະຕິເຫດ' },
       { page:'defects',     icon:'🔧', label:'ຄວາມບົກພ່ອງ' },
@@ -3650,7 +3650,7 @@ async function renderVehicleDetail() {
     const ctx = document.getElementById('vehMilCh');
     if (ctx) new Chart(ctx, { type: 'line',
       data: { labels: milLogs.map(m => m.date),
-        datasets: [{ label: 'Mileage', data: milLogs.map(m => m.mileage),
+        datasets: [{ label: 'ເລກໄມ', data: milLogs.map(m => m.mileage),
           borderColor: '#3B82F6', backgroundColor: 'rgba(59,130,246,.1)', fill: true, tension: .3 }] },
       options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
     });
@@ -4103,7 +4103,7 @@ pages.mileage = async () => {
     <div class="card">
       ${logs.length === 0 ? `<div class="empty"><div class="icon">📏</div><p>${t('no_data')}</p></div>` : `
       <table>
-        <tr><th>${t('add_date')}</th><th>${t('nav_vehicles')}</th><th>Mileage (km)</th><th>Hours</th><th>${t('add_driver')}</th><th>${t('fld_notes')}</th><th></th></tr>
+        <tr><th>${t('add_date')}</th><th>${t('nav_vehicles')}</th><th>ເລກໄມ (km)</th><th>Hours</th><th>${t('add_driver')}</th><th>${t('fld_notes')}</th><th></th></tr>
         ${logs.slice(0,100).map(m => `<tr>
           <td>${m.date}</td><td><strong>${m.vehicle_id}</strong></td>
           <td><strong>${fmt(m.mileage||0)}</strong></td>
@@ -4130,7 +4130,7 @@ async function openMileageModal() {
       ${vehicles.map(v => `<option value="${v.vehicle_id}" data-km="${v.mileage||0}" data-hr="${v.hour||0}"><strong>${v.plate||'-'}</strong> — ${v.vehicle_id} — ${v.type||'-'} (${fmt(v.mileage||0)} km)</option>`).join('')}
     </select></div>
     <div class="row">
-      <div class="fld"><label>Mileage (km) <small style="color:var(--muted)">— ຈະອັບເດດເຂົ້າທະບຽນລົດອັດຕະໂນມັດ</small></label><input id="m_mileage" type="number" /></div>
+      <div class="fld"><label>ເລກໄມ (km) <small style="color:var(--muted)">— ຈະອັບເດດເຂົ້າທະບຽນລົດອັດຕະໂນມັດ</small></label><input id="m_mileage" type="number" /></div>
       <div class="fld"><label>Hours <small style="color:var(--muted)">— ເຄື່ອງຈັກໜັກ</small></label><input id="m_hours" type="number" /></div>
     </div>
     <div class="fld"><label>${t('fld_notes')}</label><textarea id="m_notes"></textarea></div>`;
@@ -4292,7 +4292,7 @@ async function printJO(id) {
     <table>
       <tr><th style="width:25%">ລະຫັດລົດ</th><td>${j.vehicle_id}</td><th style="width:20%">ທະບຽນ</th><td>${v?v.plate:'-'}</td></tr>
       <tr><th>ປະເພດ / ຍີ່ຫໍ້</th><td>${v?v.type:''} ${v?v.brand:''} ${v?v.year||'':''}</td><th>ສາຂາ</th><td>${v?v.branch:'-'}</td></tr>
-      <tr><th>Mileage</th><td>${v?fmt(v.mileage):'-'} ${v&&v.hour?'/ '+v.hour+'h':'km'}</td><th>Next PM</th><td>${v?v.nextPM||'-':'-'}</td></tr>
+      <tr><th>ເລກໄມ</th><td>${v?fmt(v.mileage):'-'} ${v&&v.hour?'/ '+v.hour+'h':'km'}</td><th>Next PM</th><td>${v?v.nextPM||'-':'-'}</td></tr>
     </table>
 
     <h2>ລາຍລະອຽດງານສ້ອມ</h2>
@@ -5539,12 +5539,12 @@ pages.predictive = async () => {
   $('#main').innerHTML = `
     <div class="crumbs">${t('nav_operations')} › ${t('nav_predictive')}</div>
     <div class="page-title">🔮 ${t('nav_predictive')}</div>
-    <div class="alert info">💡 ໃຊ້ Mileage Log ໃນ 10 ບັນທຶກລ່າສຸດ ຄຳນວນ km/ມື້ → ພະຍາກອນວ່າອີກກີ່ມື້ຈະຄົບ PM 5,000 km ຄັ້ງຕໍ່ໄປ</div>
+    <div class="alert info">💡 ໃຊ້ ປະຫວັດ ເລກໄມ ໃນ 10 ບັນທຶກລ່າສຸດ ຄຳນວນ km/ມື້ → ພະຍາກອນວ່າອີກກີ່ມື້ຈະຄົບ PM 5,000 km ຄັ້ງຕໍ່ໄປ</div>
     <div class="card" style="padding:0">
-      ${predictions.length === 0 ? `<div class="empty" style="padding:30px"><div class="icon">🔮</div><p>ບໍ່ມີ Mileage Log ພຽງພໍ - ໃຫ້ບັນທຶກໃນ "ບັນທຶກ Mileage"</p></div>` : `
+      ${predictions.length === 0 ? `<div class="empty" style="padding:30px"><div class="icon">🔮</div><p>ບໍ່ມີປະຫວັດ ເລກໄມ ພຽງພໍ - ໃຫ້ບັນທຶກໃນ "ບັນທຶກເລກໄມ"</p></div>` : `
       <table>
-        <tr><th>ລົດ</th><th>ປະເພດ</th><th>Mileage ປັດຈຸບັນ</th><th>ສະເລ່ຍ km/ມື້</th>
-          <th>ບັນທຶກ Mileage</th><th>${t('predict_due_in')}</th><th>ວັນທີຄາດການ</th><th></th></tr>
+        <tr><th>ລົດ</th><th>ປະເພດ</th><th>ເລກໄມ ປັດຈຸບັນ</th><th>ສະເລ່ຍ km/ມື້</th>
+          <th>ບັນທຶກເລກໄມ</th><th>${t('predict_due_in')}</th><th>ວັນທີຄາດການ</th><th></th></tr>
         ${predictions.map(p => `<tr>
           <td><strong style="cursor:pointer;color:var(--accent);text-decoration:underline" onclick="goVehicleDetail(${p.id})">${p.vehicle_id}</strong></td>
           <td>${p.type}</td>
@@ -5704,7 +5704,7 @@ pages.gps = async () => {
             <p style="font-size:12px;color:var(--muted);margin-top:4px">ກຳນົດເຂດໃຫ້ລົດ ຖ້າອອກນອກເຂດ → ແຈ້ງເຕືອນ. ໂດຍສະເພາະລົດເຄນ/ແບັກໂຮ</p>
           </div>
           <div style="background:#F5F3FF;border-left:4px solid #8B5CF6;padding:12px;border-radius:8px">
-            <strong>📏 Auto-update Mileage</strong>
+            <strong>📏 Auto-update ເລກໄມ</strong>
             <p style="font-size:12px;color:var(--muted);margin-top:4px">ບໍ່ຕ້ອງໃຫ້ຄົນຂັບກອກ km ເອງ — GPS ສົ່ງມາໃຫ້ ໂດຍຕົງ. PM ຈະຕ້ອງເວລາ.</p>
           </div>
           <div style="background:#ECFEFF;border-left:4px solid #06B6D4;padding:12px;border-radius:8px">
@@ -13019,7 +13019,7 @@ pages.bulk_import = async () => {
       <select id="bi_type" onchange="updateBulkTemplate()" style="padding:10px;border:1px solid var(--line);border-radius:8px;font-size:14px;width:100%">
         <option value="joborders">📋 ໃບສັ່ງສ້ອມ (JO)</option>
         <option value="fuel_log">⛽ ບັນທຶກນ້ຳມັນເຊື້ອໄຟ</option>
-        <option value="mileage_log">📏 ບັນທຶກ Mileage (km)</option>
+        <option value="mileage_log">📏 ບັນທຶກເລກໄມ (km)</option>
         <option value="parts_replacements">💰 ການປ່ຽນອາໄຫລ່</option>
         <option value="incidents">🚨 ອຸບັດເຫດ</option>
         <option value="inspections">✅ ການກວດປະຈຳວັນ</option>
@@ -16813,7 +16813,7 @@ pages.about = async () => {
         <li>🔍 Vehicle Detail Drill-down — ຄລິກລະຫັດລົດເພື່ອເບິ່ງປະຫວັດເຕັມ</li>
         <li>🖨 Print Job Card — ພິມໃບສັ່ງສ້ອມ A4 ພ້ອມ Torque Record</li>
         <li>⚡ Auto-create JO ຈາກ PM Schedule</li>
-        <li>📏 ບັນທຶກ Mileage ປະຈຳ — Auto trigger PM alerts</li>
+        <li>📏 ບັນທຶກເລກໄມ ປະຈຳ — Auto trigger PM alerts</li>
         <li>🛢 ຕິດຕາມການປ່ຽນນ້ຳມັນ 8 ປະເພດ (Engine, Gear, Brake, Coolant, Hydraulic, PS, ATF, Grease)</li>
         <li>🎨 SVG Tire Diagram — ສະແດງຕຳແໜ່ງຢາງຈິງຕາມຮູບລົດ (Pickup, 6W, 10W, Tractor, Excavator, Loader)</li>
       </ul>
