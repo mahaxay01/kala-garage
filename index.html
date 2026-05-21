@@ -1497,6 +1497,62 @@ db.version(2).stores({
   outsource: '++id, jo_id, vendor_id, status',
   settings: 'key',
 });
+// ===== v20: Delivery Locations + Distance Matrix =====
+db.version(20).stores({
+  vehicles: '++id, vehicle_id, plate, type, branch, status, category_id',
+  inspections: '++id, vehicle_id, date, status, frequency, driver',
+  joborders: '++id, jo_id, vehicle_id, priority, status, created',
+  parts: '++id, code, class, grade, category_id, warehouse, status',
+  partmovements: '++id, part_id, type, date',
+  drivers: '++id, driver_id, name, license_expiry, assigned_vehicle',
+  tires: '++id, tire_id, current_vehicle, position, status, install_km, install_date',
+  tire_history: '++id, tire_id, date, event_type, vehicle_id, position, km',
+  vendors: '++id, vendor_id, name, category_id, province',
+  vendorprices: '++id, vendor_id, part_code, currency, date',
+  tools: '++id, tool_id, name, calib_due, status',
+  outsource: '++id, jo_id, vendor_id, status',
+  fluids: '++id, vehicle_id, type, date, next_due_date',
+  mileage_log: '++id, vehicle_id, date, mileage',
+  categories: '++id, name, type, parent_id',
+  exchange_rates: '++id, currency, rate, valid_from',
+  pm_templates: '++id, vehicle_type, interval_type, interval_value',
+  pm_history: '++id, vehicle_id, template_id, date, mileage',
+  fuel_log: '++id, vehicle_id, date, driver, station',
+  documents: '++id, entity_type, entity_id, doc_type, expiry_date',
+  incidents: '++id, date, vehicle_id, driver_id, severity, status',
+  audit_log: '++id, timestamp, user, action, entity',
+  purchase_requests: '++id, pr_id, vendor_id, status, created, total_lak',
+  purchase_orders: '++id, po_id, vendor_id, status, created, urgency, total_lak',
+  vehicle_pm: '++id, vehicle_id, interval_type, interval_value, active',
+  gps_devices: '++id, vehicle_id, imei, model, platform, status, installed_date',
+  driver_reviews: '++id, driver_id, review_date, reviewer, period, total_score',
+  receipt_inspections: '++id, jo_id, vehicle_id, date, inspector',
+  predelivery_inspections: '++id, jo_id, vehicle_id, date, inspector, approved',
+  users: '++id, username, role, name, active, created',
+  depreciation: '++id, vehicle_id, year, month, value, accumulated',
+  parts_replacements: '++id, vehicle_id, part_type, date, km, cost, jo_id',
+  ai_chat_history: '++id, timestamp, role, content',
+  deleted_items: '++id, deleted_at, deleted_by, store, original_id, summary, restored',
+  price_change_audit: '++id, timestamp, user, entity_type, entity_id, field, old_value, new_value, summary',
+  service_rates: '++id, service_code, service_name, category, vehicle_group, base_charge, skill_required, active',
+  tech_profiles: '++id, tech_id, name, skill_level, commission_pct, walkin_commission_pct, active, branch',
+  labor_entries: '++id, entry_id, date, jo_id, vehicle_id, tech_id, service_code, charge_amount, commission_amount, status, approved_by, customer_type, intake_id',
+  customer_receipts: '++id, receipt_id, date, labor_entry_id, customer_name, customer_phone, vehicle_plate, total_amount, signed_at, signed_by_customer',
+  vehicle_intakes: '++id, intake_id, date, customer_phone, vehicle_plate, pickup_code, status, received_by_tech_id, linked_entry_id, delivered_at',
+  camera_counts: '++id, date, vehicles_in, vehicles_out, recorded_by',
+  customer_audits: '++id, audit_id, labor_entry_id, customer_phone, audit_date, called_at, response, satisfaction, received_receipt, called_by, notes',
+  branches: '++id, branch_id, name, province, address, manager, active',
+  vehicle_specs: '++id, vehicle_id, updated_at',
+  vehicle_usage: '++id, usage_id, date, vehicle_id, usage_type, billing_type, customer_phone, status, total_amount, created_by',
+  vehicle_usage_rates: '++id, vehicle_id, vehicle_type, rate_per_km, rate_per_hour, rate_per_ton, fixed_trip_rate, active',
+  // ===== NEW v20: Delivery Locations + Distance Matrix =====
+  // type: branch | village | town | landmark | customer_site | construction_site | market
+  locations: '++id, location_id, name, type, province, district, village, active',
+  // ໄລຍະທາງລະຫວ່າງ 2 location — bidirectional (ໃຊ້ from < to ເພື່ອບໍ່ຊ້ຳ)
+  distance_matrix: '++id, from_id, to_id, distance_km, travel_time_min, route_notes, updated_at',
+  settings: 'key',
+});
+
 // ===== v19: Vehicle Data Sheet + Usage Log =====
 db.version(19).stores({
   vehicles: '++id, vehicle_id, plate, type, branch, status, category_id',
@@ -2353,6 +2409,7 @@ const NAV_GROUPS = [
     items: [
       { page:'vehicles',      icon:'🚗', label:'ທະບຽນລົດ' },
       { page:'vehicle_usage', icon:'🚚', label:'ບັນທຶກໃຊ້ລົດ + ຄ່າບໍລິການ' },
+      { page:'locations',     icon:'📍', label:'ສະຖານທີ່ + ໄລຍະທາງ' },
       { page:'drivers',       icon:'👤', label:'ຄົນຂັບ' },
       { page:'driver_perf',   icon:'🏆', label:'ຄະແນນຄົນຂັບ' },
       { page:'daily',         icon:'✅', label:'ກວດປະຈຳວັນ' },
@@ -17937,6 +17994,8 @@ async function openVehicleUsageModal(prefillVehicleId, editId) {
     branch_to: '',
     start_location: '',
     end_location: '',
+    start_location_id: null,
+    end_location_id: null,
     start_km: 0, end_km: 0, total_km: 0,
     start_time: '', end_time: '', total_hours: 0,
     trips: 1, tonnage: 0,
@@ -17959,6 +18018,16 @@ async function openVehicleUsageModal(prefillVehicleId, editId) {
   const branches = allBranches.filter(b => b.active !== false);
   const branchOptions = branches.map(b => `<option value="${escapeHtml(b.name)}" ${u.branch_from===b.name?'selected':''}>${escapeHtml(b.name)}</option>`).join('');
   const branchOptionsTo = branches.map(b => `<option value="${escapeHtml(b.name)}" ${u.branch_to===b.name?'selected':''}>${escapeHtml(b.name)}</option>`).join('');
+  // 📍 ດຶງ Locations (active) ສຳລັບ dropdown ຈຸດອອກ/ຈຸດໝາຍ
+  const allLocations = (await db.locations.toArray()).filter(l => l.active !== false).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  const locOptionsFrom = allLocations.map(l => {
+    const lt = LOCATION_TYPES.find(t => t.key === l.type);
+    return `<option value="${l.id}" ${u.start_location_id==l.id?'selected':''}>${lt?.label.charAt(0)||'📍'} ${escapeHtml(l.name)}${l.village?' — '+escapeHtml(l.village):''}</option>`;
+  }).join('');
+  const locOptionsTo = allLocations.map(l => {
+    const lt = LOCATION_TYPES.find(t => t.key === l.type);
+    return `<option value="${l.id}" ${u.end_location_id==l.id?'selected':''}>${lt?.label.charAt(0)||'📍'} ${escapeHtml(l.name)}${l.village?' — '+escapeHtml(l.village):''}</option>`;
+  }).join('');
 
   modal(editId ? `✏️ ແກ້ໄຂບັນທຶກໃຊ້ລົດ` : `🚚 ບັນທຶກໃຊ້ລົດ`, `
     <div class="row">
@@ -18006,11 +18075,26 @@ async function openVehicleUsageModal(prefillVehicleId, editId) {
       <div class="fld"><label>ລາຍລະອຽດສິນຄ້າ</label><input id="uy_cargo_branch" value="${escapeHtml(u.cargo_desc||'')}" placeholder="ສິນຄ້າທີ່ໂອນ"/></div>
     </div>
 
-    <h4 style="color:var(--primary-2);margin:12px 0 6px;font-size:13px">📍 ສະຖານທີ່ + ໄລຍະທາງ</h4>
+    <h4 style="color:var(--primary-2);margin:12px 0 6px;font-size:13px">📍 ສະຖານທີ່ + ໄລຍະທາງ
+      ${allLocations.length === 0 ? '<small style="color:var(--warn)">⚠️ ຍັງບໍ່ມີສະຖານທີ່ — <a href="javascript:closeModal();go(\'locations\')" style="color:var(--accent)">ສ້າງກ່ອນ</a></small>' : ''}
+    </h4>
     <div class="row">
-      <div class="fld"><label>ຈຸດອອກ</label><input id="uy_start_loc" value="${escapeHtml(u.start_location||'')}" placeholder="ປາກເຊ ສຳນັກງານໃຫຍ່"/></div>
-      <div class="fld"><label>ຈຸດໝາຍ</label><input id="uy_end_loc" value="${escapeHtml(u.end_location||'')}" placeholder="ໂຄງການກໍ່ສ້າງ ບ້ານ..."/></div>
+      <div class="fld"><label>ຈຸດອອກ <small style="color:var(--muted)">(ເລືອກຈາກ Database)</small></label>
+        <select id="uy_start_loc_id" onchange="autoFillUsageDistance()">
+          <option value="">— ປ້ອນເອງດ້ານລຸ່ມ —</option>
+          ${locOptionsFrom}
+        </select>
+        <input id="uy_start_loc" value="${escapeHtml(u.start_location||'')}" placeholder="ຫຼື ປ້ອນຊື່ສະຖານທີ່ເອງ" style="margin-top:4px"/>
+      </div>
+      <div class="fld"><label>ຈຸດໝາຍ <small style="color:var(--muted)">(ເລືອກຈາກ Database)</small></label>
+        <select id="uy_end_loc_id" onchange="autoFillUsageDistance()">
+          <option value="">— ປ້ອນເອງດ້ານລຸ່ມ —</option>
+          ${locOptionsTo}
+        </select>
+        <input id="uy_end_loc" value="${escapeHtml(u.end_location||'')}" placeholder="ຫຼື ປ້ອນຊື່ສະຖານທີ່ເອງ" style="margin-top:4px"/>
+      </div>
     </div>
+    <div id="uy_distance_hint" style="font-size:12px;color:var(--ok);background:#ECFDF5;padding:6px 10px;border-radius:6px;margin:4px 0;display:none"></div>
     <div class="row">
       <div class="fld"><label>ເລກໄມເລີ່ມ</label><input id="uy_start_km" type="number" value="${u.start_km}" oninput="calcUsageAmount()"/></div>
       <div class="fld"><label>ເລກໄມຈົບ</label><input id="uy_end_km" type="number" value="${u.end_km}" oninput="calcUsageAmount()"/></div>
@@ -18061,10 +18145,55 @@ async function openVehicleUsageModal(prefillVehicleId, editId) {
   `);
   updateUsageForm();
   calcUsageAmount();
+  // ຖ້າເປັນ Edit ມີ location_id ແລ້ວ → ສະແດງ hint
+  if (u.start_location_id || u.end_location_id) setTimeout(() => autoFillUsageDistance(), 100);
   } catch (e) {
     console.error('openVehicleUsageModal error:', e);
     toast('❌ ເປີດຟອມບໍ່ສຳເລັດ: ' + e.message, 'bad');
   }
+}
+
+// 🔗 Auto-fill ໄລຍະທາງ ເມື່ອເລືອກ Start + End Location
+async function autoFillUsageDistance() {
+  const fromId = parseInt($('#uy_start_loc_id')?.value) || null;
+  const toId = parseInt($('#uy_end_loc_id')?.value) || null;
+  const hint = $('#uy_distance_hint');
+  if (!hint) return;
+  if (!fromId || !toId) { hint.style.display = 'none'; return; }
+  if (fromId === toId) { hint.style.display='block'; hint.style.background='#FEE2E2'; hint.style.color='#7F1D1D'; hint.innerHTML = '⚠️ ຈຸດອອກ ແລະ ຈຸດໝາຍຄືກັນ'; return; }
+  const fromLoc = await db.locations.get(fromId);
+  const toLoc = await db.locations.get(toId);
+  // ປ້ອນຊື່ໃສ່ text input ໃຫ້ອັດຕະໂນມັດ
+  if (fromLoc && $('#uy_start_loc')) $('#uy_start_loc').value = fromLoc.name;
+  if (toLoc && $('#uy_end_loc')) $('#uy_end_loc').value = toLoc.name;
+  // ດຶງໄລຍະຈາກ Matrix
+  const km = await getDistance(fromId, toId);
+  hint.style.display = 'block';
+  hint.style.background = km != null ? '#ECFDF5' : '#FEF3C7';
+  hint.style.color = km != null ? '#065F46' : '#92400E';
+  if (km != null) {
+    hint.innerHTML = `✅ ໄລຍະທາງຕາມ Database: <strong>${km} km</strong> (${escapeHtml(fromLoc?.name||'?')} → ${escapeHtml(toLoc?.name||'?')}) <button class="btn sm ok" style="margin-left:8px" onclick="applyDistanceToUsage(${km})">ໃຊ້ໄລຍະນີ້</button>`;
+  } else {
+    hint.innerHTML = `⚠️ ຍັງບໍ່ມີໄລຍະທາງລະຫວ່າງ <strong>${escapeHtml(fromLoc?.name||'?')}</strong> ↔ <strong>${escapeHtml(toLoc?.name||'?')}</strong> ໃນ Database. <a href="javascript:closeModal();go('locations')" style="color:var(--accent);text-decoration:underline">ໄປຕັ້ງຄ່າໄລຍະທາງ</a>`;
+  }
+}
+
+// ນຳໄລຍະທາງມາໃສ່ໃນຊ່ອງ "ຈຳນວນໜ່ວຍ" + ຄຳນວນຍອດ (ສຳລັບສູດ per_km)
+function applyDistanceToUsage(km) {
+  const billing = $('#uy_billing')?.value;
+  if (billing === 'per_km') {
+    // ໃສ່ໃນ qty + ປັບ start/end km (ປະມານການ)
+    if ($('#uy_qty')) $('#uy_qty').value = km;
+  } else {
+    // ປ່ຽນສູດເປັນ per_km ໃຫ້ອັດຕະໂນມັດ
+    if (confirm(`ໄລຍະທາງ ${km} km — ປ່ຽນສູດເປັນ "ຄ່າຕໍ່ km" ບໍ?`)) {
+      if ($('#uy_billing')) $('#uy_billing').value = 'per_km';
+      if ($('#uy_qty')) $('#uy_qty').value = km;
+      updateUsageForm();
+    }
+  }
+  calcUsageAmount();
+  toast(`✅ ໃຊ້ໄລຍະ ${km} km — ກວດສອບ "ອັດຕາ" ກ່ອນບັນທຶກ`);
 }
 
 function updateUsageForm() {
@@ -18136,6 +18265,8 @@ async function saveVehicleUsage(editId) {
     cargo_desc: $('#uy_cargo_crane')?.value || $('#uy_cargo_del')?.value || $('#uy_cargo_branch')?.value || '',
     start_location: $('#uy_start_loc').value,
     end_location: $('#uy_end_loc').value,
+    start_location_id: parseInt($('#uy_start_loc_id')?.value) || null,
+    end_location_id: parseInt($('#uy_end_loc_id')?.value) || null,
     start_km: sKm, end_km: eKm, total_km: totalKm,
     start_time: sT, end_time: eT, total_hours: Math.round(totalHours*100)/100,
     trips: billing==='fixed_trip' ? qty : 1,
@@ -18296,6 +18427,341 @@ async function delVehicleUsage(id) {
   if (!confirm(t('confirm_delete'))) return;
   await softDelete('vehicle_usage', id, r => `Usage: ${r.usage_id} — ${r.vehicle_id}`);
   pages.vehicle_usage();
+}
+
+// =============================================================================
+// 📍 LOCATIONS MASTER + DISTANCE MATRIX (ສະຖານທີ່ສົ່ງ + ໄລຍະທາງ)
+// =============================================================================
+
+const LOCATION_TYPES = [
+  { key: 'branch',            label: '🏢 ສາຂາ KALA',           color: '#1F2937' },
+  { key: 'town',              label: '🏙 ຕົວເມືອງ',              color: '#3B82F6' },
+  { key: 'village',           label: '🏘 ບ້ານ',                  color: '#10B981' },
+  { key: 'landmark',          label: '📍 ສະຖານທີ່ສຳຄັນ',         color: '#8B5CF6' },
+  { key: 'customer_site',     label: '👤 ທີ່ຢູ່ລູກຄ້າປະຈຳ',      color: '#F59E0B' },
+  { key: 'construction_site', label: '🏗 ໂຄງການກໍ່ສ້າງ',         color: '#EF4444' },
+  { key: 'market',            label: '🏪 ຕະຫຼາດ',               color: '#06B6D4' },
+];
+
+const SOUTHERN_PROVINCES = ['ຈຳປາສັກ', 'ສາລະວັນ', 'ເຊກອງ', 'ອັດຕະປື', 'ສະຫວັນນະເຂດ', 'ນະຄອນຫຼວງວຽງຈັນ', 'ຄຳມ່ວນ'];
+
+async function nextLocationId() {
+  const all = await db.locations.toArray();
+  const max = all.reduce((m,l) => {
+    const n = parseInt((l.location_id||'').replace('LOC-','')) || 0;
+    return n > m ? n : m;
+  }, 0);
+  return `LOC-${String(max+1).padStart(4,'0')}`;
+}
+
+// 📍 ໜ້າຫຼັກ Locations
+window._locFilter = window._locFilter || { type:'', province:'', q:'' };
+
+pages.locations = async () => {
+  const all = (await db.locations.toArray()).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  const matrix = await db.distance_matrix.toArray();
+  const f = window._locFilter;
+  let filtered = all;
+  if (f.type) filtered = filtered.filter(l => l.type === f.type);
+  if (f.province) filtered = filtered.filter(l => l.province === f.province);
+  if (f.q) {
+    const q = f.q.toLowerCase();
+    filtered = filtered.filter(l => (l.name||'').toLowerCase().includes(q) || (l.village||'').toLowerCase().includes(q) || (l.district||'').toLowerCase().includes(q));
+  }
+
+  // ນັບຕາມປະເພດ
+  const typeCounts = {};
+  LOCATION_TYPES.forEach(t => { typeCounts[t.key] = all.filter(l => l.type === t.key).length; });
+
+  $('#main').innerHTML = `
+    <div class="crumbs">ການປະຕິບັດງານ › ສະຖານທີ່ + ໄລຍະທາງ</div>
+    <div class="page-title">📍 Locations Master + Distance Matrix <small style="font-weight:400;color:var(--muted);font-size:13px">— ${filtered.length}/${all.length} ສະຖານທີ່ • ${matrix.length} ໄລຍະທາງ</small></div>
+    <div class="alert info" style="font-size:12px">💡 ບັນທຶກສະຖານທີ່ສຳຄັນ (ບ້ານ, ຕົວເມືອງ, ໂຄງການ, ລູກຄ້າປະຈຳ) + ກຳນົດໄລຍະທາງລະຫວ່າງຈຸດ → ໃຊ້ສຳລັບການຄຳນວນຄ່າຂົນສົ່ງອັດຕະໂນມັດໃນ "ບັນທຶກໃຊ້ລົດ"</div>
+
+    <div class="kpi-grid">
+      <div class="kpi"><div class="label">📍 ສະຖານທີ່</div><div class="val">${all.length}</div></div>
+      <div class="kpi"><div class="label">🛣 ໄລຍະທາງ</div><div class="val" style="color:var(--accent)">${matrix.length}</div><div class="muted">ຄູ່</div></div>
+      <div class="kpi"><div class="label">📂 ປະເພດ</div><div class="val">${LOCATION_TYPES.filter(t => typeCounts[t.key]>0).length}</div></div>
+      <div class="kpi"><div class="label">🗺 ແຂວງ</div><div class="val">${new Set(all.map(l => l.province).filter(Boolean)).size}</div></div>
+    </div>
+
+    <div class="toolbar" style="flex-wrap:wrap;gap:8px">
+      <select onchange="window._locFilter.type=this.value;pages.locations()" style="padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px">
+        <option value="">📂 ທຸກປະເພດ (${all.length})</option>
+        ${LOCATION_TYPES.map(t => `<option value="${t.key}" ${f.type===t.key?'selected':''}>${t.label} (${typeCounts[t.key]||0})</option>`).join('')}
+      </select>
+      <select onchange="window._locFilter.province=this.value;pages.locations()" style="padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px">
+        <option value="">🗺 ທຸກແຂວງ</option>
+        ${SOUTHERN_PROVINCES.map(p => `<option value="${p}" ${f.province===p?'selected':''}>${p}</option>`).join('')}
+      </select>
+      <input type="search" placeholder="🔍 ຄົ້ນຫາ ຊື່/ບ້ານ/ເມືອງ..." value="${escapeHtml(f.q)}"
+        oninput="window._locFilter.q=this.value;clearTimeout(window._lft);window._lft=setTimeout(()=>pages.locations(),300)"
+        style="padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;min-width:220px"/>
+      <button class="btn outline" onclick="window._locFilter={type:'',province:'',q:''};pages.locations()">🔄 ລ້າງ</button>
+      <div style="flex:1"></div>
+      <button class="btn outline" onclick="openDistanceMatrix()">🛣 ຈັດການໄລຍະທາງ</button>
+      <button class="btn outline" onclick="seedKalaLocations()">📥 ໂຫລດຂໍ້ມູນເລີ່ມຕົ້ນ</button>
+      <button class="btn ok" onclick="openLocationModal()">+ ເພີ່ມສະຖານທີ່</button>
+    </div>
+
+    <div class="card" style="padding:0;overflow-x:auto">
+      ${filtered.length === 0 ? '<div class="empty" style="padding:30px"><div class="icon">📍</div><p>ຍັງບໍ່ມີສະຖານທີ່ — ກົດ "+ ເພີ່ມສະຖານທີ່" ຫຼື "ໂຫລດຂໍ້ມູນເລີ່ມຕົ້ນ"</p></div>' : `
+      <table style="font-size:12.5px">
+        <tr><th>ID</th><th>ປະເພດ</th><th>ຊື່ສະຖານທີ່</th><th>ບ້ານ</th><th>ເມືອງ</th><th>ແຂວງ</th><th style="text-align:right">ຄ່ຽງມີໄລຍະ</th><th></th></tr>
+        ${filtered.map(l => {
+          const lt = LOCATION_TYPES.find(t => t.key === l.type);
+          const distancesCount = matrix.filter(d => d.from_id === l.id || d.to_id === l.id).length;
+          return `<tr>
+            <td><strong style="font-family:monospace;font-size:11px">${l.location_id||l.id}</strong></td>
+            <td><span class="pill" style="background:${lt?.color||'#888'};color:#fff;font-size:10px">${lt?.label||l.type}</span></td>
+            <td><strong>${escapeHtml(l.name||'-')}</strong></td>
+            <td>${escapeHtml(l.village||'-')}</td>
+            <td>${escapeHtml(l.district||'-')}</td>
+            <td>${escapeHtml(l.province||'-')}</td>
+            <td style="text-align:right"><span class="pill ${distancesCount>0?'ok':'gray'}">${distancesCount}</span></td>
+            <td class="actions">
+              <button class="btn sm outline" onclick="openLocationDistances(${l.id})" title="ຈັດການໄລຍະ">🛣</button>
+              <button class="btn sm outline" onclick="openLocationModal(${l.id})">${t('edit')}</button>
+              ${isAdmin()?`<button class="btn sm danger" onclick="delLocation(${l.id})">${t('delete')}</button>`:''}
+            </td>
+          </tr>`;
+        }).join('')}
+      </table>`}
+    </div>
+  `;
+};
+
+async function openLocationModal(id) {
+  let loc = { name:'', type:'village', province:'ຈຳປາສັກ', district:'', village:'', address:'', notes:'', active:true };
+  if (id) loc = Object.assign(loc, await db.locations.get(id));
+  modal(id?'✏️ ແກ້ໄຂສະຖານທີ່':'+ ເພີ່ມສະຖານທີ່ໃໝ່', `
+    <div class="row">
+      <div class="fld"><label>ຊື່ສະຖານທີ່ <small style="color:var(--bad)">*</small></label>
+        <input id="loc_name" value="${escapeHtml(loc.name||'')}" placeholder="ໂຄງການ ABC / ບ້ານທ່າເຮືອ / ໂຮງແຮມ XYZ"/></div>
+      <div class="fld"><label>ປະເພດ</label><select id="loc_type">
+        ${LOCATION_TYPES.map(t => `<option value="${t.key}" ${loc.type===t.key?'selected':''}>${t.label}</option>`).join('')}
+      </select></div>
+    </div>
+    <div class="row">
+      <div class="fld"><label>ແຂວງ</label><select id="loc_province">
+        ${SOUTHERN_PROVINCES.map(p => `<option value="${p}" ${loc.province===p?'selected':''}>${p}</option>`).join('')}
+      </select></div>
+      <div class="fld"><label>ເມືອງ</label><input id="loc_district" value="${escapeHtml(loc.district||'')}" placeholder="ປາກເຊ / ປາກຊ່ອງ..."/></div>
+    </div>
+    <div class="row">
+      <div class="fld"><label>ບ້ານ</label><input id="loc_village" value="${escapeHtml(loc.village||'')}" placeholder="ບ້ານ..."/></div>
+      <div class="fld"><label>ສະຖານະ</label><select id="loc_active">
+        <option value="true" ${loc.active!==false?'selected':''}>ໃຊ້ງານ</option>
+        <option value="false" ${loc.active===false?'selected':''}>ປິດ</option>
+      </select></div>
+    </div>
+    <div class="fld"><label>ທີ່ຢູ່ລະອຽດ</label><textarea id="loc_address" rows="2">${escapeHtml(loc.address||'')}</textarea></div>
+    <div class="fld"><label>ໝາຍເຫດ</label><textarea id="loc_notes" rows="2" placeholder="Landmark ໃກ້ຄຽງ, ຄຳແນະນຳເສັ້ນທາງ...">${escapeHtml(loc.notes||'')}</textarea></div>
+  `, `
+    <button class="btn outline" onclick="closeModal()">${t('cancel')}</button>
+    <button class="btn ok" onclick="saveLocation(${id||'null'})">💾 ${t('save')}</button>
+  `);
+}
+
+async function saveLocation(id) {
+  const name = $('#loc_name').value.trim();
+  if (!name) { toast('ກະລຸນາໃສ່ຊື່ສະຖານທີ່','bad'); return; }
+  const data = {
+    name,
+    type: $('#loc_type').value,
+    province: $('#loc_province').value,
+    district: $('#loc_district').value.trim(),
+    village: $('#loc_village').value.trim(),
+    address: $('#loc_address').value.trim(),
+    notes: $('#loc_notes').value.trim(),
+    active: $('#loc_active').value === 'true',
+  };
+  if (id) await db.locations.update(id, data);
+  else {
+    data.location_id = await nextLocationId();
+    data.created_at = new Date().toISOString();
+    await db.locations.add(data);
+  }
+  closeModal(); toast('💾 ບັນທຶກສຳເລັດ');
+  pages.locations();
+}
+
+async function delLocation(id) {
+  if (!confirm(t('confirm_delete')+'\n(ໄລຍະທາງທີ່ກ່ຽວຂ້ອງຈະຖືກລຶບນຳ)')) return;
+  // ລຶບໄລຍະທາງທີ່ກ່ຽວຂ້ອງກ່ອນ
+  const related = await db.distance_matrix.where('from_id').equals(id).toArray();
+  const related2 = await db.distance_matrix.where('to_id').equals(id).toArray();
+  for (const d of related.concat(related2)) await db.distance_matrix.delete(d.id);
+  await softDelete('locations', id, r => `Location: ${r.name}`);
+  pages.locations();
+}
+
+// ===== Distance Matrix =====
+async function openDistanceMatrix() {
+  const locs = (await db.locations.toArray()).filter(l => l.active !== false).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  const matrix = await db.distance_matrix.toArray();
+  if (locs.length < 2) { toast('ກະລຸນາມີສະຖານທີ່ຢ່າງໜ້ອຍ 2 ຈຸດກ່ອນ', 'warn'); return; }
+
+  // ສ້າງ map ໄລຍະ
+  const distMap = {};
+  matrix.forEach(d => {
+    const key = `${Math.min(d.from_id,d.to_id)}_${Math.max(d.from_id,d.to_id)}`;
+    distMap[key] = d;
+  });
+
+  // ສ້າງ table ໝວດເຄິ່ງ (ບໍ່ຊ້ຳ)
+  let html = `<div class="alert info" style="font-size:12px;margin-bottom:10px">💡 ໃສ່ໄລຍະທາງ (km) ລະຫວ່າງ 2 ຈຸດ — ໃຊ້ກັນສອງທາງ (A→B = B→A). ກົດ Save ຫຼັງປ້ອນ.</div>
+    <div style="max-height:500px;overflow:auto"><table style="font-size:11px;min-width:600px">
+    <tr><th style="position:sticky;left:0;background:var(--bg);z-index:1">ຈາກ \\ ໄປ</th>`;
+  locs.forEach(l => { html += `<th style="font-size:10px;writing-mode:vertical-rl;white-space:nowrap;height:80px">${escapeHtml(l.name.slice(0,20))}</th>`; });
+  html += '</tr>';
+  locs.forEach((l1, i) => {
+    html += `<tr><th style="position:sticky;left:0;background:var(--bg);z-index:1;text-align:left;font-size:11px">${escapeHtml(l1.name.slice(0,25))}</th>`;
+    locs.forEach((l2, j) => {
+      if (i === j) { html += `<td style="background:#1F2937;color:#fff;text-align:center">—</td>`; }
+      else if (j < i) { html += `<td style="background:var(--bg)"></td>`; }
+      else {
+        const key = `${Math.min(l1.id,l2.id)}_${Math.max(l1.id,l2.id)}`;
+        const d = distMap[key];
+        html += `<td style="padding:2px"><input type="number" data-from="${l1.id}" data-to="${l2.id}" value="${d?d.distance_km:''}" placeholder="km" style="width:55px;padding:3px;font-size:11px;border:1px solid var(--line);border-radius:4px;text-align:center" class="dist-cell"/></td>`;
+      }
+    });
+    html += '</tr>';
+  });
+  html += '</table></div>';
+
+  modal('🛣 Matrix ໄລຍະທາງ — ທຸກຈຸດ → ທຸກຈຸດ', html, `
+    <button class="btn outline" onclick="closeModal()">${t('cancel')}</button>
+    <button class="btn ok" onclick="saveDistanceMatrix()">💾 ບັນທຶກທັງໝົດ</button>
+  `);
+}
+
+async function saveDistanceMatrix() {
+  const cells = document.querySelectorAll('.dist-cell');
+  let saved = 0, deleted = 0;
+  for (const cell of cells) {
+    const fromId = parseInt(cell.dataset.from);
+    const toId = parseInt(cell.dataset.to);
+    const km = parseFloat(cell.value);
+    const minId = Math.min(fromId, toId);
+    const maxId = Math.max(fromId, toId);
+    const existing = (await db.distance_matrix.where('from_id').equals(minId).toArray()).find(d => d.to_id === maxId);
+    if (isNaN(km) || km <= 0) {
+      if (existing) { await db.distance_matrix.delete(existing.id); deleted++; }
+      continue;
+    }
+    const data = {
+      from_id: minId, to_id: maxId,
+      distance_km: km,
+      updated_at: new Date().toISOString(),
+    };
+    if (existing) await db.distance_matrix.update(existing.id, data);
+    else await db.distance_matrix.add(data);
+    saved++;
+  }
+  closeModal();
+  toast(`💾 ບັນທຶກ ${saved} ໄລຍະ${deleted>0?` • ລຶບ ${deleted}`:''}`);
+  if (currentPage === 'locations') pages.locations();
+}
+
+// ໄລຍະຂອງສະຖານທີ່ດຽວ — ສະແດງລາຍການ
+async function openLocationDistances(id) {
+  const loc = await db.locations.get(id);
+  if (!loc) return;
+  const allLocs = (await db.locations.toArray()).filter(l => l.id !== id && l.active !== false).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  const matrix = await db.distance_matrix.toArray();
+  const myDistances = matrix.filter(d => d.from_id === id || d.to_id === id);
+  const distMap = {};
+  myDistances.forEach(d => { distMap[d.from_id === id ? d.to_id : d.from_id] = d; });
+
+  modal(`🛣 ໄລຍະທາງຈາກ "${escapeHtml(loc.name)}"`, `
+    <div class="alert info" style="font-size:12px;margin-bottom:10px">ໃສ່ໄລຍະຈາກ <strong>${escapeHtml(loc.name)}</strong> ໄປແຕ່ລະຈຸດ (km)</div>
+    <div style="max-height:400px;overflow-y:auto">
+      <table style="font-size:12px">
+        <tr><th>ສະຖານທີ່</th><th>ປະເພດ</th><th>km</th></tr>
+        ${allLocs.map(l2 => {
+          const d = distMap[l2.id];
+          const lt = LOCATION_TYPES.find(t => t.key === l2.type);
+          return `<tr>
+            <td><strong>${escapeHtml(l2.name)}</strong> <small class="muted">${escapeHtml(l2.village||'')}</small></td>
+            <td><span class="pill" style="background:${lt?.color||'#888'};color:#fff;font-size:10px">${lt?.label||l2.type}</span></td>
+            <td><input type="number" data-other="${l2.id}" value="${d?d.distance_km:''}" placeholder="km" style="width:80px;padding:4px;font-size:12px;border:1px solid var(--line);border-radius:4px" class="dist-row"/></td>
+          </tr>`;
+        }).join('')}
+      </table>
+    </div>
+  `, `
+    <button class="btn outline" onclick="closeModal()">${t('cancel')}</button>
+    <button class="btn ok" onclick="saveLocationDistances(${id})">💾 ${t('save')}</button>
+  `);
+}
+
+async function saveLocationDistances(id) {
+  const cells = document.querySelectorAll('.dist-row');
+  let saved = 0, deleted = 0;
+  for (const cell of cells) {
+    const otherId = parseInt(cell.dataset.other);
+    const km = parseFloat(cell.value);
+    const minId = Math.min(id, otherId);
+    const maxId = Math.max(id, otherId);
+    const existing = (await db.distance_matrix.where('from_id').equals(minId).toArray()).find(d => d.to_id === maxId);
+    if (isNaN(km) || km <= 0) {
+      if (existing) { await db.distance_matrix.delete(existing.id); deleted++; }
+      continue;
+    }
+    const data = { from_id: minId, to_id: maxId, distance_km: km, updated_at: new Date().toISOString() };
+    if (existing) await db.distance_matrix.update(existing.id, data);
+    else await db.distance_matrix.add(data);
+    saved++;
+  }
+  closeModal();
+  toast(`💾 ບັນທຶກ ${saved} ໄລຍະ${deleted>0?` • ລຶບ ${deleted}`:''}`);
+  pages.locations();
+}
+
+// ໂຫລດຂໍ້ມູນເລີ່ມຕົ້ນ — ສາຂາ KALA + ຕົວເມືອງສຳຄັນ
+async function seedKalaLocations() {
+  if (!confirm('ໂຫລດສະຖານທີ່ເລີ່ມຕົ້ນ?\n(ສາຂາ KALA + ຕົວເມືອງສຳຄັນພາກໃຕ້)')) return;
+  const seed = [
+    // ສາຂາ KALA
+    { name:'ສຳນັກງານໃຫຍ່ ປາກເຊ', type:'branch', province:'ຈຳປາສັກ', district:'ປາກເຊ', village:'' },
+    { name:'ສາຂາ ປາກຊ່ອງ', type:'branch', province:'ຈຳປາສັກ', district:'ປາກຊ່ອງ', village:'' },
+    { name:'ສາຂາ ໂຂງ', type:'branch', province:'ຈຳປາສັກ', district:'ໂຂງ', village:'' },
+    { name:'ສາຂາ ສາລະວັນ', type:'branch', province:'ສາລະວັນ', district:'ສາລະວັນ', village:'' },
+    { name:'ສາຂາ ອັດຕະປື', type:'branch', province:'ອັດຕະປື', district:'ສາມັກຄີໄຊ', village:'' },
+    { name:'ຮ້ານຄ້າ ສະຫວັນນະເຂດ', type:'branch', province:'ສະຫວັນນະເຂດ', district:'ສະຫວັນນະເຂດ', village:'' },
+    { name:'ຮ້ານຄ້າ ເຊໂນ', type:'branch', province:'ສະຫວັນນະເຂດ', district:'ເຊໂນ', village:'' },
+    { name:'ຮ້ານຄ້າ ນະຄອນຫຼວງວຽງຈັນ', type:'branch', province:'ນະຄອນຫຼວງວຽງຈັນ', district:'ຈັນທະບູລີ', village:'' },
+    // ຕົວເມືອງສຳຄັນ
+    { name:'ຕົວເມືອງ ປາກເຊ', type:'town', province:'ຈຳປາສັກ', district:'ປາກເຊ', village:'' },
+    { name:'ຕົວເມືອງ ປາກຊ່ອງ', type:'town', province:'ຈຳປາສັກ', district:'ປາກຊ່ອງ', village:'' },
+    { name:'ຕົວເມືອງ ສາລະວັນ', type:'town', province:'ສາລະວັນ', district:'ສາລະວັນ', village:'' },
+    { name:'ຕົວເມືອງ ເຊກອງ', type:'town', province:'ເຊກອງ', district:'ລະມາມ', village:'' },
+    { name:'ຕົວເມືອງ ອັດຕະປື', type:'town', province:'ອັດຕະປື', district:'ສາມັກຄີໄຊ', village:'' },
+  ];
+  let added = 0;
+  for (const s of seed) {
+    // ກວດສອບວ່າມີຢູ່ແລ້ວບໍ
+    const existing = (await db.locations.toArray()).find(l => l.name === s.name);
+    if (existing) continue;
+    s.location_id = await nextLocationId();
+    s.created_at = new Date().toISOString();
+    s.active = true;
+    await db.locations.add(s);
+    added++;
+  }
+  toast(`📥 ໂຫລດ ${added} ສະຖານທີ່ໃໝ່ສຳເລັດ`);
+  pages.locations();
+}
+
+// 🔗 Helper — ດຶງໄລຍະທາງລະຫວ່າງ 2 location IDs
+async function getDistance(fromId, toId) {
+  if (!fromId || !toId || fromId === toId) return null;
+  const minId = Math.min(fromId, toId);
+  const maxId = Math.max(fromId, toId);
+  const all = await db.distance_matrix.where('from_id').equals(minId).toArray();
+  const d = all.find(x => x.to_id === maxId);
+  return d ? d.distance_km : null;
 }
 
 pages.about = async () => {
