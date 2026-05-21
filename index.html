@@ -1497,6 +1497,60 @@ db.version(2).stores({
   outsource: '++id, jo_id, vendor_id, status',
   settings: 'key',
 });
+// ===== v21: Nationwide Locations (Hierarchy + GPS + Haversine) =====
+db.version(21).stores({
+  vehicles: '++id, vehicle_id, plate, type, branch, status, category_id',
+  inspections: '++id, vehicle_id, date, status, frequency, driver',
+  joborders: '++id, jo_id, vehicle_id, priority, status, created',
+  parts: '++id, code, class, grade, category_id, warehouse, status',
+  partmovements: '++id, part_id, type, date',
+  drivers: '++id, driver_id, name, license_expiry, assigned_vehicle',
+  tires: '++id, tire_id, current_vehicle, position, status, install_km, install_date',
+  tire_history: '++id, tire_id, date, event_type, vehicle_id, position, km',
+  vendors: '++id, vendor_id, name, category_id, province',
+  vendorprices: '++id, vendor_id, part_code, currency, date',
+  tools: '++id, tool_id, name, calib_due, status',
+  outsource: '++id, jo_id, vendor_id, status',
+  fluids: '++id, vehicle_id, type, date, next_due_date',
+  mileage_log: '++id, vehicle_id, date, mileage',
+  categories: '++id, name, type, parent_id',
+  exchange_rates: '++id, currency, rate, valid_from',
+  pm_templates: '++id, vehicle_type, interval_type, interval_value',
+  pm_history: '++id, vehicle_id, template_id, date, mileage',
+  fuel_log: '++id, vehicle_id, date, driver, station',
+  documents: '++id, entity_type, entity_id, doc_type, expiry_date',
+  incidents: '++id, date, vehicle_id, driver_id, severity, status',
+  audit_log: '++id, timestamp, user, action, entity',
+  purchase_requests: '++id, pr_id, vendor_id, status, created, total_lak',
+  purchase_orders: '++id, po_id, vendor_id, status, created, urgency, total_lak',
+  vehicle_pm: '++id, vehicle_id, interval_type, interval_value, active',
+  gps_devices: '++id, vehicle_id, imei, model, platform, status, installed_date',
+  driver_reviews: '++id, driver_id, review_date, reviewer, period, total_score',
+  receipt_inspections: '++id, jo_id, vehicle_id, date, inspector',
+  predelivery_inspections: '++id, jo_id, vehicle_id, date, inspector, approved',
+  users: '++id, username, role, name, active, created',
+  depreciation: '++id, vehicle_id, year, month, value, accumulated',
+  parts_replacements: '++id, vehicle_id, part_type, date, km, cost, jo_id',
+  ai_chat_history: '++id, timestamp, role, content',
+  deleted_items: '++id, deleted_at, deleted_by, store, original_id, summary, restored',
+  price_change_audit: '++id, timestamp, user, entity_type, entity_id, field, old_value, new_value, summary',
+  service_rates: '++id, service_code, service_name, category, vehicle_group, base_charge, skill_required, active',
+  tech_profiles: '++id, tech_id, name, skill_level, commission_pct, walkin_commission_pct, active, branch',
+  labor_entries: '++id, entry_id, date, jo_id, vehicle_id, tech_id, service_code, charge_amount, commission_amount, status, approved_by, customer_type, intake_id',
+  customer_receipts: '++id, receipt_id, date, labor_entry_id, customer_name, customer_phone, vehicle_plate, total_amount, signed_at, signed_by_customer',
+  vehicle_intakes: '++id, intake_id, date, customer_phone, vehicle_plate, pickup_code, status, received_by_tech_id, linked_entry_id, delivered_at',
+  camera_counts: '++id, date, vehicles_in, vehicles_out, recorded_by',
+  customer_audits: '++id, audit_id, labor_entry_id, customer_phone, audit_date, called_at, response, satisfaction, received_receipt, called_by, notes',
+  branches: '++id, branch_id, name, province, address, manager, active',
+  vehicle_specs: '++id, vehicle_id, updated_at',
+  vehicle_usage: '++id, usage_id, date, vehicle_id, usage_type, billing_type, customer_phone, status, total_amount, created_by',
+  vehicle_usage_rates: '++id, vehicle_id, vehicle_type, rate_per_km, rate_per_hour, rate_per_ton, fixed_trip_rate, active',
+  // 🆕 v21: ມີ parent_id + lat/lng ສຳລັບ Hierarchy + GPS
+  locations: '++id, location_id, name, type, province, district, village, parent_id, lat, lng, active',
+  distance_matrix: '++id, from_id, to_id, distance_km, travel_time_min, route_notes, source, updated_at',
+  settings: 'key',
+});
+
 // ===== v20: Delivery Locations + Distance Matrix =====
 db.version(20).stores({
   vehicles: '++id, vehicle_id, plate, type, branch, status, category_id',
@@ -1546,10 +1600,12 @@ db.version(20).stores({
   vehicle_usage: '++id, usage_id, date, vehicle_id, usage_type, billing_type, customer_phone, status, total_amount, created_by',
   vehicle_usage_rates: '++id, vehicle_id, vehicle_type, rate_per_km, rate_per_hour, rate_per_ton, fixed_trip_rate, active',
   // ===== NEW v20: Delivery Locations + Distance Matrix =====
-  // type: branch | village | town | landmark | customer_site | construction_site | market
-  locations: '++id, location_id, name, type, province, district, village, active',
+  // type: branch | province | district | village | town | landmark | customer_site | construction_site | market | poi
+  // parent_id ສຳລັບ hierarchy: ແຂວງ → ເມືອງ → ບ້ານ → POI
+  locations: '++id, location_id, name, type, province, district, village, parent_id, lat, lng, active',
   // ໄລຍະທາງລະຫວ່າງ 2 location — bidirectional (ໃຊ້ from < to ເພື່ອບໍ່ຊ້ຳ)
-  distance_matrix: '++id, from_id, to_id, distance_km, travel_time_min, route_notes, updated_at',
+  // source: 'manual' (ປ້ອນເອງ) | 'haversine' (ຄຳນວນຈາກ GPS) | 'imported'
+  distance_matrix: '++id, from_id, to_id, distance_km, travel_time_min, route_notes, source, updated_at',
   settings: 'key',
 });
 
@@ -18181,15 +18237,19 @@ async function autoFillUsageDistance() {
   // ປ້ອນຊື່ໃສ່ text input ໃຫ້ອັດຕະໂນມັດ
   if (fromLoc && $('#uy_start_loc')) $('#uy_start_loc').value = fromLoc.name;
   if (toLoc && $('#uy_end_loc')) $('#uy_end_loc').value = toLoc.name;
-  // ດຶງໄລຍະຈາກ Matrix
-  const km = await getDistance(fromId, toId);
+  // ດຶງໄລຍະຈາກ Matrix ຫຼື GPS Haversine
+  const result = await getDistance(fromId, toId);
   hint.style.display = 'block';
-  hint.style.background = km != null ? '#ECFDF5' : '#FEF3C7';
-  hint.style.color = km != null ? '#065F46' : '#92400E';
-  if (km != null) {
-    hint.innerHTML = `✅ ໄລຍະທາງຕາມ Database: <strong>${km} km</strong> (${escapeHtml(fromLoc?.name||'?')} → ${escapeHtml(toLoc?.name||'?')}) <button class="btn sm ok" style="margin-left:8px" onclick="applyDistanceToUsage(${km})">ໃຊ້ໄລຍະນີ້</button>`;
+  if (result) {
+    const isAuto = result.source === 'haversine';
+    hint.style.background = isAuto ? '#EFF6FF' : '#ECFDF5';
+    hint.style.color = isAuto ? '#1E40AF' : '#065F46';
+    const sourceLabel = isAuto ? '🌐 GPS ປະມານ (Haversine × 1.4)' : '✅ ປ້ອນເອງ';
+    hint.innerHTML = `${sourceLabel}: <strong>${result.km} km</strong> (${escapeHtml(fromLoc?.name||'?')} → ${escapeHtml(toLoc?.name||'?')}) <button class="btn sm ok" style="margin-left:8px" onclick="applyDistanceToUsage(${result.km})">ໃຊ້ໄລຍະນີ້</button>`;
   } else {
-    hint.innerHTML = `⚠️ ຍັງບໍ່ມີໄລຍະທາງລະຫວ່າງ <strong>${escapeHtml(fromLoc?.name||'?')}</strong> ↔ <strong>${escapeHtml(toLoc?.name||'?')}</strong> ໃນ Database. <a href="javascript:closeModal();go('locations')" style="color:var(--accent);text-decoration:underline">ໄປຕັ້ງຄ່າໄລຍະທາງ</a>`;
+    hint.style.background = '#FEF3C7';
+    hint.style.color = '#92400E';
+    hint.innerHTML = `⚠️ ຍັງບໍ່ມີໄລຍະທາງ ແລະ ບໍ່ມີ GPS ສຳລັບ <strong>${escapeHtml(fromLoc?.name||'?')}</strong> ↔ <strong>${escapeHtml(toLoc?.name||'?')}</strong>. <a href="javascript:closeModal();go('locations')" style="color:var(--accent);text-decoration:underline">ໄປຕັ້ງຄ່າ GPS ຫຼື ໄລຍະທາງ</a>`;
   }
 }
 
@@ -18687,15 +18747,43 @@ async function renderUsageReport(cfg) {
 
 const LOCATION_TYPES = [
   { key: 'branch',            label: '🏢 ສາຂາ KALA',           color: '#1F2937' },
+  { key: 'province',          label: '🌏 ແຂວງ',                color: '#7C3AED' },
+  { key: 'district',          label: '🏛 ເມືອງ',                color: '#2563EB' },
   { key: 'town',              label: '🏙 ຕົວເມືອງ',              color: '#3B82F6' },
   { key: 'village',           label: '🏘 ບ້ານ',                  color: '#10B981' },
   { key: 'landmark',          label: '📍 ສະຖານທີ່ສຳຄັນ',         color: '#8B5CF6' },
   { key: 'customer_site',     label: '👤 ທີ່ຢູ່ລູກຄ້າປະຈຳ',      color: '#F59E0B' },
   { key: 'construction_site', label: '🏗 ໂຄງການກໍ່ສ້າງ',         color: '#EF4444' },
   { key: 'market',            label: '🏪 ຕະຫຼາດ',               color: '#06B6D4' },
+  { key: 'poi',               label: '⭐ POI (ສະຖານທີ່ສຳຄັນ)',    color: '#EC4899' },
 ];
 
-const SOUTHERN_PROVINCES = ['ຈຳປາສັກ', 'ສາລະວັນ', 'ເຊກອງ', 'ອັດຕະປື', 'ສະຫວັນນະເຂດ', 'ນະຄອນຫຼວງວຽງຈັນ', 'ຄຳມ່ວນ'];
+// 18 ແຂວງລາວ (ລວມນະຄອນຫຼວງ)
+const SOUTHERN_PROVINCES = [
+  'ຈຳປາສັກ', 'ສາລະວັນ', 'ເຊກອງ', 'ອັດຕະປື', 'ສະຫວັນນະເຂດ', 'ຄຳມ່ວນ',
+  'ບໍລິຄຳໄຊ', 'ນະຄອນຫຼວງວຽງຈັນ', 'ວຽງຈັນ', 'ໄຊສົມບູນ', 'ຊຽງຂວາງ',
+  'ຫົວພັນ', 'ຫຼວງພະບາງ', 'ໄຊຍະບູລີ', 'ອຸດົມໄຊ', 'ຫຼວງນ້ຳທາ',
+  'ບໍ່ແກ້ວ', 'ຜົ້ງສາລີ'
+];
+
+// 🧮 Haversine formula — ໄລຍະທາງລະຫວ່າງ 2 GPS points (km)
+function haversineKm(lat1, lng1, lat2, lng2) {
+  if (lat1 == null || lng1 == null || lat2 == null || lng2 == null) return null;
+  const R = 6371; // ລັດສະໝີໂລກ km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLng/2)**2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+// 🛣 ປະຕິບັດການ Factor — ໄລຍະຖະໜົນຈິງ = ໄລຍະຕົງ × 1.4 (ສະເລ່ຍສຳລັບ ສປປ ລາວ)
+const ROAD_FACTOR = 1.4;
+
+function estimateRoadKm(loc1, loc2) {
+  const straight = haversineKm(loc1.lat, loc1.lng, loc2.lat, loc2.lng);
+  if (straight == null) return null;
+  return Math.round(straight * ROAD_FACTOR);
+}
 
 async function nextLocationId() {
   const all = await db.locations.toArray();
@@ -18732,9 +18820,9 @@ pages.locations = async () => {
 
     <div class="kpi-grid">
       <div class="kpi"><div class="label">📍 ສະຖານທີ່</div><div class="val">${all.length}</div></div>
-      <div class="kpi"><div class="label">🛣 ໄລຍະທາງ</div><div class="val" style="color:var(--accent)">${matrix.length}</div><div class="muted">ຄູ່</div></div>
-      <div class="kpi"><div class="label">📂 ປະເພດ</div><div class="val">${LOCATION_TYPES.filter(t => typeCounts[t.key]>0).length}</div></div>
-      <div class="kpi"><div class="label">🗺 ແຂວງ</div><div class="val">${new Set(all.map(l => l.province).filter(Boolean)).size}</div></div>
+      <div class="kpi"><div class="label">🌐 ມີ GPS</div><div class="val" style="color:var(--ok)">${all.filter(l => l.lat && l.lng).length}</div><div class="muted">${all.length>0?Math.round(all.filter(l => l.lat && l.lng).length/all.length*100):0}%</div></div>
+      <div class="kpi"><div class="label">🛣 ໄລຍະປ້ອນເອງ</div><div class="val" style="color:var(--accent)">${matrix.length}</div><div class="muted">ຄູ່</div></div>
+      <div class="kpi"><div class="label">🗺 ແຂວງ</div><div class="val">${new Set(all.map(l => l.province).filter(Boolean)).size}</div><div class="muted">/18</div></div>
     </div>
 
     <div class="toolbar" style="flex-wrap:wrap;gap:8px">
@@ -18752,17 +18840,19 @@ pages.locations = async () => {
       <button class="btn outline" onclick="window._locFilter={type:'',province:'',q:''};pages.locations()">🔄 ລ້າງ</button>
       <div style="flex:1"></div>
       <button class="btn outline" onclick="openDistanceMatrix()">🛣 ຈັດການໄລຍະທາງ</button>
-      <button class="btn outline" onclick="seedKalaLocations()">📥 ໂຫລດຂໍ້ມູນເລີ່ມຕົ້ນ</button>
+      <button class="btn outline" onclick="openLocationsCSVImport()">📥 ນຳເຂົ້າ CSV</button>
+      <button class="btn outline" onclick="seedKalaLocations()">🌏 ໂຫລດ 18 ແຂວງ</button>
       <button class="btn ok" onclick="openLocationModal()">+ ເພີ່ມສະຖານທີ່</button>
     </div>
 
     <div class="card" style="padding:0;overflow-x:auto">
       ${filtered.length === 0 ? '<div class="empty" style="padding:30px"><div class="icon">📍</div><p>ຍັງບໍ່ມີສະຖານທີ່ — ກົດ "+ ເພີ່ມສະຖານທີ່" ຫຼື "ໂຫລດຂໍ້ມູນເລີ່ມຕົ້ນ"</p></div>' : `
       <table style="font-size:12.5px">
-        <tr><th>ID</th><th>ປະເພດ</th><th>ຊື່ສະຖານທີ່</th><th>ບ້ານ</th><th>ເມືອງ</th><th>ແຂວງ</th><th style="text-align:right">ຄ່ຽງມີໄລຍະ</th><th></th></tr>
+        <tr><th>ID</th><th>ປະເພດ</th><th>ຊື່ສະຖານທີ່</th><th>ບ້ານ</th><th>ເມືອງ</th><th>ແຂວງ</th><th style="text-align:center">GPS</th><th style="text-align:right">ໄລຍະ</th><th></th></tr>
         ${filtered.map(l => {
           const lt = LOCATION_TYPES.find(t => t.key === l.type);
           const distancesCount = matrix.filter(d => d.from_id === l.id || d.to_id === l.id).length;
+          const hasGPS = l.lat != null && l.lng != null;
           return `<tr>
             <td><strong style="font-family:monospace;font-size:11px">${l.location_id||l.id}</strong></td>
             <td><span class="pill" style="background:${lt?.color||'#888'};color:#fff;font-size:10px">${lt?.label||l.type}</span></td>
@@ -18770,6 +18860,7 @@ pages.locations = async () => {
             <td>${escapeHtml(l.village||'-')}</td>
             <td>${escapeHtml(l.district||'-')}</td>
             <td>${escapeHtml(l.province||'-')}</td>
+            <td style="text-align:center">${hasGPS?`<span title="${l.lat.toFixed(4)},${l.lng.toFixed(4)}" style="color:var(--ok);font-size:14px">🌐</span>`:'<span style="color:var(--muted);font-size:14px" title="ບໍ່ມີ GPS">—</span>'}</td>
             <td style="text-align:right"><span class="pill ${distancesCount>0?'ok':'gray'}">${distancesCount}</span></td>
             <td class="actions">
               <button class="btn sm outline" onclick="openLocationDistances(${l.id})" title="ຈັດການໄລຍະ">🛣</button>
@@ -18784,7 +18875,7 @@ pages.locations = async () => {
 };
 
 async function openLocationModal(id) {
-  let loc = { name:'', type:'village', province:'ຈຳປາສັກ', district:'', village:'', address:'', notes:'', active:true };
+  let loc = { name:'', type:'village', province:'ຈຳປາສັກ', district:'', village:'', address:'', notes:'', active:true, lat:null, lng:null };
   if (id) loc = Object.assign(loc, await db.locations.get(id));
   modal(id?'✏️ ແກ້ໄຂສະຖານທີ່':'+ ເພີ່ມສະຖານທີ່ໃໝ່', `
     <div class="row">
@@ -18807,6 +18898,19 @@ async function openLocationModal(id) {
         <option value="false" ${loc.active===false?'selected':''}>ປິດ</option>
       </select></div>
     </div>
+    <div class="card" style="background:#EFF6FF;border-left:4px solid #3B82F6;padding:10px;margin:8px 0">
+      <h4 style="margin:0 0 6px;color:#1E40AF;font-size:13px">🌐 GPS Coordinates (ບໍ່ບັງຄັບ — ແຕ່ໃຊ້ສຳລັບການຄຳນວນໄລຍະທາງອັດຕະໂນມັດ)</h4>
+      <div class="row">
+        <div class="fld"><label>Latitude (ເສັ້ນຮຸ້ງ)</label><input id="loc_lat" type="number" step="any" value="${loc.lat!=null?loc.lat:''}" placeholder="15.1202 (ປາກເຊ)"/></div>
+        <div class="fld"><label>Longitude (ເສັ້ນແວງ)</label><input id="loc_lng" type="number" step="any" value="${loc.lng!=null?loc.lng:''}" placeholder="105.7989"/></div>
+      </div>
+      <div class="row">
+        <div class="fld" style="grid-column:span 2"><label>📋 ວາງ Google Maps URL ຫຼື Coordinates</label>
+          <input id="loc_gmaps_paste" placeholder="https://maps.google.com/?q=15.1202,105.7989 ຫຼື 15.1202, 105.7989" oninput="parseGmapsInput()"/>
+          <small style="font-size:11px;color:var(--muted)">💡 ໃນ Google Maps ກົດເຄິ່ງເທິງສະຖານທີ່ → Click ຂວາ → ກົດໃສ່ coordinates → ວາງມາທີ່ນີ້</small>
+        </div>
+      </div>
+    </div>
     <div class="fld"><label>ທີ່ຢູ່ລະອຽດ</label><textarea id="loc_address" rows="2">${escapeHtml(loc.address||'')}</textarea></div>
     <div class="fld"><label>ໝາຍເຫດ</label><textarea id="loc_notes" rows="2" placeholder="Landmark ໃກ້ຄຽງ, ຄຳແນະນຳເສັ້ນທາງ...">${escapeHtml(loc.notes||'')}</textarea></div>
   `, `
@@ -18815,9 +18919,27 @@ async function openLocationModal(id) {
   `);
 }
 
+// 🌐 Parse Google Maps URL ຫຼື coords string → lat/lng inputs
+function parseGmapsInput() {
+  const v = $('#loc_gmaps_paste')?.value || '';
+  if (!v.trim()) return;
+  // Pattern 1: ?q=lat,lng or @lat,lng
+  let m = v.match(/[@?&]q?=?(-?\d+\.\d+)[,\s]+(-?\d+\.\d+)/);
+  if (!m) m = v.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+  // Pattern 2: plain "lat, lng"
+  if (!m) m = v.match(/^\s*(-?\d+\.\d+)[,\s]+(-?\d+\.\d+)/);
+  if (m) {
+    if ($('#loc_lat')) $('#loc_lat').value = parseFloat(m[1]);
+    if ($('#loc_lng')) $('#loc_lng').value = parseFloat(m[2]);
+    toast('✅ ດຶງ GPS ສຳເລັດ');
+  }
+}
+
 async function saveLocation(id) {
   const name = $('#loc_name').value.trim();
   if (!name) { toast('ກະລຸນາໃສ່ຊື່ສະຖານທີ່','bad'); return; }
+  const latRaw = $('#loc_lat')?.value;
+  const lngRaw = $('#loc_lng')?.value;
   const data = {
     name,
     type: $('#loc_type').value,
@@ -18826,6 +18948,8 @@ async function saveLocation(id) {
     village: $('#loc_village').value.trim(),
     address: $('#loc_address').value.trim(),
     notes: $('#loc_notes').value.trim(),
+    lat: latRaw ? parseFloat(latRaw) : null,
+    lng: lngRaw ? parseFloat(lngRaw) : null,
     active: $('#loc_active').value === 'true',
   };
   if (id) await db.locations.update(id, data);
@@ -18971,49 +19095,217 @@ async function saveLocationDistances(id) {
   pages.locations();
 }
 
-// ໂຫລດຂໍ້ມູນເລີ່ມຕົ້ນ — ສາຂາ KALA + ຕົວເມືອງສຳຄັນ
+// 🌏 ຂໍ້ມູນແຂວງລາວ + GPS ປະຈຸບັນເມືອງ (ສະຖານທີ່ສຳນັກງານປົກຄອງແຂວງ)
+const LAO_PROVINCES_DATA = [
+  // [name, lat, lng, capital_district_name]
+  ['ຜົ້ງສາລີ',         21.6841, 102.1098, 'ຜົ້ງສາລີ'],
+  ['ຫຼວງນ້ຳທາ',         20.9489, 101.4022, 'ຫຼວງນ້ຳທາ'],
+  ['ບໍ່ແກ້ວ',           20.2756, 100.4106, 'ຫ້ວຍຊາຍ'],
+  ['ອຸດົມໄຊ',           20.6938, 101.9892, 'ໄຊ'],
+  ['ໄຊຍະບູລີ',          19.2557, 101.7081, 'ໄຊຍະບູລີ'],
+  ['ຫຼວງພະບາງ',         19.8845, 102.1348, 'ຫຼວງພະບາງ'],
+  ['ຫົວພັນ',            20.4193, 104.0317, 'ຊຳເໜືອ'],
+  ['ຊຽງຂວາງ',           19.4582, 103.1862, 'ແປກ'],
+  ['ວຽງຈັນ (ແຂວງ)',     18.5667, 102.4500, 'ໂພນໂຮງ'],
+  ['ນະຄອນຫຼວງວຽງຈັນ',   17.9757, 102.6331, 'ຈັນທະບູລີ'],
+  ['ບໍລິຄຳໄຊ',          18.4283, 103.6817, 'ປາກຊັນ'],
+  ['ໄຊສົມບູນ',          18.7400, 103.0567, 'ອານຸວົງ'],
+  ['ຄຳມ່ວນ',           17.4116, 105.0944, 'ທ່າແຂກ'],
+  ['ສະຫວັນນະເຂດ',       16.5494, 104.7572, 'ໄກສອນພົມວິຫານ'],
+  ['ສາລະວັນ',          15.7140, 106.4220, 'ສາລະວັນ'],
+  ['ເຊກອງ',            15.3458, 106.7308, 'ລະມາມ'],
+  ['ຈຳປາສັກ',          15.1202, 105.7989, 'ປາກເຊ'],
+  ['ອັດຕະປື',          14.8079, 106.8420, 'ສາມັກຄີໄຊ'],
+];
+
+// ໂຫລດ 18 ແຂວງ + ສຳນັກງານປົກຄອງ
 async function seedKalaLocations() {
-  if (!confirm('ໂຫລດສະຖານທີ່ເລີ່ມຕົ້ນ?\n(ສາຂາ KALA + ຕົວເມືອງສຳຄັນພາກໃຕ້)')) return;
-  const seed = [
-    // ສາຂາ KALA
-    { name:'ສຳນັກງານໃຫຍ່ ປາກເຊ', type:'branch', province:'ຈຳປາສັກ', district:'ປາກເຊ', village:'' },
-    { name:'ສາຂາ ປາກຊ່ອງ', type:'branch', province:'ຈຳປາສັກ', district:'ປາກຊ່ອງ', village:'' },
-    { name:'ສາຂາ ໂຂງ', type:'branch', province:'ຈຳປາສັກ', district:'ໂຂງ', village:'' },
-    { name:'ສາຂາ ສາລະວັນ', type:'branch', province:'ສາລະວັນ', district:'ສາລະວັນ', village:'' },
-    { name:'ສາຂາ ອັດຕະປື', type:'branch', province:'ອັດຕະປື', district:'ສາມັກຄີໄຊ', village:'' },
-    { name:'ຮ້ານຄ້າ ສະຫວັນນະເຂດ', type:'branch', province:'ສະຫວັນນະເຂດ', district:'ສະຫວັນນະເຂດ', village:'' },
-    { name:'ຮ້ານຄ້າ ເຊໂນ', type:'branch', province:'ສະຫວັນນະເຂດ', district:'ເຊໂນ', village:'' },
-    { name:'ຮ້ານຄ້າ ນະຄອນຫຼວງວຽງຈັນ', type:'branch', province:'ນະຄອນຫຼວງວຽງຈັນ', district:'ຈັນທະບູລີ', village:'' },
-    // ຕົວເມືອງສຳຄັນ
-    { name:'ຕົວເມືອງ ປາກເຊ', type:'town', province:'ຈຳປາສັກ', district:'ປາກເຊ', village:'' },
-    { name:'ຕົວເມືອງ ປາກຊ່ອງ', type:'town', province:'ຈຳປາສັກ', district:'ປາກຊ່ອງ', village:'' },
-    { name:'ຕົວເມືອງ ສາລະວັນ', type:'town', province:'ສາລະວັນ', district:'ສາລະວັນ', village:'' },
-    { name:'ຕົວເມືອງ ເຊກອງ', type:'town', province:'ເຊກອງ', district:'ລະມາມ', village:'' },
-    { name:'ຕົວເມືອງ ອັດຕະປື', type:'town', province:'ອັດຕະປື', district:'ສາມັກຄີໄຊ', village:'' },
+  if (!confirm('ໂຫລດ 18 ແຂວງ + 18 ສຳນັກງານປົກຄອງເມືອງ ທົ່ວປະເທດລາວ?\n(ມີ GPS Coordinates ສຳລັບການຄຳນວນໄລຍະທາງອັດຕະໂນມັດ)')) return;
+  const all = await db.locations.toArray();
+  let added = 0, skipped = 0;
+  for (const [pname, plat, plng, capital] of LAO_PROVINCES_DATA) {
+    // ແຂວງ
+    if (!all.find(l => l.type === 'province' && l.name === pname)) {
+      const pid = await nextLocationId();
+      await db.locations.add({
+        location_id: pid, name: pname, type: 'province',
+        province: pname, district: '', village: '',
+        lat: plat, lng: plng, active: true,
+        created_at: new Date().toISOString()
+      });
+      added++;
+    } else skipped++;
+    // ສຳນັກງານປົກຄອງ (district capital)
+    const distName = `ຕົວເມືອງ ${capital}`;
+    if (!all.find(l => l.type === 'district' && l.name === distName)) {
+      await db.locations.add({
+        location_id: await nextLocationId(),
+        name: distName, type: 'district',
+        province: pname, district: capital, village: '',
+        lat: plat, lng: plng, active: true,
+        created_at: new Date().toISOString()
+      });
+      added++;
+    } else skipped++;
+  }
+  // ສາຂາ KALA ທີ່ມີຢູ່ — ໂຫລດເພີ່ມຖ້າຍັງບໍ່ມີ
+  const KALA_BRANCHES = [
+    ['ສຳນັກງານໃຫຍ່ ປາກເຊ', 15.1202, 105.7989, 'ຈຳປາສັກ', 'ປາກເຊ'],
+    ['ສາຂາ ປາກຊ່ອງ',       15.1969, 106.2333, 'ຈຳປາສັກ', 'ປາກຊ່ອງ'],
+    ['ສາຂາ ໂຂງ',           14.1167, 105.8333, 'ຈຳປາສັກ', 'ໂຂງ'],
+    ['ສາຂາ ສາລະວັນ',       15.7140, 106.4220, 'ສາລະວັນ', 'ສາລະວັນ'],
+    ['ສາຂາ ອັດຕະປື',       14.8079, 106.8420, 'ອັດຕະປື', 'ສາມັກຄີໄຊ'],
+    ['ຮ້ານຄ້າ ສະຫວັນນະເຂດ', 16.5494, 104.7572, 'ສະຫວັນນະເຂດ', 'ໄກສອນພົມວິຫານ'],
+    ['ຮ້ານຄ້າ ເຊໂນ',       16.6833, 105.0167, 'ສະຫວັນນະເຂດ', 'ເຊໂນ'],
+    ['ຮ້ານຄ້າ ນະຄອນຫຼວງວຽງຈັນ', 17.9757, 102.6331, 'ນະຄອນຫຼວງວຽງຈັນ', 'ຈັນທະບູລີ'],
   ];
+  for (const [bname, blat, blng, bp, bd] of KALA_BRANCHES) {
+    if (!all.find(l => l.name === bname)) {
+      await db.locations.add({
+        location_id: await nextLocationId(),
+        name: bname, type: 'branch',
+        province: bp, district: bd, village: '',
+        lat: blat, lng: blng, active: true,
+        created_at: new Date().toISOString()
+      });
+      added++;
+    } else skipped++;
+  }
+  toast(`📥 ໂຫລດ ${added} ສະຖານທີ່ໃໝ່${skipped>0?` • ມີຢູ່ແລ້ວ ${skipped}`:''}`);
+  pages.locations();
+}
+
+// 📥 CSV Import — ໂຫລດບ້ານ/POI ເປັນຫຼາຍຮ້ອຍຈຸດ
+function openLocationsCSVImport() {
+  const csvTemplate = `name,type,province,district,village,lat,lng,notes
+ບ້ານທ່າເຮືອ,village,ຈຳປາສັກ,ປາກເຊ,ທ່າເຮືອ,15.1234,105.8001,ໃກ້ແມ່ນ້ຳໂຂງ
+ໂຄງການ ABC,construction_site,ຈຳປາສັກ,ປາກຊ່ອງ,,15.1969,106.2333,ໂຄງການກໍ່ສ້າງເຂື່ອນ
+ຕະຫຼາດ XYZ,market,ສາລະວັນ,ສາລະວັນ,,15.7140,106.4220,`;
+  modal('📥 ນຳເຂົ້າສະຖານທີ່ຈາກ CSV', `
+    <div class="alert info" style="font-size:12px">💡 ສຳລັບໂຫລດບ້ານ + POI ເປັນຫຼາຍຮ້ອຍ/ພັນຈຸດ ໃນຄັ້ງດຽວ</div>
+    <h4 style="margin:10px 0 6px;font-size:13px;color:var(--primary-2)">📋 ຮູບແບບ CSV (ມີ Header ບັງຄັບ)</h4>
+    <pre style="background:var(--bg);padding:10px;border-radius:6px;font-size:11px;overflow-x:auto;border:1px solid var(--line)">${escapeHtml(csvTemplate)}</pre>
+    <p style="font-size:12px;color:var(--muted);margin:6px 0">
+      • <strong>name</strong>: ຊື່ສະຖານທີ່ (ບັງຄັບ)<br>
+      • <strong>type</strong>: ${LOCATION_TYPES.map(t=>t.key).join(' | ')} (ບໍ່ບັງຄັບ — Default: village)<br>
+      • <strong>province, district, village</strong>: ບໍ່ບັງຄັບ<br>
+      • <strong>lat, lng</strong>: GPS (ບໍ່ບັງຄັບ ແຕ່ແນະນຳ — ໃຊ້ສຳລັບການຄຳນວນໄລຍະອັດຕະໂນມັດ)
+    </p>
+    <button class="btn outline" onclick="downloadLocationsCsvTemplate()">⬇ ດາວໂຫລດ Template</button>
+    <div class="fld" style="margin-top:10px">
+      <label>ວາງ CSV ໃສ່ບ່ອນນີ້</label>
+      <textarea id="csv_input" rows="10" style="font-family:monospace;font-size:11px" placeholder="${escapeHtml(csvTemplate)}"></textarea>
+    </div>
+    <div id="csv_preview"></div>
+  `, `
+    <button class="btn outline" onclick="closeModal()">${t('cancel')}</button>
+    <button class="btn outline" onclick="previewLocationsCsv()">👁 Preview</button>
+    <button class="btn ok" onclick="importLocationsCsv()">📥 Import</button>
+  `);
+}
+
+function downloadLocationsCsvTemplate() {
+  const csv = `name,type,province,district,village,lat,lng,notes
+ບ້ານທ່າເຮືອ,village,ຈຳປາສັກ,ປາກເຊ,ທ່າເຮືອ,15.1234,105.8001,ໃກ້ແມ່ນ້ຳໂຂງ
+ໂຄງການ ABC,construction_site,ຈຳປາສັກ,ປາກຊ່ອງ,,15.1969,106.2333,ໂຄງການກໍ່ສ້າງ
+ຕະຫຼາດ XYZ,market,ສາລະວັນ,ສາລະວັນ,,15.7140,106.4220,
+ບ້ານໃໝ່,village,,,ໃໝ່,,,
+`;
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'kala_locations_template.csv';
+  a.click(); URL.revokeObjectURL(url);
+}
+
+function parseLocationsCsv(text) {
+  const lines = text.trim().split(/\r?\n/);
+  if (lines.length < 2) return { rows: [], errors: ['ບໍ່ມີຂໍ້ມູນ (ຕ້ອງມີ Header + ຢ່າງໜ້ອຍ 1 ແຖວ)'] };
+  const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+  const requiredIdx = headers.indexOf('name');
+  if (requiredIdx < 0) return { rows: [], errors: ['ບໍ່ພົບຄໍລຳ "name" ໃນ header'] };
+  const rows = [], errors = [];
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+    const cols = line.split(',').map(c => c.trim());
+    const obj = {};
+    headers.forEach((h, j) => { obj[h] = cols[j] || ''; });
+    if (!obj.name) { errors.push(`ແຖວ ${i+1}: ບໍ່ມີຊື່`); continue; }
+    obj.type = obj.type || 'village';
+    if (!LOCATION_TYPES.find(t => t.key === obj.type)) {
+      errors.push(`ແຖວ ${i+1}: ປະເພດ "${obj.type}" ບໍ່ຮູ້ຈັກ`);
+      obj.type = 'village';
+    }
+    obj.lat = obj.lat ? parseFloat(obj.lat) : null;
+    obj.lng = obj.lng ? parseFloat(obj.lng) : null;
+    if (obj.lat && (obj.lat < -90 || obj.lat > 90)) { errors.push(`ແຖວ ${i+1}: lat ບໍ່ຖືກຕ້ອງ`); obj.lat = null; }
+    if (obj.lng && (obj.lng < -180 || obj.lng > 180)) { errors.push(`ແຖວ ${i+1}: lng ບໍ່ຖືກຕ້ອງ`); obj.lng = null; }
+    rows.push(obj);
+  }
+  return { rows, errors };
+}
+
+function previewLocationsCsv() {
+  const text = $('#csv_input').value;
+  const { rows, errors } = parseLocationsCsv(text);
+  let html = `<h4 style="margin:10px 0 6px;color:var(--primary-2)">Preview: ${rows.length} ແຖວ ${errors.length>0?`• ⚠️ ${errors.length} Errors`:''}</h4>`;
+  if (errors.length > 0) {
+    html += `<div class="alert bad" style="font-size:11px;max-height:120px;overflow-y:auto"><strong>ຂໍ້ຜິດພາດ:</strong><ul style="margin:4px 0;padding-left:18px">${errors.slice(0,10).map(e => `<li>${escapeHtml(e)}</li>`).join('')}${errors.length>10?`<li>... +${errors.length-10} ອື່ນໆ</li>`:''}</ul></div>`;
+  }
+  if (rows.length > 0) {
+    html += `<div style="max-height:300px;overflow-y:auto"><table style="font-size:11px">
+      <tr><th>ຊື່</th><th>ປະເພດ</th><th>ແຂວງ</th><th>ເມືອງ</th><th>GPS</th></tr>
+      ${rows.slice(0,30).map(r => `<tr>
+        <td><strong>${escapeHtml(r.name)}</strong></td>
+        <td>${escapeHtml(r.type)}</td>
+        <td>${escapeHtml(r.province||'-')}</td>
+        <td>${escapeHtml(r.district||'-')}</td>
+        <td style="font-size:10px;font-family:monospace">${r.lat?r.lat.toFixed(4)+','+r.lng.toFixed(4):'-'}</td>
+      </tr>`).join('')}
+      ${rows.length>30?`<tr><td colspan="5" style="text-align:center;color:var(--muted);font-style:italic">... +${rows.length-30} ອື່ນໆ</td></tr>`:''}
+    </table></div>`;
+  }
+  $('#csv_preview').innerHTML = html;
+}
+
+async function importLocationsCsv() {
+  const text = $('#csv_input').value;
+  const { rows, errors } = parseLocationsCsv(text);
+  if (rows.length === 0) { toast('ບໍ່ມີຂໍ້ມູນເພື່ອນຳເຂົ້າ','bad'); return; }
+  if (errors.length > 0 && !confirm(`ມີ ${errors.length} ຂໍ້ຜິດພາດ — ດຳເນີນຕໍ່? (ແຖວທີ່ຜິດຈະຖືກຂ້າມໄປ)`)) return;
+  if (!confirm(`ນຳເຂົ້າ ${rows.length} ສະຖານທີ່?`)) return;
   let added = 0;
-  for (const s of seed) {
-    // ກວດສອບວ່າມີຢູ່ແລ້ວບໍ
-    const existing = (await db.locations.toArray()).find(l => l.name === s.name);
-    if (existing) continue;
-    s.location_id = await nextLocationId();
-    s.created_at = new Date().toISOString();
-    s.active = true;
-    await db.locations.add(s);
+  for (const r of rows) {
+    r.location_id = await nextLocationId();
+    r.created_at = new Date().toISOString();
+    r.active = true;
+    await db.locations.add(r);
     added++;
   }
-  toast(`📥 ໂຫລດ ${added} ສະຖານທີ່ໃໝ່ສຳເລັດ`);
+  closeModal();
+  toast(`📥 ນຳເຂົ້າ ${added} ສະຖານທີ່ສຳເລັດ`);
   pages.locations();
 }
 
 // 🔗 Helper — ດຶງໄລຍະທາງລະຫວ່າງ 2 location IDs
+// returns: { km, source: 'manual'|'haversine'|null }
 async function getDistance(fromId, toId) {
   if (!fromId || !toId || fromId === toId) return null;
   const minId = Math.min(fromId, toId);
   const maxId = Math.max(fromId, toId);
   const all = await db.distance_matrix.where('from_id').equals(minId).toArray();
   const d = all.find(x => x.to_id === maxId);
-  return d ? d.distance_km : null;
+  // Manual ມາກ່ອນ
+  if (d) return { km: d.distance_km, source: d.source || 'manual' };
+  // Fallback: ຄຳນວນຈາກ GPS (ຖ້າມີ)
+  const loc1 = await db.locations.get(fromId);
+  const loc2 = await db.locations.get(toId);
+  if (loc1?.lat && loc2?.lat) {
+    const km = estimateRoadKm(loc1, loc2);
+    if (km != null && km > 0) return { km, source: 'haversine' };
+  }
+  return null;
 }
 
 pages.about = async () => {
