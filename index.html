@@ -2403,13 +2403,11 @@ const NAV_GROUPS = [
       { page:'ai_assistant',  icon:'🤖', label:'AI ຜູ້ຊ່ວຍສະຫຼາດ' },
     ]
   },
-  // 🚗 ລົດ ແລະ ການກວດປະຈຳວັນ
+  // 🚗 ລົດ ແລະ ການກວດປະຈຳວັນ (ສ່ວນກາງ — ໃຊ້ກັບທຸກໂມດູນ)
   {
     id:'fleet', icon:'🚗', label:'ລົດ ແລະ ການກວດປະຈຳວັນ',
     items: [
       { page:'vehicles',      icon:'🚗', label:'ທະບຽນລົດ' },
-      { page:'vehicle_usage', icon:'🚚', label:'ບັນທຶກໃຊ້ລົດ + ຄ່າບໍລິການ' },
-      { page:'locations',     icon:'📍', label:'ສະຖານທີ່ + ໄລຍະທາງ' },
       { page:'drivers',       icon:'👤', label:'ຄົນຂັບ' },
       { page:'driver_perf',   icon:'🏆', label:'ຄະແນນຄົນຂັບ' },
       { page:'daily',         icon:'✅', label:'ກວດປະຈຳວັນ' },
@@ -2419,13 +2417,19 @@ const NAV_GROUPS = [
       { page:'incidents',     icon:'🚨', label:'ອຸປະຕິເຫດ' },
       { page:'defects',       icon:'🔧', label:'ຄວາມບົກພ່ອງ' },
       { page:'documents',     icon:'📜', label:'ເອກະສານ' },
+      { page:'vehicle_usage', icon:'🚙', label:'ບັນທຶກໃຊ້ສ່ວນຕົວ' },
     ]
   },
-  // 🔧 ການສ້ອມບຳລຸງ
+  // 🔧 [ໂມດູນ 1] ການສ້ອມບຳລຸງ — Garage
   {
-    id:'repair', icon:'🔧', label:'ການສ້ອມບຳລຸງ',
+    id:'repair', icon:'🛠', label:'🛠 ໂມດູນ ການສ້ອມບຳລຸງ (Garage)',
     items: [
       { page:'jo',           icon:'📋', label:'ໃບສັ່ງສ້ອມ (JO)' },
+      { page:'labor_entries',icon:'💼', label:'ບັນທຶກວຽກ + ຄ່າແຮງ' },
+      { page:'tech_performance', icon:'📊', label:'ຜົນງານຊ່າງ (Daily)' },
+      { page:'commission',   icon:'💰', label:'ສະຫຼຸບຄອມມິສຊັ່ນ' },
+      { page:'tech_profiles',icon:'🔧', label:'ໂປຣໄຟລ໌ຊ່າງ' },
+      { page:'service_rates',icon:'📋', label:'ບັນຊີຄ່າແຮງ' },
       { page:'fluids',       icon:'🛢', label:'ຕິດຕາມການເຕີມນ້ຳມັນ' },
       { page:'outsource',    icon:'🔨', label:'ສົ່ງສ້ອມນອກ' },
       { page:'pm',           icon:'🗓', label:'ແຜນ PM' },
@@ -2434,15 +2438,22 @@ const NAV_GROUPS = [
       { page:'predictive',   icon:'🔮', label:'Predictive Maintenance' },
     ]
   },
-  // 👷 ຊ່າງ ແລະ ຄ່າແຮງ
+  // 🚚 [ໂມດູນ 2] ການຂົນສົ່ງ — Logistics
   {
-    id:'labor', icon:'👷', label:'ຊ່າງ ແລະ ຄ່າແຮງ',
+    id:'logistics', icon:'🚚', label:'🚚 ໂມດູນ ການຂົນສົ່ງ (Logistics)',
     items: [
-      { page:'labor_entries',    icon:'💼', label:'ບັນທຶກວຽກ + ຄ່າແຮງ' },
-      { page:'tech_performance', icon:'📊', label:'ຜົນງານຊ່າງ (Daily)' },
-      { page:'commission',       icon:'💰', label:'ສະຫຼຸບຄອມມິສຊັ່ນ' },
-      { page:'tech_profiles',    icon:'🔧', label:'ໂປຣໄຟລ໌ຊ່າງ' },
-      { page:'service_rates',    icon:'📋', label:'ບັນຊີຄ່າແຮງ' },
+      { page:'deliveries',      icon:'📦', label:'ສົ່ງສິນຄ້າໃຫ້ລູກຄ້າ' },
+      { page:'inter_branch',    icon:'🔄', label:'ໂອນສາຂາພາຍໃນ' },
+      { page:'logistics_report',icon:'📊', label:'ລາຍງານຂົນສົ່ງ' },
+      { page:'locations',       icon:'📍', label:'ສະຖານທີ່ + ໄລຍະທາງ' },
+    ]
+  },
+  // 🏗 [ໂມດູນ 3] ການເຊົ່າ — Rental
+  {
+    id:'rental', icon:'🏗', label:'🏗 ໂມດູນ ການເຊົ່າ (Rental)',
+    items: [
+      { page:'rentals',        icon:'🏗', label:'ການເຊົ່າເຄນ/ລົດໜັກ' },
+      { page:'rental_report',  icon:'📊', label:'ລາຍງານການເຊົ່າ' },
     ]
   },
   // 🛡️ ການກວດສອບ Anti-Fraud
@@ -3936,11 +3947,15 @@ async function renderVehicleDetail() {
       <div id="vehicleSpecBox"></div>
     </div>
 
-    <!-- 🚚 Usage Log Summary ສະເພາະຄັນນີ້ -->
+    <!-- 🚚 Usage Log Summary ສະເພາະຄັນນີ້ — ລວມທຸກໂມດູນ (ສ່ວນຕົວ + ຂົນສົ່ງ + ເຊົ່າ) -->
     <div class="card">
-      <h3>🚚 ປະຫວັດການໃຊ້ລົດ + ຄ່າບໍລິການ
-        <button class="btn sm" style="float:right;background:#8B5CF6;color:#fff" onclick="openVehicleUsageModal('${v.vehicle_id}')">+ ບັນທຶກໃຊ້ລົດ</button>
-        <button class="btn sm outline" style="float:right;margin-right:6px" onclick="go('vehicle_usage')">📊 ເບິ່ງທັງໝົດ</button>
+      <h3>🚚 ປະຫວັດການໃຊ້ລົດ + ຄ່າບໍລິການ <small style="font-weight:400;color:var(--muted);font-size:12px">— ລວມທຸກໂມດູນ</small>
+        <span style="float:right;display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn sm outline" onclick="openVehicleUsageModal('${v.vehicle_id}',null,'personal')" title="ໃຊ້ສ່ວນຕົວ">🚙 ສ່ວນຕົວ</button>
+          <button class="btn sm outline" onclick="openVehicleUsageModal('${v.vehicle_id}',null,'customer_delivery')" title="ສົ່ງສິນຄ້າ">📦 ສົ່ງ</button>
+          <button class="btn sm outline" onclick="openVehicleUsageModal('${v.vehicle_id}',null,'crane_rental')" title="ເຊົ່າເຄນ/ລົດໜັກ">🏗 ເຊົ່າ</button>
+          <button class="btn sm outline" onclick="openVehicleUsageModal('${v.vehicle_id}',null,'inter_branch')" title="ໂອນສາຂາ">🔄 ໂອນ</button>
+        </span>
       </h3>
       <div id="vehicleUsageBox"></div>
     </div>
@@ -17971,7 +17986,7 @@ async function nextUsageId() {
   return `UY-${yymm}-${String(max+1).padStart(4,'0')}`;
 }
 
-async function openVehicleUsageModal(prefillVehicleId, editId) {
+async function openVehicleUsageModal(prefillVehicleId, editId, forcedType) {
   try {
   const vehicles = await db.vehicles.toArray();
   const drivers = await db.drivers.toArray();
@@ -17984,7 +17999,7 @@ async function openVehicleUsageModal(prefillVehicleId, editId) {
     usage_id: '',
     date: todayISO(),
     vehicle_id: prefillVehicleId || vehicles[0]?.vehicle_id || '',
-    usage_type: 'personal',
+    usage_type: forcedType || 'personal',
     billing_type: 'per_km',
     driver_id: '',
     operator_name: '',
@@ -18032,9 +18047,9 @@ async function openVehicleUsageModal(prefillVehicleId, editId) {
   modal(editId ? `✏️ ແກ້ໄຂບັນທຶກໃຊ້ລົດ` : `🚚 ບັນທຶກໃຊ້ລົດ`, `
     <div class="row">
       <div class="fld"><label>ວັນທີ</label><input id="uy_date" type="date" value="${u.date}"/></div>
-      <div class="fld"><label>ປະເພດການໃຊ້</label><select id="uy_type" onchange="updateUsageForm()">
+      <div class="fld"><label>ປະເພດການໃຊ້</label><select id="uy_type" onchange="updateUsageForm()" ${forcedType?'disabled style="background:#FEF3C7;font-weight:700"':''}>
         ${USAGE_TYPES.map(t => `<option value="${t.key}" ${u.usage_type===t.key?'selected':''}>${t.label}</option>`).join('')}
-      </select></div>
+      </select>${forcedType?'<small class="muted" style="font-size:11px">🔒 ປະເພດຖືກກຳນົດໂດຍໂມດູນ — ບໍ່ສາມາດປ່ຽນໄດ້</small>':''}</div>
     </div>
     <div class="row">
       <div class="fld"><label>ລົດ</label><select id="uy_vehicle">
@@ -18348,7 +18363,8 @@ async function renderVehicleUsageSummary(v) {
 window._usageFilter = window._usageFilter || { type:'', status:'', month:'' };
 
 pages.vehicle_usage = async () => {
-  const all = (await db.vehicle_usage.toArray()).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  // 🔒 ໂມດູນສ່ວນຕົວ: ສະແດງສະເພາະການໃຊ້ "ສ່ວນຕົວ" — ບໍ່ປົນກັບ Logistics/Rental
+  const all = (await db.vehicle_usage.toArray()).filter(u => u.usage_type === 'personal' || !u.usage_type).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   const vehicles = await db.vehicles.toArray();
   const f = window._usageFilter;
   let filtered = all;
@@ -18362,9 +18378,11 @@ pages.vehicle_usage = async () => {
   const pendingAmount = pendingPay.reduce((s,u)=>s+(u.total_amount||0),0);
 
   $('#main').innerHTML = `
-    <div class="crumbs">${t('nav_operations')||'ການດຳເນີນງານ'} › ບັນທຶກໃຊ້ລົດ</div>
-    <div class="page-title">🚚 ບັນທຶກໃຊ້ລົດ + ຄ່າບໍລິການ <small style="font-weight:400;color:var(--muted);font-size:13px">— ${filtered.length}/${all.length} ລາຍການ</small></div>
-    <div class="alert info" style="font-size:12px">💡 ບັນທຶກການໃຊ້ລົດ 4 ປະເພດ: ສ່ວນຕົວ, ບໍລິການເຄນ, ສົ່ງສິນຄ້າ, ໂອນສາຂາ — ຄິດຄ່າຕາມ km/ຊມ/ຄັ້ງ/ໂຕນ</div>
+    <div class="crumbs">ລົດ ແລະ ການກວດປະຈຳວັນ › ບັນທຶກໃຊ້ສ່ວນຕົວ</div>
+    <div class="page-title">🚙 ບັນທຶກໃຊ້ສ່ວນຕົວ (ບໍ່ຄິດເງິນ) <small style="font-weight:400;color:var(--muted);font-size:13px">— ${filtered.length}/${all.length} ລາຍການ</small></div>
+    <div class="alert info" style="font-size:12px">💡 ບັນທຶກການໃຊ້ລົດສ່ວນຕົວ — ບໍ່ຄິດເງິນ ແຕ່ຕິດຕາມ km/ນ້ຳມັນ.<br>
+      📦 ສຳລັບ <strong>ສົ່ງສິນຄ້າ</strong> → ໄປໂມດູນ <a href="javascript:go('deliveries')" style="color:var(--accent)">🚚 ການຂົນສົ່ງ</a> &nbsp;|&nbsp;
+      🏗 ສຳລັບ <strong>ເຊົ່າເຄນ</strong> → ໄປໂມດູນ <a href="javascript:go('rentals')" style="color:var(--accent)">ການເຊົ່າ</a></div>
 
     <div class="kpi-grid">
       <div class="kpi"><div class="label">📊 ບັນທຶກທັງໝົດ</div><div class="val">${all.length}</div></div>
@@ -18387,11 +18405,11 @@ pages.vehicle_usage = async () => {
       <input type="month" value="${f.month}" onchange="window._usageFilter.month=this.value;pages.vehicle_usage()" style="padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px"/>
       <button class="btn outline" onclick="window._usageFilter={type:'',status:'',month:''};pages.vehicle_usage()">🔄 ລ້າງ</button>
       <div style="flex:1"></div>
-      <button class="btn ok" onclick="openVehicleUsageModal()">+ ບັນທຶກໃໝ່</button>
+      <button class="btn ok" onclick="openVehicleUsageModal(null,null,'personal')">+ ບັນທຶກໃຊ້ສ່ວນຕົວ</button>
     </div>
 
     <div class="card" style="padding:0;overflow-x:auto">
-      ${filtered.length === 0 ? '<div class="empty" style="padding:30px"><div class="icon">🚚</div><p>ບໍ່ມີຂໍ້ມູນ</p></div>' : `
+      ${filtered.length === 0 ? '<div class="empty" style="padding:30px"><div class="icon">🚙</div><p>ບໍ່ມີຂໍ້ມູນ</p></div>' : `
       <table style="font-size:12.5px;min-width:1100px">
         <tr>
           <th>ວັນທີ</th><th>ເລກທີ</th><th>ປະເພດ</th><th>ລົດ</th><th>ຄົນຂັບ</th>
@@ -18426,7 +18444,241 @@ pages.vehicle_usage = async () => {
 async function delVehicleUsage(id) {
   if (!confirm(t('confirm_delete'))) return;
   await softDelete('vehicle_usage', id, r => `Usage: ${r.usage_id} — ${r.vehicle_id}`);
-  pages.vehicle_usage();
+  if (currentPage === 'deliveries') pages.deliveries();
+  else if (currentPage === 'inter_branch') pages.inter_branch();
+  else if (currentPage === 'rentals') pages.rentals();
+  else pages.vehicle_usage();
+}
+
+// =============================================================================
+// 📦 ໂມດູນ ການຂົນສົ່ງ — Customer Delivery + Inter-Branch Transfer
+// =============================================================================
+
+// 📦 ສົ່ງສິນຄ້າໃຫ້ລູກຄ້າ
+pages.deliveries = async () => {
+  await renderUsageModulePage({
+    module: 'deliveries',
+    allowedTypes: ['customer_delivery'],
+    title: '📦 ການສົ່ງສິນຄ້າໃຫ້ລູກຄ້າ',
+    crumb: '🚚 ການຂົນສົ່ງ',
+    icon: '📦',
+    description: 'ບັນທຶກການສົ່ງສິນຄ້າໃຫ້ລູກຄ້າ — ຄິດຄ່າຂົນສົ່ງຕາມ km/ໂຕນ/ຄັ້ງ',
+    addLabel: '+ ສ້າງໃບສົ່ງສິນຄ້າ',
+    defaultType: 'customer_delivery',
+  });
+};
+
+// 🔄 ໂອນສິນຄ້າພາຍໃນສາຂາ
+pages.inter_branch = async () => {
+  await renderUsageModulePage({
+    module: 'inter_branch',
+    allowedTypes: ['inter_branch'],
+    title: '🔄 ການໂອນສິນຄ້າພາຍໃນ (ສາຂາ ↔ ສາຂາ)',
+    crumb: '🚚 ການຂົນສົ່ງ',
+    icon: '🔄',
+    description: 'ບັນທຶກການໂອນສິນຄ້າຈາກສາຂາໜຶ່ງໄປສາຂາໜຶ່ງ — ບໍ່ຄິດເງິນ ແຕ່ຕິດຕາມ km/ນ້ຳມັນ',
+    addLabel: '+ ສ້າງໃບໂອນສາຂາ',
+    defaultType: 'inter_branch',
+  });
+};
+
+// 🏗 ການເຊົ່າເຄນ/ລົດໜັກ
+pages.rentals = async () => {
+  await renderUsageModulePage({
+    module: 'rentals',
+    allowedTypes: ['crane_rental'],
+    title: '🏗 ການເຊົ່າເຄນ / ລົດໜັກ / ແບັກໂຮ',
+    crumb: '🏗 ການເຊົ່າ',
+    icon: '🏗',
+    description: 'ບໍລິການເຊົ່າເຄນ/ລົດໜັກ/ແບັກໂຮ — ຄິດຄ່າຕາມຊົ່ວໂມງ/ໂຕນ/ຄັ້ງ',
+    addLabel: '+ ສ້າງໃບເຊົ່າ',
+    defaultType: 'crane_rental',
+  });
+};
+
+// 📊 ລາຍງານຂົນສົ່ງ
+pages.logistics_report = async () => {
+  const all = (await db.vehicle_usage.toArray()).filter(u => u.usage_type === 'customer_delivery' || u.usage_type === 'inter_branch');
+  await renderUsageReport({
+    title: '📊 ລາຍງານການຂົນສົ່ງ',
+    crumb: '🚚 ການຂົນສົ່ງ',
+    entries: all,
+    revenueTypes: ['customer_delivery'],
+  });
+};
+
+// 📊 ລາຍງານການເຊົ່າ
+pages.rental_report = async () => {
+  const all = (await db.vehicle_usage.toArray()).filter(u => u.usage_type === 'crane_rental');
+  await renderUsageReport({
+    title: '📊 ລາຍງານການເຊົ່າ',
+    crumb: '🏗 ການເຊົ່າ',
+    entries: all,
+    revenueTypes: ['crane_rental'],
+  });
+};
+
+// Helper — Generic Module Page (Filter by type)
+window._modFilter = window._modFilter || {};
+async function renderUsageModulePage(cfg) {
+  window._modFilter[cfg.module] = window._modFilter[cfg.module] || { status:'', month:'', q:'' };
+  const all = (await db.vehicle_usage.toArray())
+    .filter(u => cfg.allowedTypes.includes(u.usage_type))
+    .sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const vehicles = await db.vehicles.toArray();
+  const f = window._modFilter[cfg.module];
+  let filtered = all;
+  if (f.status) filtered = filtered.filter(u => u.payment_status === f.status);
+  if (f.month) filtered = filtered.filter(u => (u.date||'').startsWith(f.month));
+  if (f.q) {
+    const q = f.q.toLowerCase();
+    filtered = filtered.filter(u => (u.customer_name||'').toLowerCase().includes(q) ||
+      (u.cargo_desc||'').toLowerCase().includes(q) ||
+      (u.branch_to||'').toLowerCase().includes(q) ||
+      (u.usage_id||'').toLowerCase().includes(q));
+  }
+  // KPI
+  const totalRevenue = filtered.reduce((s,u)=>s+(u.total_amount||0),0);
+  const pendingPay = filtered.filter(u => u.payment_status === 'pending' && (u.total_amount||0) > 0);
+  const pendingAmount = pendingPay.reduce((s,u)=>s+(u.total_amount||0),0);
+  const inProgress = filtered.filter(u => u.status === 'in_progress' || u.status === 'planned').length;
+
+  $('#main').innerHTML = `
+    <div class="crumbs">${cfg.crumb} › ${cfg.title}</div>
+    <div class="page-title">${cfg.icon} ${cfg.title} <small style="font-weight:400;color:var(--muted);font-size:13px">— ${filtered.length}/${all.length} ລາຍການ</small></div>
+    <div class="alert info" style="font-size:12px">💡 ${cfg.description}</div>
+
+    <div class="kpi-grid">
+      <div class="kpi"><div class="label">📊 ບັນທຶກທັງໝົດ</div><div class="val">${all.length}</div></div>
+      <div class="kpi"><div class="label">💰 ມູນຄ່າລວມ</div><div class="val" style="color:var(--ok)">${fmt(totalRevenue)}</div><div class="muted">ກີບ</div></div>
+      <div class="kpi" style="${pendingAmount>0?'border-left:4px solid var(--warn)':''}"><div class="label">⏳ ຄ້າງຮັບ</div><div class="val" style="color:${pendingAmount>0?'var(--warn)':'var(--muted)'}">${fmt(pendingAmount)}</div><div class="muted">${pendingPay.length} ບິນ</div></div>
+      <div class="kpi"><div class="label">🚧 ກຳລັງດຳເນີນ</div><div class="val" style="color:var(--info)">${inProgress}</div><div class="muted">ບໍ່ສຳເລັດ</div></div>
+    </div>
+
+    <div class="toolbar" style="flex-wrap:wrap;gap:8px">
+      <select onchange="window._modFilter['${cfg.module}'].status=this.value;pages.${cfg.module}()" style="padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px">
+        <option value="">ທຸກສະຖານະຊຳລະ</option>
+        <option value="pending" ${f.status==='pending'?'selected':''}>ຍັງບໍ່ຊຳລະ</option>
+        <option value="paid" ${f.status==='paid'?'selected':''}>ຊຳລະແລ້ວ</option>
+        <option value="invoiced" ${f.status==='invoiced'?'selected':''}>ອອກບິນແລ້ວ</option>
+      </select>
+      <input type="month" value="${f.month}" onchange="window._modFilter['${cfg.module}'].month=this.value;pages.${cfg.module}()" style="padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px"/>
+      <input type="search" placeholder="🔍 ຄົ້ນຫາ..." value="${escapeHtml(f.q)}"
+        oninput="window._modFilter['${cfg.module}'].q=this.value;clearTimeout(window._mft);window._mft=setTimeout(()=>pages.${cfg.module}(),300)"
+        style="padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;min-width:200px"/>
+      <button class="btn outline" onclick="window._modFilter['${cfg.module}']={status:'',month:'',q:''};pages.${cfg.module}()">🔄 ລ້າງ</button>
+      <div style="flex:1"></div>
+      <button class="btn ok" onclick="openVehicleUsageModal(null,null,'${cfg.defaultType}')">${cfg.addLabel}</button>
+    </div>
+
+    <div class="card" style="padding:0;overflow-x:auto">
+      ${filtered.length === 0 ? `<div class="empty" style="padding:30px"><div class="icon">${cfg.icon}</div><p>ບໍ່ມີຂໍ້ມູນ — ກົດ "${cfg.addLabel}" ເພື່ອເລີ່ມຕົ້ນ</p></div>` : `
+      <table style="font-size:12.5px;min-width:1000px">
+        <tr>
+          <th>ວັນທີ</th><th>ເລກທີ</th><th>ລົດ</th><th>ຄົນຂັບ</th>
+          <th>${cfg.defaultType==='customer_delivery'?'ລູກຄ້າ':cfg.defaultType==='inter_branch'?'ສາຂາ ໄປ→ມາ':'ຜູ້ເຊົ່າ'}</th>
+          <th>ລາຍລະອຽດ</th><th style="text-align:right">ໄລຍະ/ຊມ</th><th style="text-align:right">ຍອດ</th>
+          <th>ຊຳລະ</th><th>ສະຖານະ</th><th></th>
+        </tr>
+        ${filtered.slice(0,100).map(u => {
+          const veh = vehicles.find(v => v.vehicle_id === u.vehicle_id);
+          const partyLabel = cfg.defaultType==='inter_branch' ? `${escapeHtml(u.branch_from||'?')} → ${escapeHtml(u.branch_to||'?')}` :
+                             cfg.defaultType==='customer_delivery' ? escapeHtml(u.customer_name||'-') :
+                             escapeHtml(u.customer_name || u.operator_name || '-');
+          return `<tr>
+            <td>${u.date||'-'}</td>
+            <td><strong style="font-family:monospace;font-size:11px">${u.usage_id||'-'}</strong></td>
+            <td>${veh?escapeHtml(veh.plate||veh.vehicle_id):u.vehicle_id}</td>
+            <td>${escapeHtml((u.driver_id||u.operator_name||'-').slice(0,15))}</td>
+            <td>${partyLabel}</td>
+            <td style="font-size:11px">${escapeHtml((u.cargo_desc||'-').slice(0,40))}</td>
+            <td style="text-align:right">${u.total_km?fmt(u.total_km)+' km':u.total_hours?u.total_hours.toFixed(1)+' ຊມ':'-'}</td>
+            <td style="text-align:right;font-weight:700;color:${u.total_amount>0?'var(--ok)':'var(--muted)'}">${fmt(u.total_amount||0)}</td>
+            <td><span class="pill ${u.payment_status==='paid'?'ok':u.payment_status==='invoiced'?'info':'warn'}" style="font-size:10px">${u.payment_status==='paid'?'ຊຳລະ':u.payment_status==='invoiced'?'ບິນ':'ຄ້າງ'}</span></td>
+            <td><span class="pill ${u.status==='completed'?'ok':u.status==='in_progress'?'info':u.status==='cancelled'?'bad':'gray'}" style="font-size:10px">${u.status==='completed'?'ສຳເລັດ':u.status==='in_progress'?'ດຳເນີນ':u.status==='cancelled'?'ຍົກເລີກ':'ວາງແຜນ'}</span></td>
+            <td class="actions"><button class="btn sm outline" onclick="openVehicleUsageModal(null,${u.id})">${t('edit')}</button>
+              ${isAdmin()?`<button class="btn sm danger" onclick="delVehicleUsage(${u.id})">${t('delete')}</button>`:''}
+            </td>
+          </tr>`;
+        }).join('')}
+      </table>`}
+    </div>
+  `;
+}
+
+// Generic Report Renderer
+async function renderUsageReport(cfg) {
+  const vehicles = await db.vehicles.toArray();
+  const entries = cfg.entries.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  // ນັບລາຍຮັບຕາມເດືອນ (12 ເດືອນຫຼ້າສຸດ)
+  const byMonth = {};
+  entries.forEach(e => {
+    const m = (e.date||'').slice(0,7);
+    if (!m) return;
+    byMonth[m] = byMonth[m] || { count:0, revenue:0, km:0, hours:0 };
+    byMonth[m].count++;
+    if (cfg.revenueTypes.includes(e.usage_type)) byMonth[m].revenue += (e.total_amount||0);
+    byMonth[m].km += (e.total_km||0);
+    byMonth[m].hours += (e.total_hours||0);
+  });
+  const sortedMonths = Object.keys(byMonth).sort().slice(-12);
+  // ນັບລາຍຮັບຕາມລົດ Top 10
+  const byVehicle = {};
+  entries.forEach(e => {
+    byVehicle[e.vehicle_id] = byVehicle[e.vehicle_id] || { count:0, revenue:0, km:0 };
+    byVehicle[e.vehicle_id].count++;
+    if (cfg.revenueTypes.includes(e.usage_type)) byVehicle[e.vehicle_id].revenue += (e.total_amount||0);
+    byVehicle[e.vehicle_id].km += (e.total_km||0);
+  });
+  const topVehicles = Object.entries(byVehicle).sort((a,b)=>b[1].revenue-a[1].revenue).slice(0,10);
+
+  const totalRev = entries.filter(e => cfg.revenueTypes.includes(e.usage_type)).reduce((s,e)=>s+(e.total_amount||0),0);
+  const pendingRev = entries.filter(e => cfg.revenueTypes.includes(e.usage_type) && e.payment_status==='pending').reduce((s,e)=>s+(e.total_amount||0),0);
+
+  $('#main').innerHTML = `
+    <div class="crumbs">${cfg.crumb} › ${cfg.title}</div>
+    <div class="page-title">${cfg.title}</div>
+
+    <div class="kpi-grid">
+      <div class="kpi"><div class="label">📊 ບັນທຶກລວມ</div><div class="val">${entries.length}</div></div>
+      <div class="kpi"><div class="label">💰 ລາຍຮັບລວມ</div><div class="val" style="color:var(--ok)">${fmt(totalRev)}</div><div class="muted">ກີບ</div></div>
+      <div class="kpi" style="${pendingRev>0?'border-left:4px solid var(--warn)':''}"><div class="label">⏳ ຄ້າງຮັບ</div><div class="val" style="color:${pendingRev>0?'var(--warn)':'var(--muted)'}">${fmt(pendingRev)}</div></div>
+      <div class="kpi"><div class="label">🚗 ລົດໃຊ້</div><div class="val">${Object.keys(byVehicle).length}</div></div>
+    </div>
+
+    <div class="card">
+      <h3>📅 ສະຖິຕິ 12 ເດືອນຫຼ້າສຸດ</h3>
+      ${sortedMonths.length === 0 ? '<p class="muted">ບໍ່ມີຂໍ້ມູນ</p>' : `
+      <table style="font-size:12.5px">
+        <tr><th>ເດືອນ</th><th style="text-align:right">ບັນທຶກ</th><th style="text-align:right">ລາຍຮັບ (ກີບ)</th><th style="text-align:right">km</th><th style="text-align:right">ຊມ</th></tr>
+        ${sortedMonths.map(m => `<tr>
+          <td><strong>${m}</strong></td>
+          <td style="text-align:right">${byMonth[m].count}</td>
+          <td style="text-align:right;font-weight:700;color:var(--ok)">${fmt(byMonth[m].revenue)}</td>
+          <td style="text-align:right">${fmt(Math.round(byMonth[m].km))}</td>
+          <td style="text-align:right">${byMonth[m].hours.toFixed(1)}</td>
+        </tr>`).join('')}
+      </table>`}
+    </div>
+
+    <div class="card">
+      <h3>🚗 Top 10 ລົດທີ່ສ້າງລາຍຮັບສູງສຸດ</h3>
+      ${topVehicles.length === 0 ? '<p class="muted">ບໍ່ມີຂໍ້ມູນ</p>' : `
+      <table style="font-size:12.5px">
+        <tr><th>ອັນດັບ</th><th>ລົດ</th><th style="text-align:right">ບັນທຶກ</th><th style="text-align:right">ລາຍຮັບ</th><th style="text-align:right">km ລວມ</th></tr>
+        ${topVehicles.map(([vid, st], i) => {
+          const v = vehicles.find(x => x.vehicle_id === vid);
+          return `<tr>
+            <td><strong>${i+1}</strong></td>
+            <td>${v?escapeHtml(v.plate||vid)+' — '+escapeHtml(v.type||''):vid}</td>
+            <td style="text-align:right">${st.count}</td>
+            <td style="text-align:right;font-weight:700;color:var(--ok)">${fmt(st.revenue)}</td>
+            <td style="text-align:right">${fmt(Math.round(st.km))}</td>
+          </tr>`;
+        }).join('')}
+      </table>`}
+    </div>
+  `;
 }
 
 // =============================================================================
