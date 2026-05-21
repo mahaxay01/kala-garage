@@ -17915,8 +17915,14 @@ async function nextUsageId() {
 }
 
 async function openVehicleUsageModal(prefillVehicleId, editId) {
+  try {
   const vehicles = await db.vehicles.toArray();
   const drivers = await db.drivers.toArray();
+  if (vehicles.length === 0) {
+    toast('⚠️ ກະລຸນາສ້າງລົດກ່ອນ — ໄປໜ້າ "ທະບຽນລົດ"', 'warn');
+    setTimeout(() => go('vehicles'), 800);
+    return;
+  }
   let u = {
     usage_id: '',
     date: todayISO(),
@@ -17944,8 +17950,13 @@ async function openVehicleUsageModal(prefillVehicleId, editId) {
     notes: '',
     status: 'completed',
   };
-  if (editId) u = Object.assign(u, await db.vehicle_usage.get(editId));
-  const branches = (await db.branches.where('active').equals('true').toArray()).concat(await db.branches.where('active').equals(true).toArray()).reduce((a,b)=>{ if(!a.some(x=>x.id===b.id))a.push(b); return a; },[]);
+  if (editId) {
+    const existing = await db.vehicle_usage.get(editId);
+    if (existing) u = Object.assign(u, existing);
+  }
+  // ດຶງ branches ທີ່ active=true (ໂດຍບໍ່ຜ່ານ index — ກັນປະຫຍັດ Dexie type-mismatch)
+  const allBranches = await db.branches.toArray();
+  const branches = allBranches.filter(b => b.active !== false);
   const branchOptions = branches.map(b => `<option value="${escapeHtml(b.name)}" ${u.branch_from===b.name?'selected':''}>${escapeHtml(b.name)}</option>`).join('');
   const branchOptionsTo = branches.map(b => `<option value="${escapeHtml(b.name)}" ${u.branch_to===b.name?'selected':''}>${escapeHtml(b.name)}</option>`).join('');
 
@@ -18050,6 +18061,10 @@ async function openVehicleUsageModal(prefillVehicleId, editId) {
   `);
   updateUsageForm();
   calcUsageAmount();
+  } catch (e) {
+    console.error('openVehicleUsageModal error:', e);
+    toast('❌ ເປີດຟອມບໍ່ສຳເລັດ: ' + e.message, 'bad');
+  }
 }
 
 function updateUsageForm() {
