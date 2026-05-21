@@ -1497,6 +1497,58 @@ db.version(2).stores({
   outsource: '++id, jo_id, vendor_id, status',
   settings: 'key',
 });
+// ===== v19: Vehicle Data Sheet + Usage Log =====
+db.version(19).stores({
+  vehicles: '++id, vehicle_id, plate, type, branch, status, category_id',
+  inspections: '++id, vehicle_id, date, status, frequency, driver',
+  joborders: '++id, jo_id, vehicle_id, priority, status, created',
+  parts: '++id, code, class, grade, category_id, warehouse, status',
+  partmovements: '++id, part_id, type, date',
+  drivers: '++id, driver_id, name, license_expiry, assigned_vehicle',
+  tires: '++id, tire_id, current_vehicle, position, status, install_km, install_date',
+  tire_history: '++id, tire_id, date, event_type, vehicle_id, position, km',
+  vendors: '++id, vendor_id, name, category_id, province',
+  vendorprices: '++id, vendor_id, part_code, currency, date',
+  tools: '++id, tool_id, name, calib_due, status',
+  outsource: '++id, jo_id, vendor_id, status',
+  fluids: '++id, vehicle_id, type, date, next_due_date',
+  mileage_log: '++id, vehicle_id, date, mileage',
+  categories: '++id, name, type, parent_id',
+  exchange_rates: '++id, currency, rate, valid_from',
+  pm_templates: '++id, vehicle_type, interval_type, interval_value',
+  pm_history: '++id, vehicle_id, template_id, date, mileage',
+  fuel_log: '++id, vehicle_id, date, driver, station',
+  documents: '++id, entity_type, entity_id, doc_type, expiry_date',
+  incidents: '++id, date, vehicle_id, driver_id, severity, status',
+  audit_log: '++id, timestamp, user, action, entity',
+  purchase_requests: '++id, pr_id, vendor_id, status, created, total_lak',
+  purchase_orders: '++id, po_id, vendor_id, status, created, urgency, total_lak',
+  vehicle_pm: '++id, vehicle_id, interval_type, interval_value, active',
+  gps_devices: '++id, vehicle_id, imei, model, platform, status, installed_date',
+  driver_reviews: '++id, driver_id, review_date, reviewer, period, total_score',
+  receipt_inspections: '++id, jo_id, vehicle_id, date, inspector',
+  predelivery_inspections: '++id, jo_id, vehicle_id, date, inspector, approved',
+  users: '++id, username, role, name, active, created',
+  depreciation: '++id, vehicle_id, year, month, value, accumulated',
+  parts_replacements: '++id, vehicle_id, part_type, date, km, cost, jo_id',
+  ai_chat_history: '++id, timestamp, role, content',
+  deleted_items: '++id, deleted_at, deleted_by, store, original_id, summary, restored',
+  price_change_audit: '++id, timestamp, user, entity_type, entity_id, field, old_value, new_value, summary',
+  service_rates: '++id, service_code, service_name, category, vehicle_group, base_charge, skill_required, active',
+  tech_profiles: '++id, tech_id, name, skill_level, commission_pct, walkin_commission_pct, active, branch',
+  labor_entries: '++id, entry_id, date, jo_id, vehicle_id, tech_id, service_code, charge_amount, commission_amount, status, approved_by, customer_type, intake_id',
+  customer_receipts: '++id, receipt_id, date, labor_entry_id, customer_name, customer_phone, vehicle_plate, total_amount, signed_at, signed_by_customer',
+  vehicle_intakes: '++id, intake_id, date, customer_phone, vehicle_plate, pickup_code, status, received_by_tech_id, linked_entry_id, delivered_at',
+  camera_counts: '++id, date, vehicles_in, vehicles_out, recorded_by',
+  customer_audits: '++id, audit_id, labor_entry_id, customer_phone, audit_date, called_at, response, satisfaction, received_receipt, called_by, notes',
+  branches: '++id, branch_id, name, province, address, manager, active',
+  // ===== NEW v19: Vehicle Data Sheet (ສະເປັກລະອຽດຕໍ່ລົດ) =====
+  vehicle_specs: '++id, vehicle_id, updated_at',
+  // ===== NEW v19: Vehicle Usage Log (ບັນທຶກໃຊ້ລົດ + ຄ່າບໍລິການ) =====
+  vehicle_usage: '++id, usage_id, date, vehicle_id, usage_type, billing_type, customer_phone, status, total_amount, created_by',
+  vehicle_usage_rates: '++id, vehicle_id, vehicle_type, rate_per_km, rate_per_hour, rate_per_ton, fixed_trip_rate, active',
+  settings: 'key',
+});
 db.version(18).stores({
   vehicles: '++id, vehicle_id, plate, type, branch, status, category_id',
   inspections: '++id, vehicle_id, date, status, frequency, driver',
@@ -2299,16 +2351,17 @@ const NAV_GROUPS = [
   {
     id:'fleet', icon:'🚗', label:'ລົດ ແລະ ການກວດປະຈຳວັນ',
     items: [
-      { page:'vehicles',    icon:'🚗', label:'ທະບຽນລົດ' },
-      { page:'drivers',     icon:'👤', label:'ຄົນຂັບ' },
-      { page:'driver_perf', icon:'🏆', label:'ຄະແນນຄົນຂັບ' },
-      { page:'daily',       icon:'✅', label:'ກວດປະຈຳວັນ' },
-      { page:'fuel',        icon:'⛽', label:'ບິນນ້ຳມັນ' },
-      { page:'mileage',     icon:'📏', label:'ບັນທຶກເລກໄມ' },
-      { page:'tires',       icon:'⚙️', label:'ຈັດການຢາງ' },
-      { page:'incidents',   icon:'🚨', label:'ອຸປະຕິເຫດ' },
-      { page:'defects',     icon:'🔧', label:'ຄວາມບົກພ່ອງ' },
-      { page:'documents',   icon:'📜', label:'ເອກະສານ' },
+      { page:'vehicles',      icon:'🚗', label:'ທະບຽນລົດ' },
+      { page:'vehicle_usage', icon:'🚚', label:'ບັນທຶກໃຊ້ລົດ + ຄ່າບໍລິການ' },
+      { page:'drivers',       icon:'👤', label:'ຄົນຂັບ' },
+      { page:'driver_perf',   icon:'🏆', label:'ຄະແນນຄົນຂັບ' },
+      { page:'daily',         icon:'✅', label:'ກວດປະຈຳວັນ' },
+      { page:'fuel',          icon:'⛽', label:'ບິນນ້ຳມັນ' },
+      { page:'mileage',       icon:'📏', label:'ບັນທຶກເລກໄມ' },
+      { page:'tires',         icon:'⚙️', label:'ຈັດການຢາງ' },
+      { page:'incidents',     icon:'🚨', label:'ອຸປະຕິເຫດ' },
+      { page:'defects',       icon:'🔧', label:'ຄວາມບົກພ່ອງ' },
+      { page:'documents',     icon:'📜', label:'ເອກະສານ' },
     ]
   },
   // 🔧 ການສ້ອມບຳລຸງ
@@ -3818,6 +3871,23 @@ async function renderVehicleDetail() {
       ${adminOnly(`<button class="btn sm" onclick="openVehiclePMModal()" style="margin-top:8px">+ ເພີ່ມໄລຍະ PM ສະເພາະຄັນນີ້</button>`)}
     </div>
 
+    <!-- 📋 Vehicle Data Sheet (ສະເປັກລະອຽດ) -->
+    <div class="card">
+      <h3>📋 Data Sheet — ສະເປັກລະອຽດຂອງລົດຄັນນີ້
+        <button class="btn sm ok" style="float:right" onclick="openVehicleSpecModal('${v.vehicle_id}')">${t('edit')}</button>
+      </h3>
+      <div id="vehicleSpecBox"></div>
+    </div>
+
+    <!-- 🚚 Usage Log Summary ສະເພາະຄັນນີ້ -->
+    <div class="card">
+      <h3>🚚 ປະຫວັດການໃຊ້ລົດ + ຄ່າບໍລິການ
+        <button class="btn sm" style="float:right;background:#8B5CF6;color:#fff" onclick="openVehicleUsageModal('${v.vehicle_id}')">+ ບັນທຶກໃຊ້ລົດ</button>
+        <button class="btn sm outline" style="float:right;margin-right:6px" onclick="go('vehicle_usage')">📊 ເບິ່ງທັງໝົດ</button>
+      </h3>
+      <div id="vehicleUsageBox"></div>
+    </div>
+
     <div class="card">
       <h3>${t('section_mileage_trend')}</h3>
       <div style="height:200px;position:relative"><canvas id="vehMilCh"></canvas></div>
@@ -3827,6 +3897,9 @@ async function renderVehicleDetail() {
   // Render per-vehicle PM list + Replacements
   await renderVehiclePMList(v);
   await renderVehicleReplacements(v);
+  // Render Data Sheet + Usage Summary
+  await renderVehicleSpecCard(v);
+  await renderVehicleUsageSummary(v);
 
   // Render mileage chart
   const milLogs = (await db.mileage_log.where('vehicle_id').equals(v.vehicle_id).toArray()).sort((a,b)=>a.date.localeCompare(b.date));
@@ -17597,6 +17670,617 @@ async function getActiveBranches() {
     .filter(b => b.active !== false)
     .sort((a,b) => a.branch_id.localeCompare(b.branch_id))
     .map(b => b.name);
+}
+
+// =============================================================================
+// 📋 VEHICLE DATA SHEET (ສະເປັກລະອຽດຕໍ່ລົດ) + 🚚 USAGE LOG (ບັນທຶກໃຊ້ລົດ)
+// =============================================================================
+
+// ໝວດສະເປັກ + Fields ສຳລັບ Vehicle Data Sheet
+const SPEC_SECTIONS = [
+  {
+    key: 'engine', label: '🔧 ເຄື່ອງຍົນ', icon: '🔧',
+    fields: [
+      ['engine_brand', 'ຍີ່ຫໍ້ເຄື່ອງຍົນ', 'text', 'Cummins / Mitsubishi / Hino...'],
+      ['engine_model', 'ລຸ້ນເຄື່ອງ', 'text', '6BT5.9 / 4D34...'],
+      ['engine_displacement_cc', 'ຄວາມຈຸ (CC)', 'number', '5,900'],
+      ['engine_power_hp', 'ກຳລັງສູງສຸດ (HP/ແຮງມ້າ)', 'number', '210'],
+      ['engine_torque_nm', 'Torque ສູງສຸດ (N·m)', 'number', '760'],
+      ['fuel_type', 'ປະເພດນ້ຳມັນ', 'select:diesel,gasoline,gas,hybrid,ev', 'diesel'],
+      ['fuel_tank_l', 'ຄວາມຈຸຖັງນ້ຳມັນ (ລິດ)', 'number', '200'],
+      ['emission_standard', 'ມາດຕະຖານໄອເສຍ', 'text', 'Euro 4 / Euro 5'],
+    ]
+  },
+  {
+    key: 'transmission', label: '⚙️ ສົ່ງກຳລັງ', icon: '⚙️',
+    fields: [
+      ['trans_type', 'ປະເພດເກຍ', 'select:manual,auto,amt', 'manual'],
+      ['trans_gears', 'ຈຳນວນເກຍ', 'text', '6 ໜ້າ + 1 ຫຼັງ'],
+      ['drive_layout', 'ການຂັບເຄື່ອນ', 'select:4x2,4x4,6x2,6x4,8x4', '4x2'],
+    ]
+  },
+  {
+    key: 'chassis', label: '🏗 ໂຄງສ້າງ + ຊ່ວງລ່າງ', icon: '🏗',
+    fields: [
+      ['chassis_model', 'ລຸ້ນແຊດສິສ', 'text', ''],
+      ['suspension_front', 'ຊ່ວງລ່າງໜ້າ', 'text', 'Leaf Spring / ສະປຣິງ'],
+      ['suspension_rear', 'ຊ່ວງລ່າງຫຼັງ', 'text', 'Leaf Spring / Air Suspension'],
+      ['brake_type', 'ປະເພດເບຣກ', 'text', 'Air Brake / Hydraulic'],
+      ['axles', 'ຈຳນວນຫຼາ (ເພຼົາ)', 'number', '2'],
+    ]
+  },
+  {
+    key: 'dimensions', label: '📐 ມິຕິ + ນ້ຳໜັກ', icon: '📐',
+    fields: [
+      ['length_mm', 'ຄວາມຍາວ (mm)', 'number', '7,500'],
+      ['width_mm', 'ຄວາມກວ້າງ (mm)', 'number', '2,300'],
+      ['height_mm', 'ຄວາມສູງ (mm)', 'number', '2,800'],
+      ['wheelbase_mm', 'Wheelbase (mm)', 'number', '4,200'],
+      ['ground_clearance_mm', 'ໄລຍະຫ່າງພື້ນ (mm)', 'number', '230'],
+      ['curb_weight_kg', 'ນ້ຳໜັກລົດເປົ່າ (kg)', 'number', '4,500'],
+      ['gvw_kg', 'ນ້ຳໜັກລວມສູງສຸດ - GVW (kg)', 'number', '8,500'],
+      ['payload_kg', 'ບັນທຸກສູງສຸດ (kg)', 'number', '4,000'],
+    ]
+  },
+  {
+    key: 'tires', label: '🛞 ມາດຕະຖານຢາງ', icon: '🛞',
+    fields: [
+      ['tire_size', 'ຂະໜາດຢາງ', 'text', '7.50R16 / 11R22.5'],
+      ['tire_type', 'ປະເພດຢາງ', 'select:tubeless,tube,radial,bias', 'tubeless'],
+      ['tire_brand_pref', 'ຍີ່ຫໍ້ມາດຕະຖານ', 'text', 'Bridgestone / Michelin'],
+      ['tire_pressure_front', 'ລົມຢາງໜ້າ (PSI)', 'number', '110'],
+      ['tire_pressure_rear', 'ລົມຢາງຫຼັງ (PSI)', 'number', '120'],
+      ['tire_qty', 'ຈຳນວນຢາງ + Spare', 'text', '6 + 1'],
+    ]
+  },
+  {
+    key: 'fluids', label: '🛢 ນ້ຳມັນ + ຂອງແຫຼວ', icon: '🛢',
+    fields: [
+      ['engine_oil_grade', 'ນ້ຳມັນເຄື່ອງ - SAE', 'text', '15W-40'],
+      ['engine_oil_api', 'ມາດຕະຖານ API', 'text', 'CI-4 / CK-4'],
+      ['engine_oil_capacity_l', 'ຈຸເຄື່ອງ (ລິດ)', 'number', '14'],
+      ['gear_oil_grade', 'ນ້ຳມັນເກຍ', 'text', '85W-140 / 75W-90'],
+      ['gear_oil_capacity_l', 'ຈຸເກຍ (ລິດ)', 'number', '6'],
+      ['diff_oil_grade', 'ນ້ຳມັນເຟືອງທ້າຍ', 'text', '85W-140'],
+      ['brake_fluid', 'ນ້ຳມັນເບຣກ', 'text', 'DOT 4'],
+      ['coolant_type', 'ນ້ຳຫຼໍ່ເຢັນ', 'text', 'Long Life Coolant'],
+      ['coolant_capacity_l', 'ຈຸລະບົບເຢັນ (ລິດ)', 'number', '20'],
+      ['hydraulic_oil', 'ນ້ຳມັນໄຮດໍລິກ (ຖ້າມີ)', 'text', 'ISO VG 46'],
+      ['ac_refrigerant', 'ນ້ຳຢາແອ', 'text', 'R-134a / R-1234yf'],
+    ]
+  },
+  {
+    key: 'electrical', label: '🔋 ໄຟຟ້າ', icon: '🔋',
+    fields: [
+      ['battery_v', 'ໝໍ້ໄຟ (V)', 'number', '24'],
+      ['battery_ah', 'Ah', 'number', '100'],
+      ['battery_qty', 'ຈຳນວນໝໍ້ໄຟ', 'number', '2'],
+      ['alternator_a', 'ໄດສະຕາດ - Alternator (A)', 'number', '90'],
+    ]
+  },
+  {
+    key: 'crane', label: '🏗 ເຄນ (Crane) — ຖ້າມີ', icon: '🏗',
+    fields: [
+      ['crane_brand', 'ຍີ່ຫໍ້ເຄນ', 'text', 'Tadano / Hiab / Kanglim'],
+      ['crane_model', 'ລຸ້ນເຄນ', 'text', 'TM-ZR504'],
+      ['max_lift_ton', 'ນ້ຳໜັກຍົກສູງສຸດ (ໂຕນ)', 'number', '5'],
+      ['max_lift_height_m', 'ຄວາມສູງຍົກສູງສຸດ (m)', 'number', '15'],
+      ['max_lift_radius_m', 'ໄລຍະຍຶດສູງສຸດ (m)', 'number', '12'],
+      ['boom_sections', 'ຈຳນວນປ້ອງບູມ', 'number', '4'],
+      ['boom_type', 'ປະເພດບູມ', 'select:hydraulic,knuckle,telescopic', 'hydraulic'],
+      ['outriggers', 'ຂາຍັນ (Outriggers)', 'number', '4'],
+    ]
+  },
+  {
+    key: 'backhoe', label: '🚜 ແບັກໂຮ/ລົດຕັກ — ຖ້າມີ', icon: '🚜',
+    fields: [
+      ['bucket_capacity_m3', 'ຄວາມຈຸບຸ້ງກີ໋ (m³)', 'number', '0.25'],
+      ['dig_depth_m', 'ຄວາມເລິກຂຸດສູງສຸດ (m)', 'number', '4.5'],
+      ['dig_reach_m', 'ໄລຍະຂຸດສູງສຸດ (m)', 'number', '7.0'],
+      ['operating_weight_kg', 'ນ້ຳໜັກລົດໃຊ້ງານ (kg)', 'number', '7,500'],
+      ['track_type', 'ປະເພດຕີນ', 'select:tire,track,wheeled', 'track'],
+    ]
+  },
+  {
+    key: 'notes', label: '📝 ບັນທຶກເພີ່ມເຕີມ', icon: '📝',
+    fields: [
+      ['notes', 'ບັນທຶກອື່ນໆ', 'textarea', 'ຄຳແນະນຳພິເສດ ຄຳເຕືອນຄວາມປອດໄພ ປະຫວັດການແກ້ໄຂພິເສດ...'],
+    ]
+  },
+];
+
+async function renderVehicleSpecCard(v) {
+  const el = document.getElementById('vehicleSpecBox');
+  if (!el) return;
+  const spec = (await db.vehicle_specs.where('vehicle_id').equals(v.vehicle_id).toArray())[0];
+  if (!spec) {
+    el.innerHTML = `<div class="empty"><div class="icon">📋</div>
+      <p>ຍັງບໍ່ມີ Data Sheet ສຳລັບລົດຄັນນີ້</p>
+      <p class="muted" style="font-size:12px">ກົດປຸ່ມ "ແກ້ໄຂ" ດ້ານເທິງເພື່ອປ້ອນຂໍ້ມູນສະເປັກລະອຽດ — ເຄື່ອງຍົນ ຊ່ວງລ່າງ ນ້ຳມັນ ຢາງ ເຄນ ໂຕນ...</p></div>`;
+    return;
+  }
+  // Render compact view: ໝວດທີ່ມີຂໍ້ມູນ
+  let html = `<div class="alert info" style="font-size:11px;margin-bottom:10px">ອັບເດດລ່າສຸດ: ${new Date(spec.updated_at).toLocaleString('lo')} ໂດຍ ${escapeHtml(spec.updated_by||'-')}</div>`;
+  html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px">';
+  for (const sec of SPEC_SECTIONS) {
+    const hasData = sec.fields.some(([fk]) => spec[fk] != null && spec[fk] !== '');
+    if (!hasData) continue;
+    html += `<div style="background:var(--bg);padding:10px;border-radius:8px;border:1px solid var(--line)">
+      <h4 style="margin:0 0 6px;font-size:13px;color:var(--primary)">${sec.label}</h4>
+      <table style="font-size:11.5px;width:100%">`;
+    for (const [fk, label] of sec.fields) {
+      const v2 = spec[fk];
+      if (v2 == null || v2 === '') continue;
+      html += `<tr><td style="color:var(--muted);padding:2px 4px;width:50%">${label}</td><td style="font-weight:600">${escapeHtml(String(v2))}</td></tr>`;
+    }
+    html += '</table></div>';
+  }
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+async function openVehicleSpecModal(vehicleId) {
+  const v = (await db.vehicles.where('vehicle_id').equals(vehicleId).toArray())[0];
+  if (!v) { toast('ບໍ່ພົບລົດ','bad'); return; }
+  let spec = (await db.vehicle_specs.where('vehicle_id').equals(vehicleId).toArray())[0] || { vehicle_id: vehicleId };
+  // ສ້າງ Body: ໝວດແບບ Tab
+  const sectionsHTML = SPEC_SECTIONS.map((sec, i) => {
+    const fieldsHTML = sec.fields.map(([fk, label, type, ph]) => {
+      const val = spec[fk] != null ? String(spec[fk]) : '';
+      if (type.startsWith('select:')) {
+        const opts = type.slice(7).split(',');
+        return `<div class="fld"><label>${label}</label><select id="spec_${fk}">
+          <option value="">— ເລືອກ —</option>
+          ${opts.map(o => `<option value="${o}" ${val===o?'selected':''}>${o}</option>`).join('')}
+        </select></div>`;
+      }
+      if (type === 'textarea') {
+        return `<div class="fld" style="grid-column:span 2"><label>${label}</label><textarea id="spec_${fk}" rows="3" placeholder="${ph}">${escapeHtml(val)}</textarea></div>`;
+      }
+      return `<div class="fld"><label>${label}</label><input id="spec_${fk}" type="${type}" value="${escapeHtml(val)}" placeholder="${ph}"/></div>`;
+    }).join('');
+    return `
+      <div class="spec-section" data-sec="${sec.key}" style="display:${i===0?'block':'none'}">
+        <h4 style="color:var(--primary);margin:0 0 10px">${sec.label}</h4>
+        <div class="row" style="grid-template-columns:1fr 1fr">${fieldsHTML}</div>
+      </div>`;
+  }).join('');
+  const tabsHTML = SPEC_SECTIONS.map((sec, i) => `
+    <button class="btn sm ${i===0?'':'outline'}" data-tab="${sec.key}" onclick="switchSpecTab('${sec.key}', this)">${sec.label}</button>`).join('');
+  modal(`📋 Data Sheet — ${v.vehicle_id} (${v.plate||''})`, `
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--line)">
+      ${tabsHTML}
+    </div>
+    ${sectionsHTML}
+  `, `
+    <button class="btn outline" onclick="closeModal()">${t('cancel')}</button>
+    <button class="btn ok" onclick="saveVehicleSpec('${vehicleId}')">💾 ${t('save')}</button>
+  `);
+}
+
+function switchSpecTab(key, btn) {
+  document.querySelectorAll('.spec-section').forEach(s => {
+    s.style.display = s.dataset.sec === key ? 'block' : 'none';
+  });
+  document.querySelectorAll('[data-tab]').forEach(b => b.classList.add('outline'));
+  if (btn) btn.classList.remove('outline');
+}
+
+async function saveVehicleSpec(vehicleId) {
+  const existing = (await db.vehicle_specs.where('vehicle_id').equals(vehicleId).toArray())[0];
+  const data = { vehicle_id: vehicleId,
+    updated_at: new Date().toISOString(),
+    updated_by: (typeof cloud!=='undefined' && cloud.profile?.name) || 'local' };
+  for (const sec of SPEC_SECTIONS) {
+    for (const [fk, , type] of sec.fields) {
+      const el = $(`#spec_${fk}`);
+      if (!el) continue;
+      let v = el.value;
+      if (type === 'number') v = v === '' ? null : parseFloat(v);
+      data[fk] = v;
+    }
+  }
+  if (existing) await db.vehicle_specs.update(existing.id, data);
+  else await db.vehicle_specs.add(data);
+  closeModal(); toast('💾 ບັນທຶກ Data Sheet ສຳເລັດ');
+  if (currentPage === 'vehicle_detail') renderVehicleDetail();
+}
+
+// =============================================================================
+// 🚚 VEHICLE USAGE LOG — 4 ປະເພດການໃຊ້ + 3 ສູດຄິດເງິນ
+// =============================================================================
+
+const USAGE_TYPES = [
+  { key: 'personal',          label: '👤 ສ່ວນຕົວ (ບໍ່ຄິດເງິນ)', color: '#6B7280', billable: false },
+  { key: 'crane_rental',      label: '🏗 ບໍລິການເຄນ/ລົດໜັກ',     color: '#F59E0B', billable: true },
+  { key: 'customer_delivery', label: '📦 ສົ່ງສິນຄ້າໃຫ້ລູກຄ້າ',    color: '#10B981', billable: true },
+  { key: 'inter_branch',      label: '🔄 ໂອນສາຂາພາຍໃນ',         color: '#3B82F6', billable: false },
+];
+
+const BILLING_TYPES = [
+  { key: 'per_km',     label: 'ຄ່າຕໍ່ km',        unit: 'km',   unitField: 'total_km' },
+  { key: 'per_hour',   label: 'ຄ່າຕໍ່ຊົ່ວໂມງ',     unit: 'ຊມ',   unitField: 'total_hours' },
+  { key: 'fixed_trip', label: 'ຄ່າຄົງທີ່ຕໍ່ຄັ້ງ',   unit: 'ຄັ້ງ',  unitField: 'trips' },
+  { key: 'per_ton',    label: 'ຄ່າຕໍ່ໂຕນ',          unit: 'ໂຕນ',  unitField: 'tonnage' },
+];
+
+async function nextUsageId() {
+  const yymm = new Date().toISOString().slice(0,7).replace('-','');
+  const all = (await db.vehicle_usage.toArray()).filter(u => (u.usage_id||'').startsWith('UY-'+yymm));
+  const max = all.reduce((m,u) => {
+    const n = parseInt((u.usage_id||'').slice(-4)) || 0;
+    return n > m ? n : m;
+  }, 0);
+  return `UY-${yymm}-${String(max+1).padStart(4,'0')}`;
+}
+
+async function openVehicleUsageModal(prefillVehicleId, editId) {
+  const vehicles = await db.vehicles.toArray();
+  const drivers = await db.drivers.toArray();
+  let u = {
+    usage_id: '',
+    date: todayISO(),
+    vehicle_id: prefillVehicleId || vehicles[0]?.vehicle_id || '',
+    usage_type: 'personal',
+    billing_type: 'per_km',
+    driver_id: '',
+    operator_name: '',
+    customer_name: '',
+    customer_phone: '',
+    branch_from: '',
+    branch_to: '',
+    start_location: '',
+    end_location: '',
+    start_km: 0, end_km: 0, total_km: 0,
+    start_time: '', end_time: '', total_hours: 0,
+    trips: 1, tonnage: 0,
+    cargo_desc: '',
+    rate: 0,
+    subtotal: 0,
+    extra_cost: 0,
+    total_amount: 0,
+    payment_status: 'pending',
+    payment_method: 'cash',
+    notes: '',
+    status: 'completed',
+  };
+  if (editId) u = Object.assign(u, await db.vehicle_usage.get(editId));
+  const branches = (await db.branches.where('active').equals('true').toArray()).concat(await db.branches.where('active').equals(true).toArray()).reduce((a,b)=>{ if(!a.some(x=>x.id===b.id))a.push(b); return a; },[]);
+  const branchOptions = branches.map(b => `<option value="${escapeHtml(b.name)}" ${u.branch_from===b.name?'selected':''}>${escapeHtml(b.name)}</option>`).join('');
+  const branchOptionsTo = branches.map(b => `<option value="${escapeHtml(b.name)}" ${u.branch_to===b.name?'selected':''}>${escapeHtml(b.name)}</option>`).join('');
+
+  modal(editId ? `✏️ ແກ້ໄຂບັນທຶກໃຊ້ລົດ` : `🚚 ບັນທຶກໃຊ້ລົດ`, `
+    <div class="row">
+      <div class="fld"><label>ວັນທີ</label><input id="uy_date" type="date" value="${u.date}"/></div>
+      <div class="fld"><label>ປະເພດການໃຊ້</label><select id="uy_type" onchange="updateUsageForm()">
+        ${USAGE_TYPES.map(t => `<option value="${t.key}" ${u.usage_type===t.key?'selected':''}>${t.label}</option>`).join('')}
+      </select></div>
+    </div>
+    <div class="row">
+      <div class="fld"><label>ລົດ</label><select id="uy_vehicle">
+        ${vehicles.map(v => `<option value="${v.vehicle_id}" ${u.vehicle_id===v.vehicle_id?'selected':''}>${v.plate||v.vehicle_id} — ${v.type||''}</option>`).join('')}
+      </select></div>
+      <div class="fld"><label>ຄົນຂັບ</label><select id="uy_driver">
+        <option value="">— ບໍ່ລະບຸ —</option>
+        ${drivers.map(d => `<option value="${d.driver_id}" ${u.driver_id===d.driver_id?'selected':''}>${d.driver_id} — ${escapeHtml(d.name||'')}</option>`).join('')}
+      </select></div>
+    </div>
+
+    <!-- ສ່ວນສະເພາະ ບໍລິການເຄນ -->
+    <div id="uy_crane_box" style="display:${u.usage_type==='crane_rental'?'block':'none'};background:#FEF3C7;padding:10px;border-radius:6px;margin:6px 0">
+      <h4 style="margin:0 0 6px;color:#92400E;font-size:13px">🏗 ບໍລິການເຄນ</h4>
+      <div class="row">
+        <div class="fld"><label>ຜູ້ປະຕິບັດການ</label><input id="uy_operator" value="${escapeHtml(u.operator_name||'')}" placeholder="ຊື່ຜູ້ບັງຄັບເຄນ"/></div>
+        <div class="fld"><label>ລາຍລະອຽດງານ</label><input id="uy_cargo_crane" value="${escapeHtml(u.cargo_desc||'')}" placeholder="ຍົກຄອນກີດ 3 ໂຕນ"/></div>
+      </div>
+    </div>
+
+    <!-- ສ່ວນສະເພາະ ສົ່ງສິນຄ້າ -->
+    <div id="uy_delivery_box" style="display:${u.usage_type==='customer_delivery'?'block':'none'};background:#ECFDF5;padding:10px;border-radius:6px;margin:6px 0">
+      <h4 style="margin:0 0 6px;color:#065F46;font-size:13px">📦 ສົ່ງສິນຄ້າ</h4>
+      <div class="row">
+        <div class="fld"><label>ຊື່ລູກຄ້າ</label><input id="uy_cust_name" value="${escapeHtml(u.customer_name||'')}"/></div>
+        <div class="fld"><label>ເບີໂທ</label><input id="uy_cust_phone" value="${escapeHtml(u.customer_phone||'')}"/></div>
+      </div>
+      <div class="fld"><label>ລາຍລະອຽດສິນຄ້າ</label><input id="uy_cargo_del" value="${escapeHtml(u.cargo_desc||'')}" placeholder="ປູນ 50 ກະສອບ / ຊີມັງ 10 ໂຕນ"/></div>
+    </div>
+
+    <!-- ສ່ວນສະເພາະ ໂອນສາຂາ -->
+    <div id="uy_branch_box" style="display:${u.usage_type==='inter_branch'?'block':'none'};background:#EFF6FF;padding:10px;border-radius:6px;margin:6px 0">
+      <h4 style="margin:0 0 6px;color:#1E40AF;font-size:13px">🔄 ໂອນສາຂາ</h4>
+      <div class="row">
+        <div class="fld"><label>ສາຂາຕົ້ນທາງ</label><select id="uy_branch_from"><option value="">— ເລືອກ —</option>${branchOptions}</select></div>
+        <div class="fld"><label>ສາຂາປາຍທາງ</label><select id="uy_branch_to"><option value="">— ເລືອກ —</option>${branchOptionsTo}</select></div>
+      </div>
+      <div class="fld"><label>ລາຍລະອຽດສິນຄ້າ</label><input id="uy_cargo_branch" value="${escapeHtml(u.cargo_desc||'')}" placeholder="ສິນຄ້າທີ່ໂອນ"/></div>
+    </div>
+
+    <h4 style="color:var(--primary-2);margin:12px 0 6px;font-size:13px">📍 ສະຖານທີ່ + ໄລຍະທາງ</h4>
+    <div class="row">
+      <div class="fld"><label>ຈຸດອອກ</label><input id="uy_start_loc" value="${escapeHtml(u.start_location||'')}" placeholder="ປາກເຊ ສຳນັກງານໃຫຍ່"/></div>
+      <div class="fld"><label>ຈຸດໝາຍ</label><input id="uy_end_loc" value="${escapeHtml(u.end_location||'')}" placeholder="ໂຄງການກໍ່ສ້າງ ບ້ານ..."/></div>
+    </div>
+    <div class="row">
+      <div class="fld"><label>ເລກໄມເລີ່ມ</label><input id="uy_start_km" type="number" value="${u.start_km}" oninput="calcUsageAmount()"/></div>
+      <div class="fld"><label>ເລກໄມຈົບ</label><input id="uy_end_km" type="number" value="${u.end_km}" oninput="calcUsageAmount()"/></div>
+    </div>
+    <div class="row">
+      <div class="fld"><label>ເວລາເລີ່ມ</label><input id="uy_start_time" type="datetime-local" value="${u.start_time||''}" oninput="calcUsageAmount()"/></div>
+      <div class="fld"><label>ເວລາຈົບ</label><input id="uy_end_time" type="datetime-local" value="${u.end_time||''}" oninput="calcUsageAmount()"/></div>
+    </div>
+
+    <h4 style="color:var(--primary-2);margin:12px 0 6px;font-size:13px">💰 ການຄິດຄ່າບໍລິການ</h4>
+    <div id="uy_billing_box">
+      <div class="row">
+        <div class="fld"><label>ສູດຄິດຄ່າ</label><select id="uy_billing" onchange="updateUsageForm();calcUsageAmount()">
+          ${BILLING_TYPES.map(b => `<option value="${b.key}" ${u.billing_type===b.key?'selected':''}>${b.label}</option>`).join('')}
+        </select></div>
+        <div class="fld"><label>ອັດຕາ (ກີບ ຕໍ່ ໜ່ວຍ)</label><input id="uy_rate" type="number" value="${u.rate}" oninput="calcUsageAmount()"/></div>
+      </div>
+      <div class="row">
+        <div class="fld"><label>ຈຳນວນໜ່ວຍ (km/ຊມ/ຄັ້ງ/ໂຕນ)</label><input id="uy_qty" type="number" step="0.01" value="${u.billing_type==='per_km'?u.total_km:u.billing_type==='per_hour'?u.total_hours:u.billing_type==='per_ton'?u.tonnage:u.trips}" oninput="calcUsageAmount()"/></div>
+        <div class="fld"><label>ຄ່າເພີ່ມເຕີມ (Toll, ນອນຄ້າງ)</label><input id="uy_extra" type="number" value="${u.extra_cost}" oninput="calcUsageAmount()"/></div>
+      </div>
+      <div class="row">
+        <div class="fld"><label>ຍອດລວມ (ຄຳນວນ Auto)</label><input id="uy_total" type="number" value="${u.total_amount}" readonly style="background:var(--bg-2);font-weight:700;color:var(--ok);font-size:16px"/></div>
+        <div class="fld"><label>ສະຖານະຊຳລະ</label><select id="uy_pay_status">
+          <option value="pending" ${u.payment_status==='pending'?'selected':''}>ຍັງບໍ່ຊຳລະ</option>
+          <option value="paid" ${u.payment_status==='paid'?'selected':''}>ຊຳລະແລ້ວ</option>
+          <option value="invoiced" ${u.payment_status==='invoiced'?'selected':''}>ອອກບິນແລ້ວ</option>
+        </select></div>
+      </div>
+      <div class="row">
+        <div class="fld"><label>ວິທີຊຳລະ</label><select id="uy_pay_method">
+          <option value="cash" ${u.payment_method==='cash'?'selected':''}>ເງິນສົດ</option>
+          <option value="bank" ${u.payment_method==='bank'?'selected':''}>ໂອນທະນາຄານ</option>
+          <option value="credit" ${u.payment_method==='credit'?'selected':''}>ເຄຣດິດ (ຊຳລະພາຍຫຼັງ)</option>
+        </select></div>
+        <div class="fld"><label>ສະຖານະງານ</label><select id="uy_status">
+          <option value="planned" ${u.status==='planned'?'selected':''}>ວາງແຜນ</option>
+          <option value="in_progress" ${u.status==='in_progress'?'selected':''}>ກຳລັງດຳເນີນການ</option>
+          <option value="completed" ${u.status==='completed'?'selected':''}>ສຳເລັດ</option>
+          <option value="cancelled" ${u.status==='cancelled'?'selected':''}>ຍົກເລີກ</option>
+        </select></div>
+      </div>
+    </div>
+    <div class="fld"><label>ໝາຍເຫດ</label><textarea id="uy_notes" rows="2">${escapeHtml(u.notes||'')}</textarea></div>
+  `, `
+    <button class="btn outline" onclick="closeModal()">${t('cancel')}</button>
+    <button class="btn ok" onclick="saveVehicleUsage(${editId||'null'})">💾 ${t('save')}</button>
+  `);
+  updateUsageForm();
+  calcUsageAmount();
+}
+
+function updateUsageForm() {
+  const type = $('#uy_type')?.value;
+  const billing = $('#uy_billing')?.value;
+  // ສະແດງ/ເຊື່ອງ box ຕາມປະເພດ
+  const craneBox = $('#uy_crane_box'); if (craneBox) craneBox.style.display = type==='crane_rental' ? 'block' : 'none';
+  const delBox = $('#uy_delivery_box'); if (delBox) delBox.style.display = type==='customer_delivery' ? 'block' : 'none';
+  const branchBox = $('#uy_branch_box'); if (branchBox) branchBox.style.display = type==='inter_branch' ? 'block' : 'none';
+  // ປະເພດ "ສ່ວນຕົວ" + "ໂອນສາຂາ" — ບໍ່ຄິດເງິນ → Force rate = 0
+  const usageType = USAGE_TYPES.find(t => t.key === type);
+  const billingBox = $('#uy_billing_box');
+  if (billingBox) {
+    if (usageType && !usageType.billable) {
+      billingBox.style.opacity = '0.6';
+      billingBox.style.pointerEvents = 'none';
+      const rate = $('#uy_rate'); if (rate) rate.value = 0;
+    } else {
+      billingBox.style.opacity = '1';
+      billingBox.style.pointerEvents = 'auto';
+    }
+  }
+}
+
+function calcUsageAmount() {
+  const billing = $('#uy_billing')?.value;
+  const sKm = parseFloat($('#uy_start_km')?.value)||0;
+  const eKm = parseFloat($('#uy_end_km')?.value)||0;
+  const sT = $('#uy_start_time')?.value;
+  const eT = $('#uy_end_time')?.value;
+  // ຄຳນວນ km + hours ອັດຕະໂນມັດ
+  const totalKm = Math.max(0, eKm - sKm);
+  let totalHours = 0;
+  if (sT && eT) totalHours = Math.max(0, (new Date(eT) - new Date(sT)) / 3600000);
+  // Auto-fill qty ຕາມ billing type
+  const qty = parseFloat($('#uy_qty')?.value)||0;
+  const rate = parseFloat($('#uy_rate')?.value)||0;
+  const extra = parseFloat($('#uy_extra')?.value)||0;
+  const subtotal = qty * rate;
+  const total = subtotal + extra;
+  if ($('#uy_total')) $('#uy_total').value = Math.round(total);
+}
+
+async function saveVehicleUsage(editId) {
+  const billing = $('#uy_billing').value;
+  const sKm = parseFloat($('#uy_start_km').value)||0;
+  const eKm = parseFloat($('#uy_end_km').value)||0;
+  const sT = $('#uy_start_time').value;
+  const eT = $('#uy_end_time').value;
+  const totalKm = Math.max(0, eKm - sKm);
+  let totalHours = 0;
+  if (sT && eT) totalHours = Math.max(0, (new Date(eT) - new Date(sT)) / 3600000);
+  const qty = parseFloat($('#uy_qty').value)||0;
+  const rate = parseFloat($('#uy_rate').value)||0;
+  const extra = parseFloat($('#uy_extra').value)||0;
+  const subtotal = qty * rate;
+  const total = subtotal + extra;
+  const data = {
+    date: $('#uy_date').value,
+    vehicle_id: $('#uy_vehicle').value,
+    usage_type: $('#uy_type').value,
+    billing_type: billing,
+    driver_id: $('#uy_driver').value,
+    operator_name: $('#uy_operator')?.value || '',
+    customer_name: $('#uy_cust_name')?.value || '',
+    customer_phone: $('#uy_cust_phone')?.value || '',
+    branch_from: $('#uy_branch_from')?.value || '',
+    branch_to: $('#uy_branch_to')?.value || '',
+    cargo_desc: $('#uy_cargo_crane')?.value || $('#uy_cargo_del')?.value || $('#uy_cargo_branch')?.value || '',
+    start_location: $('#uy_start_loc').value,
+    end_location: $('#uy_end_loc').value,
+    start_km: sKm, end_km: eKm, total_km: totalKm,
+    start_time: sT, end_time: eT, total_hours: Math.round(totalHours*100)/100,
+    trips: billing==='fixed_trip' ? qty : 1,
+    tonnage: billing==='per_ton' ? qty : 0,
+    rate,
+    subtotal: Math.round(subtotal),
+    extra_cost: extra,
+    total_amount: Math.round(total),
+    payment_status: $('#uy_pay_status').value,
+    payment_method: $('#uy_pay_method').value,
+    status: $('#uy_status').value,
+    notes: $('#uy_notes').value,
+    created_by: (typeof cloud!=='undefined' && cloud.profile?.username) || 'local',
+  };
+  if (!data.vehicle_id) { toast('ກະລຸນາເລືອກລົດ','bad'); return; }
+  let savedId;
+  if (editId) {
+    await db.vehicle_usage.update(editId, data);
+    savedId = editId;
+  } else {
+    data.usage_id = await nextUsageId();
+    data.created_at = new Date().toISOString();
+    savedId = await db.vehicle_usage.add(data);
+  }
+  if (typeof auditLog === 'function') auditLog(editId?'update':'create', 'vehicle_usage', savedId, `${data.usage_id||''} — ${data.vehicle_id} ${USAGE_TYPES.find(t=>t.key===data.usage_type)?.label||''}`);
+  closeModal(); toast(`💾 ບັນທຶກໃຊ້ລົດ ${data.usage_id||''} ສຳເລັດ`);
+  if (currentPage === 'vehicle_detail') renderVehicleDetail();
+  else if (currentPage === 'vehicle_usage') pages.vehicle_usage();
+}
+
+async function renderVehicleUsageSummary(v) {
+  const el = document.getElementById('vehicleUsageBox');
+  if (!el) return;
+  const usage = (await db.vehicle_usage.where('vehicle_id').equals(v.vehicle_id).toArray())
+    .sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  if (usage.length === 0) {
+    el.innerHTML = `<div class="empty"><div class="icon">🚚</div><p>ຍັງບໍ່ມີບັນທຶກໃຊ້ລົດ — ກົດປຸ່ມ "+ ບັນທຶກໃຊ້ລົດ" ດ້ານເທິງ</p></div>`;
+    return;
+  }
+  // KPI
+  const totalRevenue = usage.filter(u => u.usage_type === 'crane_rental' || u.usage_type === 'customer_delivery')
+    .reduce((s,u)=>s+(u.total_amount||0),0);
+  const totalKm = usage.reduce((s,u)=>s+(u.total_km||0),0);
+  const totalHours = usage.reduce((s,u)=>s+(u.total_hours||0),0);
+  const byType = {};
+  USAGE_TYPES.forEach(t => { byType[t.key] = usage.filter(u => u.usage_type === t.key).length; });
+
+  let html = `<div class="kpi-grid">
+    <div class="kpi"><div class="label">📊 ບັນທຶກ</div><div class="val">${usage.length}</div><div class="muted">ຄັ້ງ</div></div>
+    <div class="kpi"><div class="label">💰 ລາຍຮັບລວມ</div><div class="val" style="color:var(--ok)">${fmt(totalRevenue)}</div><div class="muted">ກີບ</div></div>
+    <div class="kpi"><div class="label">🛣 ໄລຍະທາງ</div><div class="val">${fmt(Math.round(totalKm))}</div><div class="muted">km</div></div>
+    <div class="kpi"><div class="label">⏱ ຊົ່ວໂມງ</div><div class="val">${totalHours.toFixed(1)}</div><div class="muted">ຊມ</div></div>
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0">
+    ${USAGE_TYPES.map(t => `<span class="pill" style="background:${t.color};color:#fff">${t.label}: ${byType[t.key]}</span>`).join('')}
+  </div>
+  <table style="font-size:12px">
+    <tr><th>ວັນທີ</th><th>ເລກທີ</th><th>ປະເພດ</th><th>ຄົນຂັບ</th><th>ລາຍລະອຽດ</th><th style="text-align:right">ໄລຍະ</th><th style="text-align:right">ຍອດ</th><th>ສະຖານະ</th><th></th></tr>
+    ${usage.slice(0,15).map(u => {
+      const ut = USAGE_TYPES.find(t => t.key === u.usage_type);
+      return `<tr>
+        <td>${u.date||'-'}</td>
+        <td><strong style="font-family:monospace;font-size:11px">${u.usage_id||'-'}</strong></td>
+        <td><span class="pill" style="background:${ut?.color||'#888'};color:#fff;font-size:10px">${ut?.label||u.usage_type}</span></td>
+        <td>${escapeHtml((u.driver_id||u.operator_name||'-').slice(0,15))}</td>
+        <td style="font-size:11px">${escapeHtml((u.cargo_desc||u.customer_name||u.branch_to||'-').slice(0,30))}</td>
+        <td style="text-align:right">${u.total_km?fmt(u.total_km)+' km':u.total_hours?u.total_hours.toFixed(1)+' ຊມ':'-'}</td>
+        <td style="text-align:right;font-weight:700;color:${u.total_amount>0?'var(--ok)':'var(--muted)'}">${fmt(u.total_amount||0)}</td>
+        <td><span class="pill ${u.payment_status==='paid'?'ok':u.payment_status==='invoiced'?'info':'warn'}" style="font-size:10px">${u.payment_status==='paid'?'ຊຳລະ':u.payment_status==='invoiced'?'ບິນ':'ຄ້າງ'}</span></td>
+        <td><button class="btn sm outline" onclick="openVehicleUsageModal(null,${u.id})">${t('edit')}</button></td>
+      </tr>`;
+    }).join('')}
+    ${usage.length > 15 ? `<tr><td colspan="9" style="text-align:center;color:var(--muted);font-size:11px;font-style:italic">ສະແດງ 15/${usage.length} — ໄປໜ້າ "ບັນທຶກໃຊ້ລົດ" ເພື່ອເບິ່ງທັງໝົດ</td></tr>` : ''}
+  </table>`;
+  el.innerHTML = html;
+}
+
+// ===== Main Vehicle Usage Page =====
+window._usageFilter = window._usageFilter || { type:'', status:'', month:'' };
+
+pages.vehicle_usage = async () => {
+  const all = (await db.vehicle_usage.toArray()).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const vehicles = await db.vehicles.toArray();
+  const f = window._usageFilter;
+  let filtered = all;
+  if (f.type) filtered = filtered.filter(u => u.usage_type === f.type);
+  if (f.status) filtered = filtered.filter(u => u.payment_status === f.status);
+  if (f.month) filtered = filtered.filter(u => (u.date||'').startsWith(f.month));
+  // KPI
+  const totalRevenue = filtered.filter(u => u.usage_type === 'crane_rental' || u.usage_type === 'customer_delivery')
+    .reduce((s,u)=>s+(u.total_amount||0),0);
+  const pendingPay = filtered.filter(u => u.payment_status === 'pending' && (u.total_amount||0) > 0);
+  const pendingAmount = pendingPay.reduce((s,u)=>s+(u.total_amount||0),0);
+
+  $('#main').innerHTML = `
+    <div class="crumbs">${t('nav_operations')||'ການດຳເນີນງານ'} › ບັນທຶກໃຊ້ລົດ</div>
+    <div class="page-title">🚚 ບັນທຶກໃຊ້ລົດ + ຄ່າບໍລິການ <small style="font-weight:400;color:var(--muted);font-size:13px">— ${filtered.length}/${all.length} ລາຍການ</small></div>
+    <div class="alert info" style="font-size:12px">💡 ບັນທຶກການໃຊ້ລົດ 4 ປະເພດ: ສ່ວນຕົວ, ບໍລິການເຄນ, ສົ່ງສິນຄ້າ, ໂອນສາຂາ — ຄິດຄ່າຕາມ km/ຊມ/ຄັ້ງ/ໂຕນ</div>
+
+    <div class="kpi-grid">
+      <div class="kpi"><div class="label">📊 ບັນທຶກທັງໝົດ</div><div class="val">${all.length}</div></div>
+      <div class="kpi"><div class="label">💰 ລາຍຮັບລວມ</div><div class="val" style="color:var(--ok)">${fmt(totalRevenue)}</div><div class="muted">ກີບ</div></div>
+      <div class="kpi" style="${pendingAmount>0?'border-left:4px solid var(--warn)':''}"><div class="label">⏳ ຄ້າງຮັບ</div><div class="val" style="color:${pendingAmount>0?'var(--warn)':'var(--muted)'}">${fmt(pendingAmount)}</div><div class="muted">${pendingPay.length} ບິນ</div></div>
+      <div class="kpi"><div class="label">🚗 ລົດໃຊ້ງານ</div><div class="val">${new Set(filtered.map(u=>u.vehicle_id)).size}</div><div class="muted">ຄັນ</div></div>
+    </div>
+
+    <div class="toolbar" style="flex-wrap:wrap;gap:8px">
+      <select onchange="window._usageFilter.type=this.value;pages.vehicle_usage()" style="padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px">
+        <option value="">📂 ທຸກປະເພດ</option>
+        ${USAGE_TYPES.map(t => `<option value="${t.key}" ${f.type===t.key?'selected':''}>${t.label}</option>`).join('')}
+      </select>
+      <select onchange="window._usageFilter.status=this.value;pages.vehicle_usage()" style="padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px">
+        <option value="">ທຸກສະຖານະຊຳລະ</option>
+        <option value="pending" ${f.status==='pending'?'selected':''}>ຍັງບໍ່ຊຳລະ</option>
+        <option value="paid" ${f.status==='paid'?'selected':''}>ຊຳລະແລ້ວ</option>
+        <option value="invoiced" ${f.status==='invoiced'?'selected':''}>ອອກບິນແລ້ວ</option>
+      </select>
+      <input type="month" value="${f.month}" onchange="window._usageFilter.month=this.value;pages.vehicle_usage()" style="padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px"/>
+      <button class="btn outline" onclick="window._usageFilter={type:'',status:'',month:''};pages.vehicle_usage()">🔄 ລ້າງ</button>
+      <div style="flex:1"></div>
+      <button class="btn ok" onclick="openVehicleUsageModal()">+ ບັນທຶກໃໝ່</button>
+    </div>
+
+    <div class="card" style="padding:0;overflow-x:auto">
+      ${filtered.length === 0 ? '<div class="empty" style="padding:30px"><div class="icon">🚚</div><p>ບໍ່ມີຂໍ້ມູນ</p></div>' : `
+      <table style="font-size:12.5px;min-width:1100px">
+        <tr>
+          <th>ວັນທີ</th><th>ເລກທີ</th><th>ປະເພດ</th><th>ລົດ</th><th>ຄົນຂັບ</th>
+          <th>ລາຍລະອຽດ</th><th style="text-align:right">ໄລຍະ</th><th style="text-align:right">ຍອດ</th>
+          <th>ຊຳລະ</th><th>ສະຖານະ</th><th></th>
+        </tr>
+        ${filtered.slice(0,100).map(u => {
+          const ut = USAGE_TYPES.find(t => t.key === u.usage_type);
+          const veh = vehicles.find(v => v.vehicle_id === u.vehicle_id);
+          return `<tr>
+            <td>${u.date||'-'}</td>
+            <td><strong style="font-family:monospace;font-size:11px">${u.usage_id||'-'}</strong></td>
+            <td><span class="pill" style="background:${ut?.color||'#888'};color:#fff;font-size:10px">${ut?.label||u.usage_type}</span></td>
+            <td>${veh?escapeHtml(veh.plate||veh.vehicle_id):u.vehicle_id}</td>
+            <td>${escapeHtml((u.driver_id||u.operator_name||'-').slice(0,15))}</td>
+            <td style="font-size:11px">${escapeHtml((u.cargo_desc||u.customer_name||(u.branch_from+'→'+u.branch_to)||'-').slice(0,40))}</td>
+            <td style="text-align:right">${u.total_km?fmt(u.total_km)+' km':u.total_hours?u.total_hours.toFixed(1)+' ຊມ':'-'}</td>
+            <td style="text-align:right;font-weight:700;color:${u.total_amount>0?'var(--ok)':'var(--muted)'}">${fmt(u.total_amount||0)}</td>
+            <td><span class="pill ${u.payment_status==='paid'?'ok':u.payment_status==='invoiced'?'info':'warn'}" style="font-size:10px">${u.payment_status==='paid'?'ຊຳລະ':u.payment_status==='invoiced'?'ບິນ':'ຄ້າງ'}</span></td>
+            <td><span class="pill ${u.status==='completed'?'ok':u.status==='in_progress'?'info':u.status==='cancelled'?'bad':'gray'}" style="font-size:10px">${u.status==='completed'?'ສຳເລັດ':u.status==='in_progress'?'ກຳລັງດຳເນີນ':u.status==='cancelled'?'ຍົກເລີກ':'ວາງແຜນ'}</span></td>
+            <td class="actions"><button class="btn sm outline" onclick="openVehicleUsageModal(null,${u.id})">${t('edit')}</button>
+              ${isAdmin()?`<button class="btn sm danger" onclick="delVehicleUsage(${u.id})">${t('delete')}</button>`:''}
+            </td>
+          </tr>`;
+        }).join('')}
+        ${filtered.length > 100 ? `<tr><td colspan="11" style="text-align:center;color:var(--muted);font-size:11px;font-style:italic">ສະແດງ 100/${filtered.length} — ໃຊ້ Filter ເພື່ອຍ່ອນ</td></tr>` : ''}
+      </table>`}
+    </div>
+  `;
+};
+
+async function delVehicleUsage(id) {
+  if (!confirm(t('confirm_delete'))) return;
+  await softDelete('vehicle_usage', id, r => `Usage: ${r.usage_id} — ${r.vehicle_id}`);
+  pages.vehicle_usage();
 }
 
 pages.about = async () => {
