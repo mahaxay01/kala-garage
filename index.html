@@ -15909,7 +15909,10 @@ pages.service_rates = async () => {
           <td style="text-align:right;font-weight:700;color:var(--ok)">${fmt(r.base_charge)}</td>
           <td class="actions compact">
             <button class="btn sm icon outline" onclick="openServiceRateModal(${r.id})" title="ແກ້ໄຂ">✏️</button>
-            <button class="btn sm icon danger" onclick="delServiceRate(${r.id})" title="ລົບ">🗑</button>
+            ${(typeof cloud==='undefined' || !cloud.profile || cloud.hasRole('owner','it')) ?
+              `<button class="btn sm icon danger" onclick="delServiceRate(${r.id})" title="ລົບ (Admin ເທົ່ານັ້ນ)">🗑</button>` :
+              `<button class="btn sm icon outline" disabled style="opacity:.3;cursor:not-allowed" title="🔒 ສະເພາະ Admin/IT ເທົ່ານັ້ນ">🔒</button>`
+            }
           </td>
         </tr>`).join('')}
       </table>`}
@@ -15976,10 +15979,23 @@ async function saveServiceRate(id) {
 }
 
 async function delServiceRate(id) {
-  if (!confirm('ລົບລາຍການນີ້?')) return;
-  await db.service_rates.delete(id);
-  toast('🗑 ລົບສຳເລັດ');
-  pages.service_rates();
+  // 🔒 ສະເພາະ Admin (Owner / IT) ເທົ່ານັ້ນ
+  if (typeof cloud!=='undefined' && cloud.profile && !cloud.hasRole('owner','it')) {
+    toast('🔒 ການລົບຄ່າແຮງ — ສະເພາະ Owner ຫລື IT Admin ເທົ່ານັ້ນ', 'bad');
+    return;
+  }
+  const r = await db.service_rates.get(id);
+  if (!r) return;
+  // ກວດສອບການນຳໃຊ້ໃນ labor_entries
+  const usedIn = (await db.labor_entries.toArray()).filter(e => e.service_code === r.service_code);
+  let msg = `ລົບລາຍການນີ້?\n\n${r.service_code} — ${r.service_name}\nຄ່າແຮງ: ${fmt(r.base_charge)} ກີບ`;
+  if (usedIn.length > 0) {
+    msg += `\n\n⚠️ ໝາຍເຫດ: ມີ ${usedIn.length} Labor Entries ໃຊ້ລະຫັດນີ້ — ການລົບຈະບໍ່ກະທົບ Labor ເກົ່າ (ຈະຍັງສະແດງລະຫັດໄວ້).`;
+  }
+  msg += '\n\n📦 ສາມາດກູ້ຄືນໄດ້ໃນ "ຖັງຂີ້ເຫຍື້ອ"';
+  if (!confirm(msg)) return;
+  await softDelete('service_rates', id, r => `Service Rate: ${r.service_code} — ${r.service_name}`);
+  if (currentPage === 'service_rates') pages.service_rates();
 }
 
 // ===== PAGE: Tech Profiles =====
