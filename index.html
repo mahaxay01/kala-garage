@@ -1168,7 +1168,7 @@ const I18N = {
     kpi_total_vehicles: "ລົດທັງໝົດ", kpi_today_inspections: "ກວດມື້ນີ້",
     inspect_pass: "ຜ່ານ", inspect_fail: "ບໍ່ຜ່ານ",
     inspect_brake: "ເບຣກເຮັດວຽກ", inspect_tires: "ລົມຢາງ + ດອກຢາງ", inspect_engine: "ສຽງເຄື່ອງ + ຄວັນ",
-    inspect_oil: "ລະດັບນ້ຳມັນ", inspect_coolant: "ລະດັບ Coolant", inspect_lights: "ໄຟທຸກດວງ",
+    inspect_oil: "ລະດັບນ້ຳມັນ", inspect_coolant: "ລະດັບ ນ້ຳຢາໝໍ້ນ້ຳ", inspect_lights: "ໄຟທຸກດວງ",
     inspect_leak: "ໃຕ້ລົດ ບໍ່ມີຮົ່ວ", inspect_belt: "ສາຍຮັດ + ກະຈົກ",
     add_driver: "ຄົນຂັບ", add_date: "ວັນທີ", add_vehicle_select: "ເລືອກລົດ",
     seed_btn: "ໃສ່ຂໍ້ມູນຕົວຢ່າງ", clear_btn: "ລ້າງຂໍ້ມູນທັງໝົດ", confirm_clear: "ຕ້ອງການລ້າງຂໍ້ມູນທັງໝົດບໍ? ຂໍ້ມູນຈະຫາຍຖາວອນ",
@@ -1194,7 +1194,7 @@ const I18N = {
     nav_fluids: "ຕິດຕາມນ້ຳມັນ", nav_mileage: "ບັນທຶກເລກໄມ",
     add_fluid: "+ ບັນທຶກປ່ຽນ", add_mileage: "+ ບັນທຶກເລກໄມ",
     fluid_engine_oil: "ນ້ຳມັນເຄື່ອງ", fluid_gear_oil: "ນ້ຳມັນເກຍ", fluid_brake: "ນ້ຳມັນເບຣກ",
-    fluid_coolant: "ນ້ຳຢາໝໍ້ນ້ຳ (Coolant)", fluid_hydraulic: "ນ້ຳມັນ Hydraulic", fluid_ps: "ນ້ຳມັນ Power Steering",
+    fluid_coolant: "ນ້ຳຢາໝໍ້ນ້ຳ (ນ້ຳຢາລໍ່ເຢັນ)", fluid_hydraulic: "ນ້ຳມັນ Hydraulic", fluid_ps: "ນ້ຳມັນ Power Steering",
     fluid_atf: "ATF (ເກຍອັດຕະໂນມັດ)", fluid_grease: "ຈາລະບີ",
     fld_fluid_type: "ປະເພດນ້ຳມັນ", fld_fluid_brand: "ຍີ່ຫໍ້/ສະເປັກ", fld_qty: "ປະລິມານ", fld_qty_unit: "ໜ່ວຍ",
     fld_change_date: "ວັນທີປ່ຽນ", fld_change_km: "ໄມເລດເມື່ອປ່ຽນ", fld_next_due_km: "Due ໄມເລດຕໍ່ໄປ", fld_next_due_date: "Due ວັນທີຕໍ່ໄປ",
@@ -5261,13 +5261,13 @@ const PM_PRESETS = {
         tasks:['ກວດ ແລະ ປ່ຽນນ້ຳມັນເຄື່ອງ','ປ່ຽນກອງນ້ຳມັນເຄື່ອງ','ກວດລົມຢາງ 4 ລໍ້','ກວດ Brake Pad','ກວດໄຟໜ້າ/ຫຼັງ/ສັນຍານ','ກວດໃບປັດນ້ຳຝົນ'],
         parts:[{code:'OIL-5W30',qty:4},{code:'OIL-FLT',qty:1}] },
       { name:'PM 10,000 km — B-Service', interval_type:'km', interval_value:10000, time:2, resp:'2',
-        tasks:['ປ່ຽນນ້ຳມັນເຄື່ອງ + ກອງ','ປ່ຽນກອງລົມ','ສະຫຼັບຢາງ Rotation','ກວດ Brake Disc + Pad','ກວດໝໍ້ໄຟ + ສາຍແບັດ','ກວດຊ່ວງລ່າງ','ກວດ Coolant'],
+        tasks:['ປ່ຽນນ້ຳມັນເຄື່ອງ + ກອງ','ປ່ຽນກອງລົມ','ສະຫຼັບຢາງ Rotation','ກວດ Brake Disc + Pad','ກວດໝໍ້ໄຟ + ສາຍແບັດ','ກວດຊ່ວງລ່າງ','ກວດ ນ້ຳຢາໝໍ້ນ້ຳ'],
         parts:[{code:'OIL-5W30',qty:4},{code:'OIL-FLT',qty:1},{code:'AIR-FLT',qty:1}] },
       { name:'PM 20,000 km — C-Service', interval_type:'km', interval_value:20000, time:3, resp:'2',
         tasks:['ປ່ຽນກອງເຊື້ອໄຟ','ປ່ຽນຫົວທຽນ','ກວດເບຣກ ໂດຍລະອຽດ','ກວດ ແລະ ປ່ຽນນ້ຳມັນເບຣກ','ກວດສະພາບຄອບສຸງ + Bushing'],
         parts:[{code:'OIL-5W30',qty:4},{code:'OIL-FLT',qty:1},{code:'FUEL-FLT',qty:1},{code:'SPARK',qty:4}] },
       { name:'PM 40,000 km — Major', interval_type:'km', interval_value:40000, time:6, resp:'3',
-        tasks:['ປ່ຽນສາຍຮັດ Timing Belt (ຖ້າມີ)','ປ່ຽນນ້ຳ Coolant','ປ່ຽນນ້ຳມັນເກຍ','ກວດສະພາບ ECU + Sensors','ປັບ Wheel Alignment + Balance'],
+        tasks:['ປ່ຽນສາຍຮັດ Timing Belt (ຖ້າມີ)','ປ່ຽນ ນ້ຳຢາໝໍ້ນ້ຳ','ປ່ຽນນ້ຳມັນເກຍ','ກວດສະພາບ ECU + Sensors','ປັບ Wheel Alignment + Balance'],
         parts:[{code:'COOLANT',qty:5},{code:'GEAR-OIL',qty:2}] },
     ],
   },
@@ -5301,7 +5301,7 @@ const PM_PRESETS = {
         tasks:['ປ່ຽນ Hydraulic Oil','ປ່ຽນກອງເຊື້ອໄຟ','ກວດ Final Drive Oil','ກວດ Diff Lock','ກວດສະພາບໃບໄຖ + Plough'],
         parts:[{code:'HYD-OIL',qty:30},{code:'FUEL-FLT',qty:1}] },
       { name:'PM 1,000 ຊມ — Major', interval_type:'hour', interval_value:1000, time:12, resp:'3',
-        tasks:['Top Overhaul ກວດ Engine','ປ່ຽນ Coolant ໝົດ','ກວດ Hydraulic Pump','ປັບ Valve','ກວດ Transmission'],
+        tasks:['Top Overhaul ກວດ Engine','ປ່ຽນ ນ້ຳຢາໝໍ້ນ້ຳ ໝົດ','ກວດ Hydraulic Pump','ປັບ Valve','ກວດ Transmission'],
         parts:[] },
     ],
   },
@@ -5318,7 +5318,7 @@ const PM_PRESETS = {
         tasks:['ປ່ຽນ Hydraulic Oil ໝົດ','ປ່ຽນ Swing/Travel Gear Oil','ກວດ Slewing Bearing','ກວດ Cooling System','ກວດ Hose ທຸກເສັ້ນ'],
         parts:[{code:'HYD-OIL',qty:80},{code:'GEAR-OIL',qty:10}] },
       { name:'PM 1,000 ຊມ — Major', interval_type:'hour', interval_value:1000, time:16, resp:'3',
-        tasks:['Top Overhaul Engine','ປ່ຽນ Coolant ໝົດ','ກວດ Final Drive','Overhaul Hydraulic Pump','Pin + Bushing Replacement'],
+        tasks:['Top Overhaul Engine','ປ່ຽນ ນ້ຳຢາໝໍ້ນ້ຳ ໝົດ','ກວດ Final Drive','Overhaul Hydraulic Pump','Pin + Bushing Replacement'],
         parts:[] },
     ],
   },
@@ -8086,7 +8086,7 @@ async function delVehicle(id) {
 // Daily Inspection items — comprehensive checklist
 const DAILY_INSPECT_ITEMS = [
   { k:'engine_oil', label:'ນ້ຳມັນເຄື່ອງ (Level + ສີ)', icon:'🛢', daily:true },
-  { k:'coolant', label:'ນ້ຳ Coolant', icon:'💧', daily:true },
+  { k:'coolant', label:'ນ້ຳຢາໝໍ້ນ້ຳ', icon:'💧', daily:true },
   { k:'brake_fluid', label:'ນ້ຳມັນເບຣກ', icon:'🛑', daily:true },
   { k:'tire_pressure', label:'ລົມຢາງ (4 ລໍ້)', icon:'⚙️', daily:true },
   { k:'tire_tread', label:'ດອກຢາງ (ສະພາບສຶກ)', icon:'🛞', daily:false },
@@ -9595,7 +9595,7 @@ const RECEIPT_ITEMS = [
   { key:'glass_lights', label:'ແຫວ່ນ ແລະ ໄຟ (ໜ້າ, ຫຼັງ, ສັນຍານ)', icon:'💡' },
   { key:'interior', label:'ພາຍໃນ (ບ່ອນນັ່ງ, ພວງມາໄລ, ໜ້າປັດ)', icon:'🛋' },
   { key:'engine_start', label:'ການສະຕາດເຄື່ອງ + ສຽງເຄື່ອງ', icon:'🔊' },
-  { key:'oil_water', label:'ສະພາບນ້ຳມັນ ແລະ ນ້ຳ Coolant', icon:'🛢' },
+  { key:'oil_water', label:'ສະພາບນ້ຳມັນ ແລະ ນ້ຳຢາໝໍ້ນ້ຳ', icon:'🛢' },
   { key:'electrical', label:'ລະບົບໄຟຟ້າ (Wiper, AC, Radio, Power Window)', icon:'⚡' },
   { key:'tools_spare', label:'ເຄື່ອງມືພາຍໃນລົດ (ແມ່ແຮງ, ຢາງສຳຮອງ)', icon:'🔧' },
   { key:'fuel_level', label:'ລະດັບນ້ຳມັນເຊື້ອໄຟ', icon:'⛽' },
@@ -9766,7 +9766,7 @@ const PREDELIVERY_ITEMS = [
   { key:'work_completed', label:'ວຽກທີ່ໄດ້ສ້ອມໝົດແລ້ວ', icon:'✅' },
   { key:'parts_replaced', label:'ອາໄຫລ່ປ່ຽນຄົບຖ້ວນ (Genuine?)', icon:'📦' },
   { key:'engine_test', label:'Test ເຄື່ອງ — ສະຕາດໄດ້ ສຽງປົກກະຕິ', icon:'🔊' },
-  { key:'fluid_levels', label:'ນ້ຳມັນ + Coolant + ນ້ຳກວດກະຈົກ ຄົບ', icon:'🛢' },
+  { key:'fluid_levels', label:'ນ້ຳມັນ + ນ້ຳຢາໝໍ້ນ້ຳ + ນ້ຳກວດກະຈົກ ຄົບ', icon:'🛢' },
   { key:'brake_test', label:'Test ເບຣກ — ມຸງມຸງ ບໍ່ສະ', icon:'🛑' },
   { key:'lights_signals', label:'ໄຟ + ສັນຍານ + Wiper ໃຊ້ໄດ້ໝົດ', icon:'💡' },
   { key:'electrical', label:'ໄຟຟ້າ AC, ວິທະຍຸ, Power Window', icon:'⚡' },
@@ -11996,7 +11996,7 @@ function calcCostPerKm(vehicle, lifespan) {
     { key:'oil_engine', label:'🛢 ນ້ຳມັນເຄື່ອງ + ໄສ້ກອງ', cost: (lifespan.oil_engine_cost + lifespan.oil_filter_cost), km: usePerVehicle('oil_change_km', lifespan.oil_engine_km) },
     { key:'oil_gear', label:'⚙️ ນ້ຳມັນເກຍ', cost: lifespan.oil_gear_cost, km: lifespan.oil_gear_km },
     { key:'oil_brake', label:'🛑 ນ້ຳມັນເບຣກ', cost: lifespan.oil_brake_cost, km: lifespan.oil_brake_km },
-    { key:'coolant', label:'💧 Coolant', cost: lifespan.coolant_cost, km: lifespan.coolant_km },
+    { key:'coolant', label:'💧 ນ້ຳຢາໝໍ້ນ້ຳ', cost: lifespan.coolant_cost, km: lifespan.coolant_km },
     { key:'air_filter', label:'🌬 ໄສ້ກອງອາກາດ', cost: lifespan.air_filter_cost, km: lifespan.air_filter_km },
     { key:'fuel_filter', label:'⛽ ໄສ້ກອງນ້ຳມັນ', cost: lifespan.fuel_filter_cost, km: lifespan.fuel_filter_km },
     { key:'tires', label:'🛞 ຢາງລົດ', cost: lifespan.tire_cost * lifespan.tire_count, km: usePerVehicle('tire_change_km', lifespan.tire_km) },
@@ -12025,7 +12025,7 @@ function openLifespanSettings() {
     <div class="fld"><label>ລາຄາ</label><input id="ls_og_cost" type="number" value="${s.oil_gear_cost}"/></div></div>
     <div class="row"><div class="fld"><label>ນ້ຳມັນເບຣກ — km</label><input id="ls_ob_km" type="number" value="${s.oil_brake_km}"/></div>
     <div class="fld"><label>ລາຄາ</label><input id="ls_ob_cost" type="number" value="${s.oil_brake_cost}"/></div></div>
-    <div class="row"><div class="fld"><label>Coolant — km</label><input id="ls_cool_km" type="number" value="${s.coolant_km}"/></div>
+    <div class="row"><div class="fld"><label>ນ້ຳຢາໝໍ້ນ້ຳ — km</label><input id="ls_cool_km" type="number" value="${s.coolant_km}"/></div>
     <div class="fld"><label>ລາຄາ</label><input id="ls_cool_cost" type="number" value="${s.coolant_cost}"/></div></div>
     <h3 style="color:var(--primary-2);font-size:13px;margin:10px 0 6px">🌬 ໄສ້ກອງ</h3>
     <div class="row"><div class="fld"><label>ໄສ້ກອງເຄື່ອງ — km</label><input id="ls_of_km" type="number" value="${s.oil_filter_km}"/></div>
@@ -12082,7 +12082,7 @@ const REPLACEMENT_PARTS = [
   { key:'oil_engine', label:'🛢 ນ້ຳມັນເຄື່ອງ + ໄສ້ກອງ' },
   { key:'oil_gear', label:'⚙️ ນ້ຳມັນເກຍ' },
   { key:'oil_brake', label:'🛑 ນ້ຳມັນເບຣກ' },
-  { key:'coolant', label:'💧 Coolant' },
+  { key:'coolant', label:'💧 ນ້ຳຢາໝໍ້ນ້ຳ' },
   { key:'air_filter', label:'🌬 ໄສ້ກອງອາກາດ' },
   { key:'fuel_filter', label:'⛽ ໄສ້ກອງນ້ຳມັນ' },
   { key:'tires', label:'🛞 ຢາງລົດ (ຊຸດ)' },
@@ -13314,7 +13314,7 @@ function printBlankReceiptForm() {
       <div><strong>ຜູ້ກວດ (KALA)</strong><div class="line"></div></div>
     </div>
     <table><tr><th width="40%">ລາຍການກວດ</th><th width="10%">ປົກກະຕິ</th><th width="10%">ມີຮອຍ</th><th width="10%">ເສຍຫາຍ</th><th width="10%">ບໍ່ມີ</th><th>ໝາຍເຫດ</th></tr>
-    ${['🚗 ສະພາບໂຕລົດພາຍນອກ','⚙️ ສະພາບຢາງລົດ','💡 ແຫວ່ນ ແລະ ໄຟ','🛋 ພາຍໃນ (ບ່ອນນັ່ງ, ພວງມາໄລ)','🔊 ການສະຕາດເຄື່ອງ + ສຽງເຄື່ອງ','🛢 ສະພາບນ້ຳມັນ ແລະ ນ້ຳ Coolant','⚡ ໄຟຟ້າ (Wiper, AC, Radio)','🔧 ເຄື່ອງມືພາຍໃນລົດ','⛽ ນ້ຳມັນເຊື້ອໄຟ','📜 ເອກະສານພາຍໃນລົດ'].map(it =>
+    ${['🚗 ສະພາບໂຕລົດພາຍນອກ','⚙️ ສະພາບຢາງລົດ','💡 ແຫວ່ນ ແລະ ໄຟ','🛋 ພາຍໃນ (ບ່ອນນັ່ງ, ພວງມາໄລ)','🔊 ການສະຕາດເຄື່ອງ + ສຽງເຄື່ອງ','🛢 ສະພາບນ້ຳມັນ ແລະ ນ້ຳຢາໝໍ້ນ້ຳ','⚡ ໄຟຟ້າ (Wiper, AC, Radio)','🔧 ເຄື່ອງມືພາຍໃນລົດ','⛽ ນ້ຳມັນເຊື້ອໄຟ','📜 ເອກະສານພາຍໃນລົດ'].map(it =>
       `<tr><td>${it}</td>${[1,2,3,4].map(()=>`<td style="text-align:center"><span class="box"></span></td>`).join('')}<td></td></tr>`).join('')}
     </table>
     <h3 style="color:#0F3D7A;font-size:13px;margin:10px 0 4px">⚠️ ຄວາມເສຍຫາຍທີ່ມີຢູ່ກ່ອນ (Existing Damage)</h3>
@@ -15547,7 +15547,7 @@ async function seedServiceRates() {
     { name:'PM Minor — ບັນທຸກເບົາ',                            cat:'PM', vg:'light_truck',  hr:2,   charge:180000,  sk:'L1' },
     { name:'PM Major — ບັນທຸກເບົາ + Air filter HD',           cat:'PM', vg:'light_truck',  hr:4,   charge:380000,  sk:'L2' },
     { name:'PM Minor — ບັນທຸກໜັກ HD',                          cat:'PM', vg:'heavy_truck',  hr:3,   charge:280000,  sk:'L2' },
-    { name:'PM Major — ບັນທຸກໜັກ + Air Dryer + Coolant',     cat:'PM', vg:'heavy_truck',  hr:6,   charge:650000,  sk:'L2' },
+    { name:'PM Major — ບັນທຸກໜັກ + Air Dryer + ນ້ຳຢາໝໍ້ນ້ຳ',  cat:'PM', vg:'heavy_truck',  hr:6,   charge:650000,  sk:'L2' },
     { name:'PM ໂມ່ປູນ — ບໍລິການເຕັມຮູບແບບ',                  cat:'PM', vg:'trailer',      hr:5,   charge:550000,  sk:'L2' },
     { name:'PM 100 ຊມ. ລົດໄຖ KUBOTA',                          cat:'PM', vg:'tractor',      hr:2,   charge:150000,  sk:'L1' },
     { name:'PM 500 ຊມ. ລົດໄຖ KUBOTA',                          cat:'PM', vg:'tractor',      hr:4,   charge:380000,  sk:'L2' },
@@ -15646,8 +15646,8 @@ async function seedServiceRates() {
 
     // ==================== 🌡 ລະບົບເຢັນ (Cooling) ====================
     { name:'ປ່ຽນ Radiator',                                          cat:'Other', vg:'all',         hr:3,   charge:380000,  sk:'L2' },
-    { name:'ປ່ຽນ Thermostat + Coolant Flush',                       cat:'Other', vg:'all',         hr:1.5, charge:180000,  sk:'L1' },
-    { name:'ປ່ຽນ Hose ໝົ້ນເຢັນ + Coolant',                          cat:'Other', vg:'all',         hr:1,   charge:120000,  sk:'L1' },
+    { name:'ປ່ຽນ Thermostat + ລ້າງ ນ້ຳຢາໝໍ້ນ້ຳ',                    cat:'Other', vg:'all',         hr:1.5, charge:180000,  sk:'L1' },
+    { name:'ປ່ຽນ Hose ໝໍ້ນ້ຳ + ນ້ຳຢາໝໍ້ນ້ຳ',                       cat:'Other', vg:'all',         hr:1,   charge:120000,  sk:'L1' },
     { name:'ປ່ຽນ Fan Clutch',                                        cat:'Other', vg:'heavy_truck', hr:2,   charge:280000,  sk:'L2' },
     { name:'ປ່ຽນ Cooling Fan + Motor',                              cat:'Other', vg:'all',         hr:1.5, charge:200000,  sk:'L2' },
 
@@ -15746,7 +15746,7 @@ async function seedServiceRates() {
     { name:'[FOTON Aumark] ປ່ຽນ Dashboard Bulb',                              cat:'Electrical', vg:'light_truck', hr:1,  charge:120000, sk:'L1' },
     { name:'[FOTON] ປ່ຽນ Turbocharger',                                       cat:'Engine', vg:'light_truck', hr:5, charge:1500000,sk:'L3' },
     { name:'[FOTON Forland] ປ່ຽນ Brake Pad Heavy Duty',                       cat:'Brake', vg:'light_truck',  hr:2, charge:220000, sk:'L1' },
-    { name:'[FOTON] ປ່ຽນ Water Pump + Coolant Flush',                         cat:'Other', vg:'light_truck',  hr:3,   charge:480000, sk:'L2' },
+    { name:'[FOTON] ປ່ຽນ Water Pump + ລ້າງ ນ້ຳຢາໝໍ້ນ້ຳ',                       cat:'Other', vg:'light_truck',  hr:3,   charge:480000, sk:'L2' },
     { name:'[FOTON] ປ່ຽນ Glow Plug 4 ຊິ້ນ',                                  cat:'Engine', vg:'light_truck', hr:1.5,charge:220000, sk:'L1' },
 
     // ====================================================
@@ -15887,7 +15887,7 @@ async function seedServiceRates() {
     // 🛢 ນ້ຳມັນ + Fluids ເພີ່ມ
     { name:'ປ່ຽນນ້ຳມັນເຄື່ອງ ດີຊີນ + Filter (4-6L)',                       cat:'PM', vg:'all',              hr:1, charge:120000, sk:'L1' },
     { name:'ປ່ຽນນ້ຳມັນເຄື່ອງ HD ບັນທຸກ (10-20L)',                          cat:'PM', vg:'heavy_truck',      hr:1.5, charge:200000, sk:'L1' },
-    { name:'Flush + Refill Coolant System',                                  cat:'PM', vg:'all',              hr:2, charge:280000, sk:'L1' },
+    { name:'Flush + ປ່ຽນ ນ້ຳຢາໝໍ້ນ້ຳ (ນ້ຳຢາລໍ່ເຢັນ)',                          cat:'PM', vg:'all',              hr:2, charge:280000, sk:'L1' },
     { name:'Flush + Refill Brake Fluid',                                     cat:'PM', vg:'all',              hr:1.5, charge:180000, sk:'L2' },
     { name:'ປ່ຽນ Clutch Fluid + Bleed',                                      cat:'PM', vg:'all',              hr:1, charge:120000, sk:'L1' },
 
@@ -22087,16 +22087,18 @@ async function generatePPTRental() {
 // =============================================================================
 
 const HELPDESK_CATEGORIES = [
-  { key: 'engine',       icon: '🔧', label: 'ເຄື່ອງຍົນ',          color: '#EF4444' },
-  { key: 'electrical',   icon: '⚡', label: 'ໄຟຟ້າ + ໝໍ້ໄຟ',       color: '#F59E0B' },
-  { key: 'transmission', icon: '⚙️', label: 'ສົ່ງກຳລັງ + ເກຍ',    color: '#8B5CF6' },
+  { key: 'fundamentals', icon: '🎓', label: 'ພື້ນຖານ + ຂັ້ນຕອນ',     color: '#0EA5E9' },
+  { key: 'engine',       icon: '🔧', label: 'ເຄື່ອງຍົນ',            color: '#EF4444' },
+  { key: 'electrical',   icon: '⚡', label: 'ໄຟຟ້າ + ໝໍ້ໄຟ',         color: '#F59E0B' },
+  { key: 'transmission', icon: '⚙️', label: 'ສົ່ງກຳລັງ + ເກຍ',      color: '#8B5CF6' },
   { key: 'brakes',       icon: '🛑', label: 'ເບຣກ',                color: '#DC2626' },
-  { key: 'cooling',      icon: '🌡', label: 'ລະບົບເຢັນ',           color: '#06B6D4' },
-  { key: 'fuel',         icon: '⛽', label: 'ນ້ຳມັນ + ໄອເສຍ',     color: '#10B981' },
-  { key: 'suspension',   icon: '🛞', label: 'ຊ່ວງລ່າງ + ຢາງ',    color: '#3B82F6' },
+  { key: 'cooling',      icon: '🌡', label: 'ລະບົບເຢັນ + ໝໍ້ນ້ຳ',  color: '#06B6D4' },
+  { key: 'fuel',         icon: '⛽', label: 'ນ້ຳມັນ + ໄອເສຍ',       color: '#10B981' },
+  { key: 'suspension',   icon: '🛞', label: 'ຊ່ວງລ່າງ + ຢາງ',      color: '#3B82F6' },
   { key: 'hydraulic',    icon: '🏗', label: 'ໄຮດໍລິກ (ເຄນ/ແບັກໂຮ)', color: '#7C3AED' },
-  { key: 'body',         icon: '🚗', label: 'ໂຄງລົດ + ກະຈົກ',    color: '#6B7280' },
-  { key: 'other',        icon: '🔩', label: 'ອື່ນໆ',                color: '#374151' },
+  { key: 'welding',      icon: '🔥', label: 'ເຊື່ອມ + ໂຄງສ້າງ',     color: '#F97316' },
+  { key: 'diagnostic',   icon: '🔍', label: 'Diagnostic + ການວັດ',  color: '#64748B' },
+  { key: 'other',        icon: '🔩', label: 'ອື່ນໆ',                 color: '#374151' },
 ];
 
 const HELPDESK_DIFFICULTY = {
@@ -22298,13 +22300,13 @@ const HELPDESK_SEED = [
     category: 'cooling', difficulty: 'L1',
     symptom: 'ເຄື່ອງຮ້ອນເກີນ — Temperature ສູງ',
     symptoms_alt: ['ເຄື່ອງຮ້ອນ', 'Overheat', 'Temp ສູງ', 'ມີຄວັນຂາວ'],
-    possible_causes: ['ນ້ຳໝົ້ນເຢັນໝົດ', 'Radiator ຕັນ', 'ປ໊ອມນ້ຳເສຍ', 'Thermostat ເສຍ', 'Fan ບໍ່ດຳເນີນ'],
+    possible_causes: ['ນ້ຳຢາໝໍ້ນ້ຳໝົດ', 'Radiator ຕັນ', 'ປ໊ອມນ້ຳເສຍ', 'Thermostat ເສຍ', 'Fan ບໍ່ດຳເນີນ'],
     time_estimate_min: 60,
     safety: '⚠️ ບໍ່ເປີດຝາ Radiator ໃນຂະນະທີ່ເຄື່ອງຮ້ອນ — ນ້ຳເດືອດອາດກະເດັນ',
     tools_needed: ['Pressure tester', 'Thermometer'],
-    parts_needed: ['ນ້ຳໝົ້ນເຢັນ (Coolant)', 'Thermostat', 'Radiator cap'],
+    parts_needed: ['ນ້ຳຢາໝໍ້ນ້ຳ (ນ້ຳຢາລໍ່ເຢັນ)', 'Thermostat', 'Radiator cap'],
     steps: [
-      { step: 1, instruction: 'ຫລັງເຄື່ອງເຢັນ — ກວດລະດັບນ້ຳໝົ້ນເຢັນ ໃນ Reservoir.' },
+      { step: 1, instruction: 'ຫລັງເຄື່ອງເຢັນ — ກວດລະດັບນ້ຳຢາໝໍ້ນ້ຳ ໃນ Reservoir.' },
       { step: 2, instruction: 'ກວດ Hose — ມີຫລົມບໍ່? ມີນ້ຳຮົ່ວບໍ່?' },
       { step: 3, instruction: 'ກວດ Fan — ດຳເນີນເຄື່ອງຈົນ Temp ສູງ. Fan ຄວນດຳເນີນ.' },
       { step: 4, instruction: 'ກວດ Thermostat — ດຳເນີນເຄື່ອງເຢັນ ກວດ Hose ເທິງ Radiator. ຄວນຮ້ອນຫລັງ 5-10 ນາທີ.' },
@@ -22313,19 +22315,19 @@ const HELPDESK_SEED = [
   },
   {
     category: 'cooling', difficulty: 'L2',
-    symptom: 'ຮົ່ວນ້ຳໝົ້ນເຢັນ',
-    symptoms_alt: ['ນ້ຳໝົ້ນເຢັນຮົ່ວ', 'ມີນ້ຳເຂັຽວຮົ່ວ', 'ນ້ຳໝົ້ນເຢັນຫາຍໄວ'],
+    symptom: 'ຮົ່ວນ້ຳຢາໝໍ້ນ້ຳ',
+    symptoms_alt: ['ນ້ຳຢາໝໍ້ນ້ຳຮົ່ວ', 'ມີນ້ຳເຂັຽວຮົ່ວ', 'ນ້ຳຢາລໍ່ເຢັນຫາຍໄວ'],
     possible_causes: ['Hose ແຕກ', 'Radiator ຮົ່ວ', 'ປ໊ອມນ້ຳ Seal ເສຍ', 'Head Gasket ເສຍ'],
     time_estimate_min: 120,
-    safety: 'ປ່ອຍໃຫ້ເຄື່ອງເຢັນສຸດກ່ອນ — ນ້ຳໝົ້ນເຢັນຄ້ອນ',
+    safety: 'ປ່ອຍໃຫ້ເຄື່ອງເຢັນສຸດກ່ອນ — ນ້ຳຢາໝໍ້ນ້ຳຮ້ອນ',
     tools_needed: ['Pressure tester kit', 'UV dye + UV light'],
     parts_needed: ['Hose ໃໝ່', 'Radiator', 'Water pump'],
     steps: [
       { step: 1, instruction: 'Pressure test — ໃຊ້ Tester ກວດ 15 PSI. ຫາທີ່ຮົ່ວ.' },
-      { step: 2, instruction: 'ໃສ່ UV dye ໃນ Coolant — ດຳເນີນເຄື່ອງ. ໃຊ້ UV light ຫາທີ່ຮົ່ວ.' },
-      { step: 3, instruction: 'ກວດ Head Gasket — ກວດກວດ Oil ມີນ້ຳໝົ້ນເຢັນບໍ່? Combustion gas ໃນ Coolant ບໍ່?' },
+      { step: 2, instruction: 'ໃສ່ UV dye ໃນ ນ້ຳຢາໝໍ້ນ້ຳ — ດຳເນີນເຄື່ອງ. ໃຊ້ UV light ຫາທີ່ຮົ່ວ.' },
+      { step: 3, instruction: 'ກວດ Head Gasket — ກວດກວດ Oil ມີນ້ຳຢາໝໍ້ນ້ຳບໍ່? Combustion gas ໃນ ນ້ຳຢາໝໍ້ນ້ຳ ບໍ່?' },
       { step: 4, instruction: 'ປ່ຽນຊິ້ນສ່ວນທີ່ຮົ່ວ.' },
-      { step: 5, instruction: 'ເຕີມ Coolant + Bleed system.' },
+      { step: 5, instruction: 'ເຕີມ ນ້ຳຢາໝໍ້ນ້ຳ + Bleed ລະບົບ.' },
     ],
   },
   // ===== ນ້ຳມັນ + ໄອເສຍ =====
@@ -22725,15 +22727,15 @@ const HELPDESK_SEED = [
   {
     vehicle_class: 'heavy_truck', vehicle_brand: 'HOWO',
     category: 'engine', difficulty: 'L3',
-    symptom: '[HOWO WD615] ນ້ຳມັນເຄື່ອງມີນ້ຳໝົ້ນເຢັນ',
-    symptoms_alt: ['Oil ສີຂຸ່ນ', 'Coolant ໃນເຄື່ອງ', 'Milky oil'],
+    symptom: '[HOWO WD615] ນ້ຳມັນເຄື່ອງມີນ້ຳຢາໝໍ້ນ້ຳປົນ',
+    symptoms_alt: ['Oil ສີຂຸ່ນ', 'ນ້ຳຢາລໍ່ເຢັນ ໃນເຄື່ອງ', 'Milky oil'],
     possible_causes: ['Head Gasket ເສຍ', 'Oil Cooler ຮົ່ວ', 'Cracked Cylinder Head'],
     time_estimate_min: 480,
     safety: '⚠️ ບໍ່ດຳເນີນເຄື່ອງ — ຈະເຮັດໃຫ້ເຄື່ອງເສຍຮ້າຍແຮງ',
     tools_needed: ['ຊຸດເຄື່ອງມືເຕັມ', 'Compression tester', 'Torque wrench (Heavy duty)'],
-    parts_needed: ['Head gasket', 'Oil cooler', 'Head bolts', 'Coolant + Oil'],
+    parts_needed: ['Head gasket', 'Oil cooler', 'Head bolts', 'ນ້ຳຢາໝໍ້ນ້ຳ + ນ້ຳມັນເຄື່ອງ'],
     steps: [
-      { step: 1, instruction: 'Pressure test Coolant — Cylinder ໃດ Pressure ຫາຍ?' },
+      { step: 1, instruction: 'Pressure test ນ້ຳຢາໝໍ້ນ້ຳ — Cylinder ໃດ Pressure ຫາຍ?' },
       { step: 2, instruction: 'ກວດ Oil Cooler — ຖອດແລ້ວ Pressure test ໂດດໆ.' },
       { step: 3, instruction: 'ຖ້າ Oil Cooler OK → Head Gasket ເສຍ.' },
       { step: 4, instruction: 'ຖອດ Head — ກວດ flatness ດ້ວຍ Straight edge.' },
@@ -22806,11 +22808,11 @@ const HELPDESK_SEED = [
     category: 'cooling', difficulty: 'L2',
     symptom: '[SHACMAN] ເຄື່ອງຮ້ອນ — Fan Clutch ບໍ່ Engage',
     symptoms_alt: ['ເຄື່ອງຮ້ອນ', 'Fan ບໍ່ດຳເນີນ', 'Overheat'],
-    possible_causes: ['Fan Clutch ສືກ', 'Coolant flow ຕັນ', 'Radiator ສກປົກ'],
+    possible_causes: ['Fan Clutch ສືກ', 'ການໄຫຼ ນ້ຳຢາໝໍ້ນ້ຳ ຕັນ', 'Radiator ສກປົກ'],
     time_estimate_min: 120,
     safety: '⚠️ ບໍ່ແຕະ Fan ໃນຂະນະທີ່ເຄື່ອງດຳເນີນ',
     tools_needed: ['Infrared thermometer', 'ປະແຈ'],
-    parts_needed: ['Fan Clutch', 'Coolant'],
+    parts_needed: ['Fan Clutch', 'ນ້ຳຢາໝໍ້ນ້ຳ'],
     steps: [
       { step: 1, instruction: 'ດຳເນີນເຄື່ອງຈົນ Temp ສູງ — Fan ຄວນ Engage (ສຽງດັງຂຶ້ນ).' },
       { step: 2, instruction: 'ໃຊ້ IR Thermometer ກວດ Radiator — ບໍລິເວນເຂົ້າ vs ອອກ. ຕ່າງ 5-10°C.' },
@@ -23223,6 +23225,541 @@ const HELPDESK_SEED = [
       { step: 4, instruction: 'ຖອດເກຍ → ປ່ຽນຊຸດຄຣັຊທັງໝົດ.' },
     ],
   },
+
+  // ============================================================
+  // 🎓 FUNDAMENTALS — ພື້ນຖານ + ຂັ້ນຕອນສຳຄັນ
+  // ============================================================
+
+  // 🔩 ການຫັນນັອດ (Torque + Bolt Tightening)
+  {
+    category: 'fundamentals', difficulty: 'L1',
+    symptom: 'ການຫັນນັອດ — Torque Specifications ມາດຕະຖານ',
+    symptoms_alt: ['ຫັນນັອດ', 'Torque', 'ຄ່າ Torque'],
+    possible_causes: ['ບໍ່ໃຊ້ Torque wrench', 'ຫັນແຮງໂພດ ນັອດແຕກ', 'ຫັນຫລວມເກີນ — ນັອດຄ່ອຍຫລົມ'],
+    time_estimate_min: 15,
+    safety: '⚠️ ໃຊ້ Torque wrench ສະເໝີ — ບໍ່ໃຊ້ Wrench ທົ່ວໄປ',
+    tools_needed: ['Torque wrench (10-200 Nm)', 'Socket set', 'Torque chart'],
+    parts_needed: [],
+    steps: [
+      { step: 1, instruction: '📖 ກວດ Torque ໃນ Service Manual ກ່ອນ — ແຕ່ລະນັອດມີຄ່າ Torque ສະເພາະ' },
+      { step: 2, instruction: '🎯 ຄ່າພື້ນຖານ: ນັອດລໍ້ກະບະ 100-110 Nm | ນັອດລໍ້ບັນທຸກໜັກ 500-600 Nm | ນັອດເຄື່ອງ M10 = 45 Nm | M12 = 80 Nm | M14 = 130 Nm' },
+      { step: 3, instruction: '🔄 ຫັນແບບສະຫຼັບ (Cross Pattern) — ນັອດລໍ້, Head bolt' },
+      { step: 4, instruction: '🔢 ຫັນເປັນ 2-3 ຂັ້ນ: 50% → 80% → 100% ຂອງ Torque ສຸດທ້າຍ' },
+      { step: 5, instruction: '✅ ກວດໂດຍຫັນ Torque ສຸດທ້າຍອີກຄັ້ງ — ບໍ່ມີ click = ຍັງບໍ່ໄດ້ Torque' },
+      { step: 6, instruction: '⚠️ ນັອດສຳຄັນ (Head bolt, Crankshaft) — ປ່ຽນໃໝ່ ຫາມໃຊ້ຊ້ຳ ຖ້າເປັນ Stretch bolt' },
+    ],
+  },
+  {
+    category: 'fundamentals', difficulty: 'L2',
+    symptom: 'ການຫັນ Cylinder Head Bolts — Sequence + Torque',
+    symptoms_alt: ['ນັອດ Head', 'Head bolts', 'ສ້ອນຫົວ'],
+    possible_causes: ['ຫັນບໍ່ຕາມ Sequence', 'ບໍ່ປ່ຽນ Bolts ໃໝ່', 'Torque ບໍ່ຖືກ'],
+    time_estimate_min: 60,
+    safety: '⚠️ ບໍ່ໃຊ້ Bolts ເກົ່າ — ໃຊ້ Bolts ໃໝ່ສະເໝີ (Stretch bolts)',
+    tools_needed: ['Torque wrench', 'Angle gauge', 'Service manual'],
+    parts_needed: ['Head Bolts ໃໝ່', 'Head Gasket'],
+    steps: [
+      { step: 1, instruction: '📖 ກວດ Service Manual — Head Bolt Sequence ສະເພາະເຄື່ອງ' },
+      { step: 2, instruction: '🧼 ທຳຄວາມສະອາດຮູນັອດ — ບໍ່ມີນ້ຳມັນ/ຂີ້' },
+      { step: 3, instruction: '🛢 ໃສ່ນ້ຳມັນບາງໆບໍລິເວນຫົວນັອດ (ບໍ່ໃສ່ໃນຮູ)' },
+      { step: 4, instruction: '🔢 ຫັນຕາມ Sequence (ມັກເລີ່ມຈາກກາງ → ນອກ) ດ້ວຍ Torque ຂັ້ນ 1 (ປະມານ 30-50 Nm)' },
+      { step: 5, instruction: '🔢 ຂັ້ນ 2: ປະມານ 70% ຂອງ Final Torque' },
+      { step: 6, instruction: '📐 ຂັ້ນ 3 (Angle Torque): ໝູນ Angle Gauge ເພີ່ມ 90°-180° ຕາມ Spec' },
+      { step: 7, instruction: '✅ ດຳເນີນເຄື່ອງເຢັນ → ຫລັງ 100 km ກວດ Torque ອີກຄັ້ງ' },
+    ],
+  },
+  {
+    category: 'fundamentals', difficulty: 'L1',
+    symptom: 'ການຫັນນັອດລໍ້ (Wheel Lug Nut) — Cross Pattern',
+    symptoms_alt: ['ນັອດລໍ້', 'ນັອດສະຕັດ', 'Wheel nut'],
+    possible_causes: ['ຫັນບໍ່ສະເໝີ', 'ບໍ່ໃຊ້ Torque'],
+    time_estimate_min: 10,
+    safety: '⚠️ ນັອດລໍ້ — ຫລົມ = ລໍ້ຫລົມ = ອັນຕະລາຍຮ້າຍແຮງ',
+    tools_needed: ['Torque wrench', 'Lug wrench'],
+    parts_needed: [],
+    steps: [
+      { step: 1, instruction: '🔄 ຫັນແບບສະຫຼັບ Cross Pattern (1→3→5→2→4 ສຳລັບ 5-lug, 1→4→2→5→3→6 ສຳລັບ 6-lug)' },
+      { step: 2, instruction: '🔢 ຂັ້ນ 1: ຫັນດ້ວຍ Hand 50% ໃຫ້ Seat' },
+      { step: 3, instruction: '🔢 ຂັ້ນ 2: Torque wrench 80% ຂອງ Final' },
+      { step: 4, instruction: '🎯 Final Torque: ກະບະ 100-110 Nm | ບັນທຸກໜັກ 500-600 Nm' },
+      { step: 5, instruction: '✅ ຫລັງ 100 km ກວດ Torque ອີກຄັ້ງ — ສຳຄັນຫລາຍ' },
+    ],
+  },
+
+  // 🔧 ການໃສ່ Gasket / Seal (Sealing)
+  {
+    category: 'fundamentals', difficulty: 'L2',
+    symptom: 'ການໃສ່ Gasket / ສະຍາ — ໃສ່ໃຫ້ບໍ່ຮົ່ວ',
+    symptoms_alt: ['ໃສ່ Gasket', 'ໃສ່ສະຍາ', 'Sealing', 'ກັນຮົ່ວ'],
+    possible_causes: ['ໜ້າສຳພັດສກປົກ', 'ໃຊ້ Gasket ເກົ່າ', 'ບໍ່ໃຊ້ Sealant ບ່ອນທີ່ຄວນໃຊ້', 'ຫັນບໍ່ໄດ້ Torque'],
+    time_estimate_min: 30,
+    safety: 'ບໍ່ດຳເນີນເຄື່ອງທັນທີຫລັງໃສ່ Sealant — ໃຫ້ Cure 2-4 ຊມ.',
+    tools_needed: ['Scraper', 'Brake cleaner', 'Sealant gun', 'Torque wrench'],
+    parts_needed: ['Gasket ໃໝ່', 'Sealant (RTV Silicone, Anaerobic)', 'O-ring'],
+    steps: [
+      { step: 1, instruction: '🧹 ທຳຄວາມສະອາດໜ້າສຳພັດທັງສອງດ້ານ — ໃຊ້ Scraper + Brake Cleaner' },
+      { step: 2, instruction: '🔍 ກວດໜ້າສຳພັດ — ບໍ່ມີຮ່ອງຮອຍຂູດ/ບີດ. ໃຊ້ Straight edge ກວດ' },
+      { step: 3, instruction: '💧 ໃຫ້ໜ້າສຳພັດແຫ້ງ ບໍ່ມີນ້ຳມັນ/ນ້ຳ' },
+      { step: 4, instruction: '🟡 ໃສ່ Sealant (RTV) ໃນຈຸດທີ່ Manual ບອກ — ປະມານ 3-5mm ໜາ' },
+      { step: 5, instruction: '🟢 ໃສ່ Gasket — ບໍ່ໃຫ້ບິດ ບໍ່ໃຫ້ມີຮອຍແຕກ' },
+      { step: 6, instruction: '🔩 ຫັນນັອດ ດ້ວຍ Torque Sequence ຂັ້ນ 1 → 2 → 3' },
+      { step: 7, instruction: '⏱ ປ່ອຍ Cure 2-4 ຊມ. ກ່ອນດຳເນີນເຄື່ອງ (Silicone)' },
+    ],
+  },
+  {
+    category: 'fundamentals', difficulty: 'L1',
+    symptom: 'ການໃສ່ O-ring — ກັນຮົ່ວ Hydraulic / Hose',
+    symptoms_alt: ['O-ring', 'ກັນຮົ່ວ', 'ສະຍາ O-ring'],
+    possible_causes: ['O-ring ຫລົງ', 'O-ring ບິດ', 'ໜ້າສຳພັດສກປົກ'],
+    time_estimate_min: 15,
+    safety: 'O-ring ບໍ່ກັນຄວາມຮ້ອນສູງ — ໃຊ້ Heat-resistant ສຳລັບ Engine',
+    tools_needed: ['O-ring kit', 'Lube (Silicone grease)'],
+    parts_needed: ['O-ring ໃໝ່ (ຂະໜາດຖືກຕ້ອງ)'],
+    steps: [
+      { step: 1, instruction: '🔍 ກວດຂະໜາດ O-ring ກັບ Slot — ບໍ່ໃຊ້ໃຫຍ່/ນ້ອຍເກີນ' },
+      { step: 2, instruction: '🧹 ທຳຄວາມສະອາດ Slot — ບໍ່ມີຂີ້ ບໍ່ມີ O-ring ເກົ່າຄ້າງ' },
+      { step: 3, instruction: '🛢 ໃສ່ Silicone Grease ບາງໆທີ່ O-ring' },
+      { step: 4, instruction: '⭕ ໃສ່ O-ring ໃນ Slot — ບໍ່ໃຫ້ບິດ' },
+      { step: 5, instruction: '🔩 ປະກອບ Fitting — ຫັນດ້ວຍມືກ່ອນ ແລ້ວ Torque ສຸດທ້າຍ' },
+    ],
+  },
+  {
+    category: 'fundamentals', difficulty: 'L2',
+    symptom: 'ການໃສ່ Head Gasket — ບໍ່ໃຫ້ຮົ່ວ',
+    symptoms_alt: ['Head Gasket', 'ໃສ່ Gasket ຫົວ', 'ກັນຮົ່ວນ້ຳຢາໝໍ້ນ້ຳ'],
+    possible_causes: ['ໜ້າສຳພັດບໍ່ສະອາດ', 'Head ບີດ', 'Torque ບໍ່ຖືກ', 'Sequence ຜິດ'],
+    time_estimate_min: 180,
+    safety: '⚠️ ບໍ່ໃຊ້ Sealant ກັບ Head Gasket — Gasket ມີ Sealant ໃນຕົວແລ້ວ',
+    tools_needed: ['Straight edge', 'Feeler gauge', 'Torque wrench', 'Angle gauge'],
+    parts_needed: ['Head Gasket ໃໝ່', 'Head Bolts ໃໝ່ (Stretch type ຫາມໃຊ້ຊ້ຳ)'],
+    steps: [
+      { step: 1, instruction: '🧹 ທຳຄວາມສະອາດ Head + Block — ໃຊ້ Scraper ບໍ່ໃຫ້ມີ Gasket ເກົ່າຄ້າງ' },
+      { step: 2, instruction: '📐 ກວດ Head Flatness — ໃຊ້ Straight edge + Feeler gauge. ບໍ່ເກີນ 0.05mm ໃນ 100mm' },
+      { step: 3, instruction: '🔍 ກວດ Block Flatness ດ້ວຍ — ຖ້າບີດ → ສົ່ງ Machine shop' },
+      { step: 4, instruction: '🟢 ໃສ່ Head Gasket — ສັງເກດ "TOP" mark — ບໍ່ໃຫ້ບິດ' },
+      { step: 5, instruction: '📐 ໃສ່ Head ລົງ — Locating dowels ຊ່ວຍຈັດແຖວ' },
+      { step: 6, instruction: '🔢 ຫັນ Head bolts ໃໝ່ — ຫລາຍຂັ້ນຕາມ Sequence (ກາງ → ນອກ): 25Nm → 50Nm → Angle 90° → 90°' },
+      { step: 7, instruction: '⏱ ດຳເນີນເຄື່ອງເຢັນ — ກວດຮົ່ວ. ຫລັງ 100 km Re-torque ຖ້າ Manual ບອກ' },
+    ],
+  },
+
+  // 🛞 ການຖອດ-ໃສ່ຢາງ
+  {
+    category: 'fundamentals', difficulty: 'L1',
+    symptom: 'ການຖອດຢາງ — Manual (ບໍ່ມີ Tire Machine)',
+    symptoms_alt: ['ຖອດຢາງ', 'ປ່ຽນຢາງ', 'ດຶງຢາງອອກ'],
+    possible_causes: [],
+    time_estimate_min: 30,
+    safety: '⚠️ ປ່ອຍລົມຢາງ 100% ກ່ອນຖອດ — ບໍ່ດຶງເມື່ອມີລົມ',
+    tools_needed: ['Tire iron 2 ຊິ້ນ', 'Bead breaker', 'Soap water', 'Valve core tool'],
+    parts_needed: ['Tire patch (ຖ້າສ້ອມ)'],
+    steps: [
+      { step: 1, instruction: '🪛 ຖອດ Valve core ດ້ວຍ Valve tool → ປ່ອຍລົມໝົດ' },
+      { step: 2, instruction: '💥 ບີດ Bead ອອກຈາກ Rim — ໃຊ້ Bead breaker ຫລື ໂລດໂມ' },
+      { step: 3, instruction: '💧 ໃສ່ Soap water ບໍລິເວນ Bead ໃຫ້ລື່ນ' },
+      { step: 4, instruction: '🪝 ໃຊ້ Tire iron 1 ດຶງ Bead ຂຶ້ນເທິງ Rim' },
+      { step: 5, instruction: '🪝 ໃຊ້ Tire iron 2 ດຶງ Bead ອອກໄປເລື່ອຍໆ ຮອບ Rim' },
+      { step: 6, instruction: '🔄 ກັບຫາງ Tire — ດຶງ Bead ດ້ານໃນອອກ ດ້ວຍວິທີດຽວກັນ' },
+      { step: 7, instruction: '✅ ກວດ Tube/Tubeless — ມີຮ່ອງຮອຍຮົ່ວບໍ່? ສ້ອມຫລື ປ່ຽນຕາມຈຳເປັນ' },
+    ],
+  },
+  {
+    category: 'fundamentals', difficulty: 'L1',
+    symptom: 'ການໃສ່ຢາງ — Mounting Tire ໃສ່ Rim',
+    symptoms_alt: ['ໃສ່ຢາງ', 'Mount tire', 'ປະກອບຢາງ'],
+    possible_causes: [],
+    time_estimate_min: 30,
+    safety: '⚠️ ບໍ່ໃຊ້ Tire ປະເພດຜິດກັບ Rim — ກວດ Spec ກ່ອນ',
+    tools_needed: ['Tire iron', 'Soap water/Bead lube', 'Air compressor', 'Pressure gauge'],
+    parts_needed: ['Valve stem ໃໝ່ (ຖ້າເກົ່າ)'],
+    steps: [
+      { step: 1, instruction: '🔍 ກວດທິດການໝູນ — Rotation arrow ດ້ານຂ້າງຢາງ' },
+      { step: 2, instruction: '💧 ໃສ່ Bead lube/Soap water ໃນ Bead 2 ດ້ານ' },
+      { step: 3, instruction: '🟢 ໃສ່ Bead ດ້ານໃນ ລົງ Rim ກ່ອນ — ໃຊ້ Tire iron ຊ່ວຍ' },
+      { step: 4, instruction: '🟢 ໃສ່ Bead ດ້ານນອກ — ມັກຍາກກວ່າ ໃຊ້ Tire iron 2 ຊິ້ນ' },
+      { step: 5, instruction: '💨 ອັດລົມຢ່າງໄວ — ໃຫ້ Bead Seat ກັບ Rim. ມີສຽງ "ປຸ້ງ" 2 ຄັ້ງ (Bead seat ສຳເລັດ)' },
+      { step: 6, instruction: '🔍 ກວດ Bead — Even Around (ບໍ່ມີຈຸດສູງ/ຕ່ຳ)' },
+      { step: 7, instruction: '🎯 ປັບລົມຢາງຕາມ Spec — ກະບະ 30-35 PSI | ບັນທຸກໜັກ 100-120 PSI' },
+      { step: 8, instruction: '⚖️ ສົ່ງໄປ Balance ກ່ອນໃສ່ໃນລົດ' },
+    ],
+  },
+  {
+    category: 'fundamentals', difficulty: 'L1',
+    symptom: 'ການເຮັດ Wheel Balance — ຖ່ວງລໍ້',
+    symptoms_alt: ['ຖ່ວງລໍ້', 'Balance ຢາງ', 'ສັ່ນ ໃນຄວາມໄວ'],
+    possible_causes: [],
+    time_estimate_min: 30,
+    safety: '⚠️ ໃສ່ Balance weight ໃຫ້ສະອາດ — ບໍ່ໃຫ້ຫລົມ',
+    tools_needed: ['Wheel balancer', 'Balance weights (Hammer-on + Stick-on)', 'Pliers'],
+    parts_needed: ['Balance weights'],
+    steps: [
+      { step: 1, instruction: '🧹 ທຳຄວາມສະອາດ Rim — ບໍ່ມີຂີ້ ບໍ່ມີ Weight ເກົ່າ' },
+      { step: 2, instruction: '⚙️ ໃສ່ Rim ໃນ Balancer — ໝູນເພື່ອ Lock' },
+      { step: 3, instruction: '📏 ປ້ອນຂໍ້ມູນ: ກວ້າງ Rim, ເສັ້ນຜ່າຄາງສະຫູນ, ໄລຍະຫ່າງ Machine' },
+      { step: 4, instruction: '▶️ ກົດ Start — ໃຫ້ Balancer ໝູນ' },
+      { step: 5, instruction: '⚖️ ໃສ່ Weight ໃນຕຳແໜ່ງທີ່ Display ບອກ (Hammer-on ສຳລັບ Steel Rim, Stick-on ສຳລັບ Alloy)' },
+      { step: 6, instruction: '🔄 ໝູນທົດສອບອີກຄັ້ງ — ຄ່າ < 5g = OK' },
+    ],
+  },
+
+  // 🌡 ໝໍ້ນ້ຳ (Radiator)
+  {
+    category: 'cooling', difficulty: 'L2',
+    symptom: 'ການສ້ອມໝໍ້ນ້ຳຮົ່ວ — Aluminum Radiator',
+    symptoms_alt: ['ໝໍ້ນ້ຳຮົ່ວ', 'ສ້ອມໝໍ້ນ້ຳ', 'Radiator leak'],
+    possible_causes: ['Aluminum core ຮົ່ວ', 'Plastic tank ແຕກ', 'Connection ຫລົມ'],
+    time_estimate_min: 90,
+    safety: '⚠️ ປ່ອຍໃຫ້ໝໍ້ນ້ຳເຢັນກ່ອນ — ນ້ຳຢາໝໍ້ນ້ຳ ຮ້ອນອັນຕະລາຍ',
+    tools_needed: ['Pressure tester', 'Aluminum solder/JB Weld', 'Wire brush', 'Heat gun'],
+    parts_needed: ['Radiator stop leak', 'Aluminum solder', 'Plastic Epoxy', 'O-ring kit'],
+    steps: [
+      { step: 1, instruction: '🔍 Pressure test ກ່ອນ — ໃສ່ 15 PSI ຫາທີ່ຮົ່ວ' },
+      { step: 2, instruction: '🧹 ທຳຄວາມສະອາດບໍລິເວນຮົ່ວ — Wire brush + Brake cleaner' },
+      { step: 3, instruction: '💧 Aluminum core ຮົ່ວ → ໃຊ້ Aluminum solder ກັບ Propane torch ຫລື JB Weld' },
+      { step: 4, instruction: '🟦 Plastic tank ແຕກ → ໃຊ້ Plastic Epoxy 2-part (Cure 24 ຊມ.)' },
+      { step: 5, instruction: '🔄 Pressure test ອີກຄັ້ງ — ບໍ່ມີຮົ່ວ → ປະກອບ' },
+      { step: 6, instruction: '💧 ໃສ່ ນ້ຳຢາໝໍ້ນ້ຳ ໃໝ່ + Bleed Air' },
+      { step: 7, instruction: '⚠️ ໂດຍຫລັກ — Radiator ຮົ່ວຫລາຍຈຸດ → ປ່ຽນທັງໝົດ (ສ້ອມຍາວບໍ່ໄດ້)' },
+    ],
+  },
+  {
+    category: 'cooling', difficulty: 'L1',
+    symptom: 'ການລ້າງໝໍ້ນ້ຳ + ລ້າງລະບົບຫລໍ່ເຢັນ',
+    symptoms_alt: ['ລ້າງໝໍ້ນ້ຳ', 'Flush ນ້ຳຢາລໍ່ເຢັນ', 'ລ້າງລະບົບເຢັນ'],
+    possible_causes: ['ນ້ຳຢາໝໍ້ນ້ຳ ສກປົກ', 'Scale build-up', 'Rust'],
+    time_estimate_min: 60,
+    safety: '⚠️ ປ່ອຍໃຫ້ເຢັນກ່ອນ — ບໍ່ເປີດຝາໝໍ້ນ້ຳເມື່ອຮ້ອນ',
+    tools_needed: ['Garden hose', 'Drain pan', 'Pressure tester'],
+    parts_needed: ['ນ້ຳຢາໝໍ້ນ້ຳ (50/50 ratio)', 'Cooling system cleaner', 'ນ້ຳກອງ'],
+    steps: [
+      { step: 1, instruction: '🚰 ປ່ອຍ ນ້ຳຢາໝໍ້ນ້ຳ ເກົ່າອອກ — ເປີດ Drain plug ດ້ານລຸ່ມ Radiator' },
+      { step: 2, instruction: '🧴 ໃສ່ Cooling system cleaner + ນ້ຳເຕັມ' },
+      { step: 3, instruction: '🔥 ດຳເນີນເຄື່ອງ 15-20 ນາທີ (ໃຫ້ Thermostat ເປີດ)' },
+      { step: 4, instruction: '🚰 ປ່ອຍອອກ — ນ້ຳສກປົກອອກ' },
+      { step: 5, instruction: '🔄 Flush ດ້ວຍນ້ຳບໍລິສຸດ 2-3 ຄັ້ງ ຈົນນ້ຳໃສ' },
+      { step: 6, instruction: '💧 ໃສ່ ນ້ຳຢາໝໍ້ນ້ຳ ໃໝ່ — 50/50 ratio ນ້ຳຢາໝໍ້ນ້ຳ + ນ້ຳກັ່ນ (Distilled)' },
+      { step: 7, instruction: '🌬 Bleed air ໂດຍເປີດ Bleed valve ໃນເວລາເຄື່ອງດຳເນີນ' },
+    ],
+  },
+  {
+    category: 'cooling', difficulty: 'L1',
+    symptom: 'Pressure Test ໝໍ້ນ້ຳ + Cap Test',
+    symptoms_alt: ['ກວດໝໍ້ນ້ຳ', 'Pressure test', 'Cap test'],
+    possible_causes: [],
+    time_estimate_min: 30,
+    safety: 'ປ່ອຍໃຫ້ເຢັນກ່ອນ',
+    tools_needed: ['Cooling System Pressure Tester', 'Cap Tester'],
+    parts_needed: ['Radiator cap (ຖ້າເສຍ)'],
+    steps: [
+      { step: 1, instruction: '🔧 ປະກອບ Pressure tester ໃສ່ບ່ອນ Radiator cap' },
+      { step: 2, instruction: '💨 ປັ໊ມເຖິງ 15 PSI (ຫລື ຄ່າ Cap rating)' },
+      { step: 3, instruction: '⏱ ປ່ອຍໄວ້ 15 ນາທີ — ຄວາມດັນ ບໍ່ຄວນຫລຸດເກີນ 2 PSI' },
+      { step: 4, instruction: '🔍 ຖ້າຫລຸດ → ຫາທີ່ຮົ່ວ (Radiator, Hose, Water pump, Head gasket)' },
+      { step: 5, instruction: '🧢 Cap test — ໃສ່ Cap ໃນ Cap tester ປັ໊ມ. ຄວນຄ້າງທີ່ຄ່າ Rating' },
+      { step: 6, instruction: '⚠️ ຖ້າ Cap ບໍ່ Hold → ປ່ຽນ Cap ໃໝ່ (ບໍ່ແພງ ແຕ່ສຳຄັນ)' },
+    ],
+  },
+
+  // 🔍 Diagnostic + Measurement
+  {
+    category: 'diagnostic', difficulty: 'L1',
+    symptom: 'ການໃຊ້ Multimeter — ວັດ Voltage / Resistance',
+    symptoms_alt: ['ໃຊ້ Multimeter', 'ວັດໄຟ', 'Test wire'],
+    possible_causes: [],
+    time_estimate_min: 20,
+    safety: '⚠️ ໃຊ້ Range ຖືກຕ້ອງ — ບໍ່ໃຊ້ Amp range ສຳລັບ Voltage',
+    tools_needed: ['Multimeter (Auto-range ດີກວ່າ)', 'Test leads'],
+    parts_needed: [],
+    steps: [
+      { step: 1, instruction: '🎛 ເລືອກ Range: V= (DC) ສຳລັບ Battery/Wires | V~ (AC) ສຳລັບ House power | Ω ສຳລັບ Resistance' },
+      { step: 2, instruction: '🔴 ສຽບ Red lead ໃນ V/Ω port | ⚫ Black lead ໃນ COM' },
+      { step: 3, instruction: '🔋 ວັດ Battery: Red ໃສ່ +, Black ໃສ່ -. ປົກກະຕິ 12.6V (Off), 13.8-14.4V (ດຳເນີນ)' },
+      { step: 4, instruction: '🔌 ວັດ Continuity (Ω): ປະຍຸກ 2 leads — ມີສຽງດັງ = ສາຍດີ' },
+      { step: 5, instruction: '⚡ ວັດ Voltage Drop: ວັດລະຫວ່າງ 2 ຈຸດໃນສາຍ — ບໍ່ຄວນເກີນ 0.5V' },
+    ],
+  },
+  {
+    category: 'diagnostic', difficulty: 'L2',
+    symptom: 'ການວັດ Compression Test — ເຄື່ອງເສຍບໍ?',
+    symptoms_alt: ['Compression test', 'ວັດ Compression', 'ກວດເຄື່ອງ'],
+    possible_causes: [],
+    time_estimate_min: 60,
+    safety: 'ຖອດສະບອນທັງໝົດ ກ່ອນທົດສອບ',
+    tools_needed: ['Compression tester', 'ປະແຈ Spark plug', 'Helper'],
+    parts_needed: [],
+    steps: [
+      { step: 1, instruction: '🔥 ດຳເນີນເຄື່ອງໃຫ້ຮ້ອນ Operating temp' },
+      { step: 2, instruction: '🛑 ປິດເຄື່ອງ → ຖອດ Spark plugs ທັງໝົດ' },
+      { step: 3, instruction: '⚡ ປົດສາຍ Fuel pump fuse + Ignition coil' },
+      { step: 4, instruction: '🔧 ປະກອບ Compression tester ໃນຮູ Spark plug 1' },
+      { step: 5, instruction: '🚀 ໃຊ້ Helper Crank ເຄື່ອງ 5-7 ຄັ້ງ — ອ່ານຄ່າ' },
+      { step: 6, instruction: '📊 ປົກກະຕິ: Gasoline 9-13 bar (130-190 PSI) | Diesel 25-35 bar (380-500 PSI)' },
+      { step: 7, instruction: '⚠️ ຄ່າຕ່ຳ → ຫຍອດນ້ຳມັນເຄື່ອງ 1 ບ່ວງເຂົ້າຫລັງ Crank ອີກ. ຄ່າຂຶ້ນ = Ring ສືກ | ບໍ່ຂຶ້ນ = Valve/Gasket' },
+    ],
+  },
+  {
+    category: 'diagnostic', difficulty: 'L1',
+    symptom: 'ການວັດ Tire Pressure — ລົມຢາງ',
+    symptoms_alt: ['ວັດລົມຢາງ', 'Tire pressure', 'PSI'],
+    possible_causes: [],
+    time_estimate_min: 10,
+    safety: 'ກວດເມື່ອຢາງເຢັນ',
+    tools_needed: ['Pressure gauge ດິຈິຕອນ', 'Air compressor'],
+    parts_needed: [],
+    steps: [
+      { step: 1, instruction: '📖 ກວດ Spec ໃນຂ້າງປະຕູລົດ ຫລື ໃນຄູ່ມື — ບໍ່ໃຊ້ໂຕເລກຂ້າງຢາງ (= Maximum)' },
+      { step: 2, instruction: '🎯 ປົກກະຕິ: ກະບະ 30-35 PSI | ບັນທຸກໜັກ 100-120 PSI | ໂຟກລິບ 80-100 PSI' },
+      { step: 3, instruction: '🔧 ຖອດ Valve cap → ກົດ Gauge ໃສ່ Valve ໃຫ້ໝັ້ນ' },
+      { step: 4, instruction: '➕ ຕ່ຳ → ເຕີມ | ➖ ສູງ → ປ່ອຍລົມ' },
+      { step: 5, instruction: '🔄 ກວດທຸກລໍ້ + Spare ສະເໝີ' },
+    ],
+  },
+  {
+    category: 'diagnostic', difficulty: 'L2',
+    symptom: 'ການກວດຮົ່ວນ້ຳມັນ — ດ້ວຍ UV Dye',
+    symptoms_alt: ['ກວດຮົ່ວ', 'UV dye', 'Oil leak'],
+    possible_causes: [],
+    time_estimate_min: 60,
+    safety: 'ໃສ່ແວ່ນຕາ — UV ມີຄວາມເຂັ້ມຂຸ້ນສູງ',
+    tools_needed: ['UV dye', 'UV flashlight', 'UV-blocking glasses'],
+    parts_needed: ['UV dye'],
+    steps: [
+      { step: 1, instruction: '💉 ໃສ່ UV dye ໃນ ນ້ຳມັນເຄື່ອງ / ນ້ຳຢາໝໍ້ນ້ຳ / ນ້ຳມັນ Power Steering (ປະມານ 30ml)' },
+      { step: 2, instruction: '🔥 ດຳເນີນເຄື່ອງ 15-30 ນາທີ ໃຫ້ Dye ໝູນຮອບ' },
+      { step: 3, instruction: '⚫ ໃນບ່ອນມືດ ໃຊ້ UV flashlight ສ່ອງ' },
+      { step: 4, instruction: '🟡 ຮ່ອງຮ່ວງເຫລືອງ-ຂຽວ ສະຫວ່າງ = ຈຸດຮົ່ວ' },
+      { step: 5, instruction: '🧹 ທຳຄວາມສະອາດ Dye ດ້ວຍ UV cleaner' },
+    ],
+  },
+  {
+    category: 'diagnostic', difficulty: 'L2',
+    symptom: 'ການກວດຮົ່ວລົມ Vacuum — Smoke Machine',
+    symptoms_alt: ['Vacuum leak', 'Smoke test', 'ກວດຫລົມ'],
+    possible_causes: [],
+    time_estimate_min: 45,
+    safety: 'ປິດເຄື່ອງ ໃນເວລາທົດສອບ',
+    tools_needed: ['Smoke machine', 'Intake plug kit'],
+    parts_needed: [],
+    steps: [
+      { step: 1, instruction: '🔌 ປະກອບ Smoke machine ກັບ Intake (ບ່ອນ MAF ຫລື Throttle body)' },
+      { step: 2, instruction: '🚧 ປິດ Exhaust + ບ່ອນອື່ນທີ່ບໍ່ຕ້ອງການກວດ' },
+      { step: 3, instruction: '💨 ປ່ອຍ Smoke ໃນ Intake' },
+      { step: 4, instruction: '👀 ຊອກຫາ Smoke ອອກ — ບ່ອນທີ່ມີຫລົມ' },
+      { step: 5, instruction: '🔧 ສ້ອມ/ປ່ຽນບ່ອນຫລົມ' },
+    ],
+  },
+  {
+    category: 'diagnostic', difficulty: 'L1',
+    symptom: 'ການກວດໄຟຫລົມ Parasitic Drain',
+    symptoms_alt: ['ໝົດແບັດ', 'ໄຟຫລົມ', 'Parasitic drain'],
+    possible_causes: ['Circuit ກິນໄຟຕະຫລອດ', 'Module ບໍ່ Sleep', 'ໄຟໃນຫ້ອງເຄື່ອງເປີດ'],
+    time_estimate_min: 60,
+    safety: 'ໃສ່ Multimeter ໃນ Amp range — ໃຊ້ Fuse Protection',
+    tools_needed: ['Multimeter (Amp 10A)', 'Fuse puller'],
+    parts_needed: [],
+    steps: [
+      { step: 1, instruction: '🔋 ປິດເຄື່ອງ ໃຫ້ Module ທັງໝົດ Sleep (10-30 ນາທີ)' },
+      { step: 2, instruction: '⚡ ປົດສາຍ (-) ຂອງໝໍ້ໄຟ' },
+      { step: 3, instruction: '🎛 ປະກອບ Multimeter ໃນໂໝດ Amp ລະຫວ່າງ (-) terminal ກັບສາຍ' },
+      { step: 4, instruction: '📊 ປົກກະຕິ: < 50mA. ສູງເກີນ → ມີ Circuit ກິນໄຟ' },
+      { step: 5, instruction: '🔍 ດຶງ Fuse ທິລະຊິ້ນ → ເບິ່ງ Amp ຫລຸດເມື່ອໃດ = Circuit ນັ້ນຄືບັນຫາ' },
+    ],
+  },
+
+  // 🔥 ການເຊື່ອມ
+  {
+    category: 'welding', difficulty: 'L2',
+    symptom: 'ການເຊື່ອມ MIG — ສ້ອມໂຄງ Chassis',
+    symptoms_alt: ['ເຊື່ອມ MIG', 'Welding', 'ສ້ອມໂຄງລົດ'],
+    possible_causes: [],
+    time_estimate_min: 120,
+    safety: '⚠️ ໃສ່ Welding mask + ໃບໜ້າແວ່ນ + ຖົງມືໜັງ + ປ້ອງກັນໄຟ. ມີ Fire extinguisher ໃກ້',
+    tools_needed: ['MIG welder', 'Welding mask (Auto-darken)', 'Wire brush', 'Grinder'],
+    parts_needed: ['MIG wire 0.8mm', 'Shielding gas (CO2 ຫລື Argon mix)'],
+    steps: [
+      { step: 1, instruction: '🧹 ທຳຄວາມສະອາດໂລຫະ — ໃຊ້ Grinder ດຶງສີ/ຂີ້ໝົ້ມໝົດ' },
+      { step: 2, instruction: '🔧 ປະກອບ Ground clamp ໃກ້ບ່ອນເຊື່ອມ' },
+      { step: 3, instruction: '⚙️ ປັບ Voltage + Wire feed speed ຕາມຄວາມໜາໂລຫະ' },
+      { step: 4, instruction: '👁 Tack weld ກ່ອນ — 4-5 ຈຸດ ໃຫ້ຍຶດ' },
+      { step: 5, instruction: '🔥 ເຊື່ອມເຕັມຮອຍ — ໝູນຍ່າງເລື່ອຍ ບໍ່ໄວ/ບໍ່ຊ້າເກີນ' },
+      { step: 6, instruction: '⏱ ປ່ອຍເຢັນ → ໃຊ້ Grinder ກວດ + ປັບ' },
+      { step: 7, instruction: '🛡 ໃສ່ Anti-rust primer ປ້ອງກັນຂີ້ໝົ້ມ' },
+    ],
+  },
+  {
+    category: 'welding', difficulty: 'L3',
+    symptom: 'ການເຊື່ອມ TIG — Aluminum Radiator',
+    symptoms_alt: ['ເຊື່ອມ TIG', 'TIG Aluminum'],
+    possible_causes: [],
+    time_estimate_min: 90,
+    safety: '⚠️ Argon gas ໜັກກວ່າອາກາດ — ໃຫ້ມີ ventilation ດີ',
+    tools_needed: ['TIG welder (AC for Aluminum)', 'Tungsten electrode', 'Argon gas'],
+    parts_needed: ['Aluminum filler rod'],
+    steps: [
+      { step: 1, instruction: '🧹 ທຳຄວາມສະອາດ Aluminum — Stainless steel brush (ບໍ່ໃຊ້ ferrous brush)' },
+      { step: 2, instruction: '🧴 ໃຊ້ Acetone ລ້າງສຸດທ້າຍ' },
+      { step: 3, instruction: '⚙️ ປັບ TIG ໂໝດ AC — Frequency 100-200Hz' },
+      { step: 4, instruction: '🔥 ສ້າງ Arc — ບໍ່ໃຫ້ Tungsten ແຕະວັດສະດຸ' },
+      { step: 5, instruction: '🧊 ໃສ່ Filler rod ໃນ Puddle' },
+      { step: 6, instruction: '👁 ສ້າງ Bead ສະເໝີ — ບໍ່ໄວ/ບໍ່ຊ້າ' },
+    ],
+  },
+
+  // 🛠 ການລ້າງ + Maintenance
+  {
+    category: 'fundamentals', difficulty: 'L2',
+    symptom: 'ການລ້າງ Injector — Ultrasonic',
+    symptoms_alt: ['ລ້າງ Injector', 'Clean injector', 'Ultrasonic'],
+    possible_causes: ['Injector ຕັນ', 'Spray pattern ບໍ່ດີ'],
+    time_estimate_min: 120,
+    safety: 'ໃຊ້ Cleaner ໃນບ່ອນລົມຖ່າຍ — ມີກິ່ນແຮງ',
+    tools_needed: ['Ultrasonic cleaner', 'Injector test bench', 'Injector cleaner'],
+    parts_needed: ['Injector seal kit', 'Filter screen'],
+    steps: [
+      { step: 1, instruction: '🔧 ຖອດ Injectors ອອກຈາກເຄື່ອງ' },
+      { step: 2, instruction: '🧪 ໃສ່ Injectors ໃນ Ultrasonic cleaner ກັບ Injector cleaner solution' },
+      { step: 3, instruction: '⏱ Run 30-45 ນາທີ' },
+      { step: 4, instruction: '🚀 ທົດສອບ Flow rate ໃນ Test bench — ປ່ຽນ Injector ທີ່ Flow ຕ່ຳ > 10%' },
+      { step: 5, instruction: '🔄 ປ່ຽນ Seal kit + ປະກອບກັບ' },
+    ],
+  },
+  {
+    category: 'fundamentals', difficulty: 'L1',
+    symptom: 'ການລ້າງ Throttle Body + Carbon',
+    symptoms_alt: ['ລ້າງ Throttle', 'Clean throttle', 'Carbon'],
+    possible_causes: ['Carbon ສະສົມ', 'Idle ບໍ່ສະຖຽນ'],
+    time_estimate_min: 45,
+    safety: 'ປ່ອຍເຄື່ອງເຢັນກ່ອນ — Throttle body ຮ້ອນ',
+    tools_needed: ['Throttle body cleaner spray', 'Brush', 'Rag'],
+    parts_needed: ['Throttle body gasket'],
+    steps: [
+      { step: 1, instruction: '🔧 ຖອດ Air intake ducts' },
+      { step: 2, instruction: '🚪 ເປີດ Throttle ດ້ວຍມື ໃຫ້ເຫັນພາຍໃນ' },
+      { step: 3, instruction: '💨 ສະເປຣ Cleaner ໃນ Throttle body' },
+      { step: 4, instruction: '🪥 Brush + ຜ້າສະອາດ ດຶງ Carbon ອອກ' },
+      { step: 5, instruction: '🔄 ປະກອບ + Reset Idle ໂດຍຖອດໝໍ້ໄຟ 10 ນາທີ' },
+      { step: 6, instruction: '🚗 ດຳເນີນເຄື່ອງ Idle 15 ນາທີ → ECU Learn ໃໝ່' },
+    ],
+  },
+  {
+    category: 'fundamentals', difficulty: 'L2',
+    symptom: 'ການລ້າງ EGR Valve + Cooler',
+    symptoms_alt: ['ລ້າງ EGR', 'EGR cleaning'],
+    possible_causes: ['Carbon ຕັນ', 'Stuck open/closed'],
+    time_estimate_min: 90,
+    safety: 'EGR ຮ້ອນສູງ — ປ່ອຍເຢັນກ່ອນ',
+    tools_needed: ['EGR cleaner', 'Brass brush', 'Pick'],
+    parts_needed: ['EGR Gasket', 'O-rings'],
+    steps: [
+      { step: 1, instruction: '🔧 ຖອດ EGR Valve' },
+      { step: 2, instruction: '👁 ສັງເກດ Carbon — ສກປົກບໍ?' },
+      { step: 3, instruction: '💨 ສະເປຣ EGR cleaner ໃສ່ Carbon' },
+      { step: 4, instruction: '🪥 Brush + Pick ດຶງ Carbon ອອກ — ໃຊ້ເວລາ' },
+      { step: 5, instruction: '🧪 ທົດສອບ Valve ດ້ວຍ Vacuum pump — ເປີດ/ປິດໄດ້ບໍ?' },
+      { step: 6, instruction: '🔄 ປ່ຽນ Gasket + ປະກອບ' },
+      { step: 7, instruction: '📊 Clear Error Code + Reset Adaptation' },
+    ],
+  },
+
+  // 🛢 ການເຕີມ + Bleeding
+  {
+    category: 'brakes', difficulty: 'L1',
+    symptom: 'ການ Bleed ເບຣກ — ໄລ່ລົມ',
+    symptoms_alt: ['Bleed brake', 'ໄລ່ລົມເບຣກ', 'Brake spongy'],
+    possible_causes: ['ມີລົມໃນສາຍເບຣກ', 'Pedal ນຸ້ມ'],
+    time_estimate_min: 45,
+    safety: '⚠️ ໃຊ້ນ້ຳມັນເບຣກ DOT 4 — ບໍ່ປະສົມຍີ່ຫໍ້',
+    tools_needed: ['Brake bleeding kit', 'ປະແຈ 8-10mm', 'Helper'],
+    parts_needed: ['Brake fluid DOT 4'],
+    steps: [
+      { step: 1, instruction: '💧 ເຕີມນ້ຳມັນເບຣກໃນ Reservoir ໃຫ້ເຕັມ — ບໍ່ໃຫ້ຫລຸດໃນຂະນະ Bleed' },
+      { step: 2, instruction: '📍 Bleed ຕາມລຳດັບ: ໄກສຸດກ່ອນ — RR → LR → RF → LF' },
+      { step: 3, instruction: '🔧 ປະກອບ Bleed hose ໃສ່ Bleeder valve' },
+      { step: 4, instruction: '👤 Helper ກົດ Pedal ຄ່ອຍໆ + Hold' },
+      { step: 5, instruction: '🔓 ເປີດ Bleeder valve 1/4 turn — Pedal ຈົມ' },
+      { step: 6, instruction: '🔒 ປິດ Bleeder — Helper ປ່ອຍ Pedal' },
+      { step: 7, instruction: '🔄 ຊ້ຳຈົນບໍ່ມີລົມ — ນ້ຳມັນອອກສະອາດ' },
+      { step: 8, instruction: '✅ ກວດ Pedal — ຄວນແຂງ ບໍ່ນຸ້ມ' },
+    ],
+  },
+
+  // 🔌 Wiring + Crimping
+  {
+    category: 'fundamentals', difficulty: 'L1',
+    symptom: 'ການເຊື່ອມຕໍ່ສາຍໄຟ — Crimp / Solder',
+    symptoms_alt: ['ຕໍ່ສາຍໄຟ', 'Crimp', 'Wire repair'],
+    possible_causes: [],
+    time_estimate_min: 30,
+    safety: 'ຖອດແບັດກ່ອນເຮັດງານ',
+    tools_needed: ['Wire stripper', 'Crimping tool', 'Heat gun', 'Multimeter'],
+    parts_needed: ['Crimp connectors', 'Heat shrink tubing', 'Solder + flux'],
+    steps: [
+      { step: 1, instruction: '✂️ ຕັດສາຍ → ດຶງ Insulation ຍາວ 10mm ດ້ວຍ Wire stripper' },
+      { step: 2, instruction: '🔧 Crimp ໂດຍໃຊ້ Crimping tool — ບໍ່ໃຊ້ Pliers ທົ່ວໄປ' },
+      { step: 3, instruction: '🔥 ຫລື Solder: ບີດສາຍ + ໃສ່ Flux + ບີດ Solder' },
+      { step: 4, instruction: '🛡 ໃສ່ Heat shrink tubing → Heat gun ບີດ' },
+      { step: 5, instruction: '🧪 ກວດ Continuity ດ້ວຍ Multimeter' },
+    ],
+  },
+
+  // 🌡 ການວັດອຸນຫະພູມ
+  {
+    category: 'diagnostic', difficulty: 'L1',
+    symptom: 'ການວັດອຸນຫະພູມ ດ້ວຍ IR Thermometer',
+    symptoms_alt: ['IR thermometer', 'ວັດອຸນຫະພູມ', 'Heat measure'],
+    possible_causes: [],
+    time_estimate_min: 15,
+    safety: 'ບໍ່ແຕະບ່ອນຮ້ອນ — ໃຊ້ IR ຈາກໄກ',
+    tools_needed: ['Infrared Thermometer'],
+    parts_needed: [],
+    steps: [
+      { step: 1, instruction: '🌡 ໃຊ້ IR Thermometer ສ່ອງ Radiator ດ້ານເຂົ້າ vs ດ້ານອອກ' },
+      { step: 2, instruction: '📊 ຕ່າງ 5-10°C = Radiator OK | ບໍ່ຕ່າງ = Radiator ຕັນ' },
+      { step: 3, instruction: '🔥 ກວດ Thermostat: Hose ເທິງ Radiator — ປົກກະຕິຮ້ອນຫລັງ Thermostat ເປີດ (~85°C)' },
+      { step: 4, instruction: '⚡ ກວດ Brake disc — ຕ່າງເທື່ອລະຂ້າງ ບໍ່ຄວນເກີນ 10°C (ຖ້າຕ່າງ → Caliper stuck)' },
+      { step: 5, instruction: '🛞 ກວດ Wheel bearing — ຮ້ອນກວ່າຂ້າງອື່ນ = Bearing ສືກ' },
+    ],
+  },
+
+  // 🛠 ການນຳໃຊ້ Hydraulic + Air tools
+  {
+    category: 'fundamentals', difficulty: 'L1',
+    symptom: 'ການນຳໃຊ້ Air Tools — Impact Wrench',
+    symptoms_alt: ['Impact wrench', 'ປະແຈລົມ', 'Air tool'],
+    possible_causes: [],
+    time_estimate_min: 15,
+    safety: '⚠️ ໃສ່ Eye protection — Socket ອາດແຕກ',
+    tools_needed: ['Impact wrench', 'Impact sockets (black)', 'Air hose', 'Compressor'],
+    parts_needed: [],
+    steps: [
+      { step: 1, instruction: '🔧 ໃຊ້ Impact sockets ສະເພາະ (ສີດຳ) — ບໍ່ໃຊ້ Chrome sockets' },
+      { step: 2, instruction: '💨 ປັບ Air pressure 90-120 PSI' },
+      { step: 3, instruction: '🎛 ປັບ Torque setting — Forward/Reverse + Power level' },
+      { step: 4, instruction: '⚠️ ບໍ່ໃຊ້ Impact ສຳລັບ Final Torque — ໃຊ້ Torque wrench ສຸດທ້າຍ' },
+      { step: 5, instruction: '🛢 ໃສ່ Air tool oil ໃນ Inlet ທຸກວັນ (2-3 drops)' },
+    ],
+  },
+
+  // ⚙️ Vehicle Lifting Safety
+  {
+    category: 'fundamentals', difficulty: 'L1',
+    symptom: 'ການຍົກລົດ — Jack + Stand ປອດໄພ',
+    symptoms_alt: ['ຍົກລົດ', 'Jack stand', 'Lift vehicle'],
+    possible_causes: [],
+    time_estimate_min: 15,
+    safety: '⚠️ ບໍ່ໃຊ້ Jack ໂດດໆ — ໃຊ້ Jack Stand ສະເໝີ. ບໍ່ມຸດໃຕ້ລົດທີ່ຍົກ Jack ໂດດໆ',
+    tools_needed: ['Floor jack (3-5 ton)', 'Jack stands (3-6 ton, 4 ໂຕ)', 'Wheel chocks'],
+    parts_needed: [],
+    steps: [
+      { step: 1, instruction: '🚧 ຈອດໃນພື້ນແບນ ແຂງ — ບໍ່ໃຊ້ພື້ນອ່ອນ' },
+      { step: 2, instruction: '🛑 ດຶງ Parking brake + ສະຫຼັບເກຍ Park' },
+      { step: 3, instruction: '🔺 ໃສ່ Wheel chocks ກັນລໍ້ຈາກລໍ້ທີ່ບໍ່ໄດ້ຍົກ' },
+      { step: 4, instruction: '📍 ຍົກ Jack ໃນ Jack point ສະເພາະ (ກວດ Manual)' },
+      { step: 5, instruction: '🪜 ໃສ່ Jack Stand ໃນ Frame ຫລື Reinforced point' },
+      { step: 6, instruction: '⬇️ ປ່ອຍ Jack ລົງ ໃຫ້ນ້ຳໜັກລົງ Stand' },
+      { step: 7, instruction: '🚫 ບໍ່ມຸດໃຕ້ລົດ ຖ້າຍັງບໍ່ມີ Stand ໝັ້ນຄົງ' },
+    ],
+  },
 ];
 
 // 📊 ສະຖິຕິ Helpdesk
@@ -23262,8 +23799,9 @@ async function seedHelpdesk() {
   pages.helpdesk();
 }
 
-// 🆘 ໜ້າຫຼັກ Helpdesk
+// 🆘 ໜ້າຫຼັກ Helpdesk — Enterprise UI v2
 window._hdFilter = window._hdFilter || { category: '', difficulty: '', q: '', vehicle_class: '', vehicle_brand: '' };
+window._hdView = window._hdView || 'list'; // 'list' | 'grid' | 'groups'
 
 pages.helpdesk = async () => {
   const all = await db.helpdesk_problems.toArray();
@@ -23282,226 +23820,338 @@ pages.helpdesk = async () => {
       (h.vehicle_brand||'').toLowerCase().includes(q)
     );
   }
-  // Sort: ຄວາມຖີ່ນຳໃຊ້ສູງສຸດ ກ່ອນ
   filtered.sort((a,b) => (b.views||0) - (a.views||0));
 
-  // ນັບຕາມໝວດ
   const catCounts = {};
   HELPDESK_CATEGORIES.forEach(c => { catCounts[c.key] = all.filter(h => h.category === c.key && h.active !== false).length; });
+  const vcCounts = {};
+  VEHICLE_CLASSES.forEach(c => { vcCounts[c.key] = all.filter(h => h.vehicle_class === c.key).length; });
+
+  const hasFilter = f.category || f.difficulty || f.vehicle_class || f.vehicle_brand || f.q;
+  const totalL1 = all.filter(h => h.difficulty==='L1').length;
+  const totalL2 = all.filter(h => h.difficulty==='L2').length;
+  const totalL3 = all.filter(h => h.difficulty==='L3').length;
+
+  // Helper — sidebar items
+  const sidebarBtnStyle = (active, color) =>
+    `display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;text-align:left;cursor:pointer;padding:10px 12px;border-radius:8px;font-size:13.5px;border:1px solid transparent;background:${active?(color||'#0F172A'):'transparent'};color:${active?'#fff':'var(--text)'};font-weight:${active?'700':'500'};margin-bottom:3px;transition:all .15s`;
 
   $('#main').innerHTML = `
+    <style>
+      .hd-shell { display:grid; grid-template-columns: 260px 1fr; gap:18px; margin-top:14px; }
+      @media (max-width:1100px){ .hd-shell { grid-template-columns: 1fr; } .hd-sidebar { position:static !important; max-height:none !important; } }
+      .hd-sidebar { position:sticky; top:12px; align-self:start; max-height:calc(100vh - 30px); overflow-y:auto; padding:14px; background:var(--bg); border:1px solid var(--line); border-radius:12px; }
+      .hd-sidebar h5 { margin:14px 0 8px; font-size:11px; letter-spacing:.5px; color:var(--muted); text-transform:uppercase; font-weight:700; border-bottom:1px solid var(--line); padding-bottom:6px; }
+      .hd-sidebar h5:first-child { margin-top:0; }
+      .hd-side-btn:hover { background:rgba(249,115,22,.08) !important; }
+      .hd-hero { background:linear-gradient(135deg,#FFF7ED 0%,#FFEDD5 50%,#FED7AA 100%); border:1px solid #FDBA74; border-radius:14px; padding:24px 26px; margin-bottom:14px; }
+      .hd-search { width:100%; padding:14px 18px 14px 46px; border:2px solid #FB923C; border-radius:10px; font-size:15px; font-family:inherit; background:#fff url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2220%22 height=%2220%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%23F97316%22 stroke-width=%222.5%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22><circle cx=%2211%22 cy=%2211%22 r=%228%22/><line x1=%2221%22 y1=%2221%22 x2=%2216.65%22 y2=%2216.65%22/></svg>') no-repeat 14px center; box-shadow:0 2px 8px rgba(249,115,22,.15); }
+      .hd-search:focus { outline:none; border-color:#EA580C; box-shadow:0 0 0 4px rgba(249,115,22,.18); }
+      .hd-stat { display:inline-flex; align-items:center; gap:6px; padding:6px 12px; background:rgba(255,255,255,.7); border-radius:20px; font-size:12.5px; font-weight:600; }
+      .hd-row { display:flex; align-items:flex-start; gap:14px; padding:16px 18px; background:#fff; border:1px solid var(--line); border-left:5px solid #888; border-radius:10px; margin-bottom:10px; cursor:pointer; transition:all .18s; }
+      .hd-row:hover { transform:translateX(3px); box-shadow:0 6px 18px rgba(0,0,0,.08); border-color:#FB923C; border-left-color:#F97316; }
+      .hd-row .hd-icon { font-size:34px; line-height:1; flex-shrink:0; }
+      .hd-row .hd-title { font-weight:700; font-size:16px; color:#0F172A; line-height:1.4; margin:0 0 6px; }
+      .hd-row .hd-tags { display:flex; flex-wrap:wrap; gap:5px; }
+      .hd-tag { padding:3px 9px; border-radius:12px; font-size:11px; font-weight:600; line-height:1.5; white-space:nowrap; }
+      .hd-causes { margin-top:10px; padding-top:10px; border-top:1px dashed #E5E7EB; font-size:12.5px; color:#475569; line-height:1.7; }
+      .hd-meta { display:flex; justify-content:space-between; align-items:center; margin-top:10px; padding-top:8px; border-top:1px dashed #E5E7EB; font-size:11.5px; color:#64748B; font-weight:500; }
+      .hd-group-hdr { display:flex; align-items:center; gap:10px; margin:22px 0 12px; padding-bottom:10px; border-bottom:2px solid var(--line); }
+      .hd-group-hdr .ic { width:42px; height:42px; border-radius:10px; display:inline-flex; align-items:center; justify-content:center; font-size:22px; color:#fff; }
+      .hd-active-filter { display:inline-flex; align-items:center; gap:6px; padding:6px 12px; background:#0F172A; color:#fff; border-radius:18px; font-size:12px; margin-right:6px; }
+      .hd-active-filter .x { cursor:pointer; opacity:.7; font-weight:700; padding:0 4px; }
+      .hd-active-filter .x:hover { opacity:1; }
+      .hd-empty { padding:60px 30px; text-align:center; background:var(--bg); border:2px dashed var(--line); border-radius:14px; }
+    </style>
+
     <div class="crumbs">🛠 ການສ້ອມບຳລຸງ › Helpdesk</div>
-    <div class="page-title">🆘 Helpdesk — ຄູ່ມືແກ້ໄຂລົດສຳລັບຊ່າງ <small style="font-weight:400;color:var(--muted);font-size:13px">— ${filtered.length}/${all.length} ບັນຫາ</small></div>
-    <div class="alert info" style="font-size:13px">💡 ຄົ້ນຫາອາການລົດ ໄດ້ຮັບຄຳແນະນຳ Step-by-Step + ເຄື່ອງມືທີ່ໃຊ້ + ອາໄຫລ່ທີ່ຄວນປ່ຽນ. ສະນັບສະໜູນຊ່າງລະດັບ L1-L3.</div>
 
-    <div class="kpi-grid">
-      <div class="kpi"><div class="label">📚 ບັນຫາທັງໝົດ</div><div class="val">${all.length}</div></div>
-      <div class="kpi"><div class="label">🟢 ງ່າຍ (L1)</div><div class="val" style="color:var(--ok)">${all.filter(h => h.difficulty==='L1').length}</div></div>
-      <div class="kpi"><div class="label">🟡 ປະຈຳ (L2)</div><div class="val" style="color:var(--warn)">${all.filter(h => h.difficulty==='L2').length}</div></div>
-      <div class="kpi"><div class="label">🔴 ຍາກ (L3)</div><div class="val" style="color:var(--bad)">${all.filter(h => h.difficulty==='L3').length}</div></div>
-    </div>
-
-    <div class="toolbar" style="flex-wrap:wrap;gap:8px">
-      <input type="search" placeholder="🔍 ຄົ້ນຫາ ອາການ/Brand ('TOYOTA', 'ເຄື່ອງບໍ່ສະຕາດ'...)" value="${escapeHtml(f.q)}"
-        oninput="window._hdFilter.q=this.value;clearTimeout(window._hdt);window._hdt=setTimeout(()=>pages.helpdesk(),300)"
-        style="padding:9px 12px;border:1px solid var(--line);border-radius:8px;font-size:14px;min-width:300px;font-family:inherit"/>
-      <select onchange="window._hdFilter.difficulty=this.value;pages.helpdesk()" style="padding:9px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px">
-        <option value="">🎓 ທຸກລະດັບ</option>
-        <option value="L1" ${f.difficulty==='L1'?'selected':''}>🟢 L1 — ຊ່າງຝຶກຫັດ</option>
-        <option value="L2" ${f.difficulty==='L2'?'selected':''}>🟡 L2 — ຊ່າງປະຈຳ</option>
-        <option value="L3" ${f.difficulty==='L3'?'selected':''}>🔴 L3 — ຊຽວຊານ</option>
-      </select>
-      <select onchange="window._hdFilter.vehicle_brand=this.value;pages.helpdesk()" style="padding:9px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px">
-        <option value="">🏷 ທຸກ Brand</option>
-        ${[...new Set(VEHICLE_CLASSES.flatMap(c => c.brands))].sort().map(b => `<option value="${b}" ${f.vehicle_brand===b?'selected':''}>${b}</option>`).join('')}
-      </select>
-      <button class="btn outline" onclick="window._hdFilter={category:'',difficulty:'',q:'',vehicle_class:'',vehicle_brand:''};pages.helpdesk()">🔄 ລ້າງ</button>
-      <div style="flex:1"></div>
-      <button class="btn outline" onclick="seedHelpdesk()">📥 ໂຫລດ ${HELPDESK_SEED.length} ບັນຫາ</button>
-      <button class="btn ok" onclick="openHelpdeskModal()">+ ເພີ່ມບັນຫາໃໝ່</button>
-    </div>
-
-    <!-- 🚗 Vehicle Class Filter -->
-    <div style="margin:14px 0">
-      <div style="font-size:12px;color:var(--muted);margin-bottom:6px;font-weight:600">🚗 ກອງຕາມປະເພດລົດ:</div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px">
-        <div onclick="window._hdFilter.vehicle_class='';window._hdFilter.vehicle_brand='';pages.helpdesk()"
-          style="cursor:pointer;padding:10px;background:${!f.vehicle_class?'#1F2937':'var(--bg)'};color:${!f.vehicle_class?'#fff':'var(--text)'};border-radius:8px;border:2px solid #1F2937;text-align:center;font-size:12px">
-          <div style="font-size:24px">🌐</div>
-          <div style="font-weight:600;margin-top:2px">ທຸກປະເພດ</div>
-          <div style="font-size:10px;opacity:.8">${all.length} ບັນຫາ</div>
+    <!-- 🎯 Hero — Big Search + Title -->
+    <div class="hd-hero">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:14px">
+        <div>
+          <h1 style="margin:0 0 4px;font-size:24px;color:#7C2D12">🆘 Helpdesk — ສູນຄວາມຮູ້ການສ້ອມລົດ</h1>
+          <div style="color:#9A3412;font-size:13.5px">ຄູ່ມືແກ້ໄຂບັນຫາແບບ Step-by-Step ສຳລັບຊ່າງທຸກລະດັບ L1 - L3</div>
         </div>
-        ${VEHICLE_CLASSES.filter(c => c.key !== 'all').map(c => {
-          const cnt = all.filter(h => h.vehicle_class === c.key).length;
-          if (cnt === 0) return '';
-          return `
-            <div onclick="window._hdFilter.vehicle_class='${f.vehicle_class===c.key?'':c.key}';window._hdFilter.vehicle_brand='';pages.helpdesk()"
-              style="cursor:pointer;padding:10px;background:${f.vehicle_class===c.key?'#F97316':'var(--bg)'};color:${f.vehicle_class===c.key?'#fff':'var(--text)'};border-radius:8px;border:2px solid #F97316;text-align:center;font-size:12px">
-              <div style="font-size:24px">${c.icon}</div>
-              <div style="font-weight:600;margin-top:2px">${c.label}</div>
-              <div style="font-size:10px;opacity:.8">${cnt} ບັນຫາ • ${c.brands.length} Brand</div>
-            </div>
-          `;
-        }).join('')}
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn outline" onclick="seedHelpdesk()" style="background:#fff">📥 ໂຫລດ ${HELPDESK_SEED.length} ບັນຫາ</button>
+          <button class="btn ok" onclick="openHelpdeskModal()">+ ເພີ່ມບັນຫາໃໝ່</button>
+        </div>
+      </div>
+      <div style="position:relative">
+        <input type="search" class="hd-search" placeholder="ຄົ້ນຫາ: ອາການລົດ / Brand / ສາເຫດ — ເຊັ່ນ 'ເຄື່ອງຮ້ອນ', 'TOYOTA', 'ໝໍ້ໄຟ'..." value="${escapeHtml(f.q)}"
+          oninput="window._hdFilter.q=this.value;clearTimeout(window._hdt);window._hdt=setTimeout(()=>pages.helpdesk(),300)"/>
+      </div>
+      <div style="margin-top:14px;display:flex;flex-wrap:wrap;gap:8px">
+        <span class="hd-stat">📚 <strong>${all.length}</strong> ບັນຫາ</span>
+        <span class="hd-stat" style="color:var(--ok)">🟢 L1: <strong>${totalL1}</strong></span>
+        <span class="hd-stat" style="color:#B45309">🟡 L2: <strong>${totalL2}</strong></span>
+        <span class="hd-stat" style="color:var(--bad)">🔴 L3: <strong>${totalL3}</strong></span>
+        <span class="hd-stat">🔍 ກອງໄດ້: <strong>${filtered.length}</strong></span>
       </div>
     </div>
 
-    <!-- 🏷 Brand chips ສຳລັບ class ທີ່ເລືອກ -->
-    ${f.vehicle_class && VEHICLE_CLASSES.find(c => c.key === f.vehicle_class)?.brands.length > 0 ? `
-      <div style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0">
-        <span style="font-size:12px;color:var(--muted);padding:6px 10px">🏷 Brand:</span>
-        ${VEHICLE_CLASSES.find(c => c.key === f.vehicle_class).brands.map(b => {
-          const cnt = all.filter(h => h.vehicle_brand === b && h.vehicle_class === f.vehicle_class).length;
-          return `<button class="btn sm ${f.vehicle_brand===b?'':'outline'}" onclick="window._hdFilter.vehicle_brand='${f.vehicle_brand===b?'':b}';pages.helpdesk()">${escapeHtml(b)} (${cnt})</button>`;
-        }).join('')}
-      </div>
-    ` : ''}
+    <!-- 🗂 Two-Column Enterprise Layout -->
+    <div class="hd-shell">
 
-    <!-- Category Cards -->
-    <div style="font-size:12px;color:var(--muted);margin:14px 0 6px;font-weight:600">🔧 ກອງຕາມໝວດບັນຫາ:</div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:14px">
-      ${HELPDESK_CATEGORIES.map(c => {
-        const cnt = catCounts[c.key]||0;
-        if (cnt === 0) return '';
-        return `
-          <div onclick="window._hdFilter.category='${f.category===c.key?'':c.key}';pages.helpdesk()"
-            style="cursor:pointer;padding:12px;background:${f.category===c.key?c.color:'var(--bg)'};color:${f.category===c.key?'#fff':'var(--text)'};border-radius:8px;border:2px solid ${c.color};text-align:center;transition:all .2s">
-            <div style="font-size:28px">${c.icon}</div>
-            <div style="font-weight:600;font-size:12px;margin-top:4px">${c.label}</div>
-            <div style="font-size:11px;opacity:.8;margin-top:2px">${cnt} ບັນຫາ</div>
+      <!-- ◀ LEFT SIDEBAR -->
+      <aside class="hd-sidebar">
+        <!-- Difficulty -->
+        <h5>🎓 ລະດັບຄວາມຍາກ</h5>
+        <div class="hd-side-btn" style="${sidebarBtnStyle(!f.difficulty)}" onclick="window._hdFilter.difficulty='';pages.helpdesk()">
+          <span>ທຸກລະດັບ</span><span style="font-size:11px;opacity:.7">${all.length}</span>
+        </div>
+        ${[['L1','🟢 L1 — ຊ່າງຝຶກຫັດ','#10B981',totalL1],['L2','🟡 L2 — ຊ່າງປະຈຳ','#F59E0B',totalL2],['L3','🔴 L3 — ຊຽວຊານ','#EF4444',totalL3]].map(([k,lbl,col,cnt]) => `
+          <div class="hd-side-btn" style="${sidebarBtnStyle(f.difficulty===k, col)}" onclick="window._hdFilter.difficulty='${f.difficulty===k?'':k}';pages.helpdesk()">
+            <span>${lbl}</span><span style="font-size:11px;opacity:.85">${cnt}</span>
           </div>
-        `;
-      }).join('')}
-    </div>
+        `).join('')}
 
-    ${filtered.length === 0 ? `
-      <div class="card empty" style="padding:40px">
-        <div class="icon">🆘</div>
-        <p>${all.length === 0 ? 'ຍັງບໍ່ມີຂໍ້ມູນ — ກົດ "📥 ໂຫລດ ບັນຫາມາດຕະຖານ" ເພື່ອເລີ່ມຕົ້ນ' : 'ບໍ່ພົບບັນຫາທີ່ຄົ້ນຫາ'}</p>
-      </div>
-    ` : `
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:12px">
-        ${filtered.map(h => {
-          const cat = HELPDESK_CATEGORIES.find(c => c.key === h.category);
-          const diff = HELPDESK_DIFFICULTY[h.difficulty];
-          const vClass = VEHICLE_CLASSES.find(c => c.key === h.vehicle_class);
-          return `
-          <div class="card" style="border-left:4px solid ${cat?.color||'#888'};cursor:pointer" onclick="openHelpdeskDetail(${h.id})">
-            <div style="display:flex;align-items:start;gap:10px">
-              <div style="font-size:32px">${cat?.icon||'🔧'}</div>
-              <div style="flex:1">
-                <div style="font-weight:700;font-size:15px;color:var(--primary)">${escapeHtml(h.symptom)}</div>
-                <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
-                  ${h.vehicle_brand ? `<span class="pill" style="background:#1F2937;color:#fff;font-size:10px">🏷 ${escapeHtml(h.vehicle_brand)}</span>` : ''}
-                  ${vClass ? `<span class="pill" style="background:#7C3AED;color:#fff;font-size:10px">${vClass.icon} ${vClass.label}</span>` : ''}
-                  <span class="pill" style="background:${cat?.color};color:#fff;font-size:10px">${cat?.label}</span>
-                  <span class="pill" style="background:${diff?.color};color:#fff;font-size:10px">${diff?.label}</span>
-                  <span class="pill gray" style="font-size:10px">⏱ ${h.time_estimate_min||60} ນາທີ</span>
-                </div>
-              </div>
-            </div>
-            ${h.possible_causes?.length > 0 ? `
-              <div style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--line);font-size:11.5px;color:var(--muted)">
-                <strong>ສາເຫດທີ່ເປັນໄປໄດ້:</strong><br>${h.possible_causes.slice(0,3).map(c => '• '+escapeHtml(c)).join('<br>')}${h.possible_causes.length>3?'<br>• ...':''}
-              </div>` : ''}
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;font-size:11px;color:var(--muted)">
-              <span>📖 ${h.steps?.length||0} ຂັ້ນຕອນ</span>
-              <span>👁 ${h.views||0} • 👍 ${h.helpful_count||0}</span>
-            </div>
+        <!-- Category Tree -->
+        <h5>🔧 ໝວດບັນຫາ</h5>
+        <div class="hd-side-btn" style="${sidebarBtnStyle(!f.category)}" onclick="window._hdFilter.category='';pages.helpdesk()">
+          <span>📂 ທຸກໝວດ</span><span style="font-size:11px;opacity:.7">${all.length}</span>
+        </div>
+        ${HELPDESK_CATEGORIES.map(c => {
+          const cnt = catCounts[c.key]||0;
+          if (cnt === 0) return '';
+          return `<div class="hd-side-btn" style="${sidebarBtnStyle(f.category===c.key, c.color)}" onclick="window._hdFilter.category='${f.category===c.key?'':c.key}';pages.helpdesk()">
+            <span>${c.icon} ${c.label}</span><span style="font-size:11px;opacity:.85">${cnt}</span>
           </div>`;
         }).join('')}
+
+        <!-- Vehicle Class -->
+        <h5>🚗 ປະເພດລົດ</h5>
+        <div class="hd-side-btn" style="${sidebarBtnStyle(!f.vehicle_class)}" onclick="window._hdFilter.vehicle_class='';window._hdFilter.vehicle_brand='';pages.helpdesk()">
+          <span>🌐 ທຸກປະເພດ</span><span style="font-size:11px;opacity:.7">${all.length}</span>
+        </div>
+        ${VEHICLE_CLASSES.filter(c => c.key !== 'all').map(c => {
+          const cnt = vcCounts[c.key]||0;
+          if (cnt === 0) return '';
+          return `<div class="hd-side-btn" style="${sidebarBtnStyle(f.vehicle_class===c.key, '#7C3AED')}" onclick="window._hdFilter.vehicle_class='${f.vehicle_class===c.key?'':c.key}';window._hdFilter.vehicle_brand='';pages.helpdesk()">
+            <span>${c.icon} ${c.label}</span><span style="font-size:11px;opacity:.85">${cnt}</span>
+          </div>`;
+        }).join('')}
+
+        <!-- Brand sub-filter — ສະແດງເມື່ອມີ class -->
+        ${f.vehicle_class && VEHICLE_CLASSES.find(c => c.key === f.vehicle_class)?.brands.length > 0 ? `
+          <h5>🏷 Brand (${VEHICLE_CLASSES.find(c => c.key === f.vehicle_class).label})</h5>
+          ${VEHICLE_CLASSES.find(c => c.key === f.vehicle_class).brands.map(b => {
+            const cnt = all.filter(h => h.vehicle_brand === b && h.vehicle_class === f.vehicle_class).length;
+            return `<div class="hd-side-btn" style="${sidebarBtnStyle(f.vehicle_brand===b, '#1F2937')}" onclick="window._hdFilter.vehicle_brand='${f.vehicle_brand===b?'':b}';pages.helpdesk()">
+              <span>${escapeHtml(b)}</span><span style="font-size:11px;opacity:.85">${cnt}</span>
+            </div>`;
+          }).join('')}
+        ` : ''}
+
+        ${hasFilter ? `
+          <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--line)">
+            <button class="btn outline" style="width:100%" onclick="window._hdFilter={category:'',difficulty:'',q:'',vehicle_class:'',vehicle_brand:''};pages.helpdesk()">🔄 ລ້າງຕົວກອງທັງໝົດ</button>
+          </div>
+        ` : ''}
+      </aside>
+
+      <!-- ▶ MAIN CONTENT -->
+      <div>
+        ${hasFilter ? `
+          <div style="margin-bottom:14px;display:flex;flex-wrap:wrap;gap:6px;align-items:center">
+            <span style="font-size:12px;color:var(--muted);margin-right:4px">ກອງ:</span>
+            ${f.q ? `<span class="hd-active-filter">🔍 "${escapeHtml(f.q)}" <span class="x" onclick="window._hdFilter.q='';pages.helpdesk()">✕</span></span>` : ''}
+            ${f.category ? (() => { const c = HELPDESK_CATEGORIES.find(x=>x.key===f.category); return `<span class="hd-active-filter" style="background:${c?.color}">${c?.icon} ${c?.label} <span class="x" onclick="window._hdFilter.category='';pages.helpdesk()">✕</span></span>`; })() : ''}
+            ${f.difficulty ? `<span class="hd-active-filter" style="background:${HELPDESK_DIFFICULTY[f.difficulty]?.color}">${HELPDESK_DIFFICULTY[f.difficulty]?.label} <span class="x" onclick="window._hdFilter.difficulty='';pages.helpdesk()">✕</span></span>` : ''}
+            ${f.vehicle_class ? (() => { const v = VEHICLE_CLASSES.find(x=>x.key===f.vehicle_class); return `<span class="hd-active-filter" style="background:#7C3AED">${v?.icon} ${v?.label} <span class="x" onclick="window._hdFilter.vehicle_class='';window._hdFilter.vehicle_brand='';pages.helpdesk()">✕</span></span>`; })() : ''}
+            ${f.vehicle_brand ? `<span class="hd-active-filter">🏷 ${escapeHtml(f.vehicle_brand)} <span class="x" onclick="window._hdFilter.vehicle_brand='';pages.helpdesk()">✕</span></span>` : ''}
+          </div>
+        ` : ''}
+
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding:0 4px">
+          <div style="font-size:14px;color:var(--muted)">
+            📊 ສະແດງ <strong style="color:var(--text)">${filtered.length}</strong> ບັນຫາ${hasFilter?` (ຈາກ ${all.length} ທັງໝົດ)`:''}
+          </div>
+          <div style="display:flex;gap:4px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:3px">
+            <button onclick="window._hdView='list';pages.helpdesk()" style="padding:6px 12px;border-radius:6px;border:none;background:${window._hdView==='list'?'#F97316':'transparent'};color:${window._hdView==='list'?'#fff':'var(--text)'};cursor:pointer;font-size:12px;font-weight:600">☰ ລາຍການ</button>
+            <button onclick="window._hdView='grid';pages.helpdesk()" style="padding:6px 12px;border-radius:6px;border:none;background:${window._hdView==='grid'?'#F97316':'transparent'};color:${window._hdView==='grid'?'#fff':'var(--text)'};cursor:pointer;font-size:12px;font-weight:600">▦ ກະຕ່າ</button>
+            <button onclick="window._hdView='groups';pages.helpdesk()" style="padding:6px 12px;border-radius:6px;border:none;background:${window._hdView==='groups'?'#F97316':'transparent'};color:${window._hdView==='groups'?'#fff':'var(--text)'};cursor:pointer;font-size:12px;font-weight:600">📑 ກຸ່ມ</button>
+          </div>
+        </div>
+
+        ${filtered.length === 0 ? `
+          <div class="hd-empty">
+            <div style="font-size:60px;margin-bottom:14px">${all.length === 0 ? '📚' : '🔍'}</div>
+            <h3 style="margin:0 0 6px;color:var(--text)">${all.length === 0 ? 'ຍັງບໍ່ມີຂໍ້ມູນໃນ Helpdesk' : 'ບໍ່ພົບບັນຫາທີ່ກົງກັບການຄົ້ນຫາ'}</h3>
+            <p style="color:var(--muted);margin:0 0 14px">${all.length === 0 ? 'ກົດປຸ່ມລຸ່ມເພື່ອໂຫລດ ບັນຫາມາດຕະຖານທີ່ພົບເລື້ອຍ' : 'ລອງປ່ຽນຄຳສັບ ຫລື ລ້າງຕົວກອງ'}</p>
+            ${all.length === 0 ? `<button class="btn ok" onclick="seedHelpdesk()">📥 ໂຫລດ ${HELPDESK_SEED.length} ບັນຫາ</button>` : `<button class="btn outline" onclick="window._hdFilter={category:'',difficulty:'',q:'',vehicle_class:'',vehicle_brand:''};pages.helpdesk()">🔄 ລ້າງຕົວກອງ</button>`}
+          </div>
+        ` : (() => {
+          const renderRow = (h) => {
+            const cat = HELPDESK_CATEGORIES.find(c => c.key === h.category);
+            const diff = HELPDESK_DIFFICULTY[h.difficulty];
+            const vClass = VEHICLE_CLASSES.find(c => c.key === h.vehicle_class);
+            return `
+              <div class="hd-row" style="border-left-color:${cat?.color||'#888'}" onclick="openHelpdeskDetail(${h.id})">
+                <div class="hd-icon" style="color:${cat?.color||'#888'}">${cat?.icon||'🔧'}</div>
+                <div style="flex:1;min-width:0">
+                  <h3 class="hd-title">${escapeHtml(h.symptom)}</h3>
+                  <div class="hd-tags">
+                    ${h.vehicle_brand ? `<span class="hd-tag" style="background:#1F2937;color:#fff">🏷 ${escapeHtml(h.vehicle_brand)}</span>` : ''}
+                    ${vClass ? `<span class="hd-tag" style="background:#EDE9FE;color:#5B21B6">${vClass.icon} ${vClass.label}</span>` : ''}
+                    <span class="hd-tag" style="background:${cat?.color}20;color:${cat?.color};border:1px solid ${cat?.color}40">${cat?.label}</span>
+                    <span class="hd-tag" style="background:${diff?.color};color:#fff">${diff?.label}</span>
+                    <span class="hd-tag" style="background:#F1F5F9;color:#475569">⏱ ${h.time_estimate_min||60} ນາທີ</span>
+                    <span class="hd-tag" style="background:#F1F5F9;color:#475569">📖 ${h.steps?.length||0} ຂັ້ນຕອນ</span>
+                  </div>
+                  ${h.possible_causes?.length > 0 ? `
+                    <div class="hd-causes">
+                      <strong style="color:#374151">🔍 ສາເຫດທີ່ເປັນໄປໄດ້:</strong>
+                      ${h.possible_causes.slice(0,3).map(c => escapeHtml(c)).join(' • ')}${h.possible_causes.length>3?'…':''}
+                    </div>` : ''}
+                  <div class="hd-meta">
+                    <span>👁 ເບິ່ງ ${h.views||0} ຄັ້ງ • 👍 ${h.helpful_count||0} ເຫັນດີ</span>
+                    <span style="color:#F97316;font-weight:700">ເບິ່ງລາຍລະອຽດ →</span>
+                  </div>
+                </div>
+              </div>
+            `;
+          };
+
+          if (window._hdView === 'grid') {
+            return `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:12px">${filtered.map(renderRow).join('')}</div>`;
+          }
+          if (window._hdView === 'groups') {
+            // ກຸ່ມຕາມໝວດ
+            const groups = {};
+            filtered.forEach(h => { (groups[h.category] = groups[h.category] || []).push(h); });
+            return HELPDESK_CATEGORIES.map(c => {
+              const items = groups[c.key];
+              if (!items || items.length === 0) return '';
+              return `
+                <div class="hd-group-hdr">
+                  <div class="ic" style="background:${c.color}">${c.icon}</div>
+                  <div>
+                    <div style="font-weight:700;font-size:17px;color:${c.color}">${c.label}</div>
+                    <div style="font-size:12px;color:var(--muted)">${items.length} ບັນຫາ</div>
+                  </div>
+                </div>
+                ${items.map(renderRow).join('')}
+              `;
+            }).join('');
+          }
+          // Default: list
+          return filtered.map(renderRow).join('');
+        })()}
       </div>
-    `}
+    </div>
   `;
 };
 
 async function openHelpdeskDetail(id) {
   const h = await db.helpdesk_problems.get(id);
   if (!h) return;
-  // ນັບການເບິ່ງ
   await db.helpdesk_problems.update(id, { views: (h.views||0) + 1 });
 
   const cat = HELPDESK_CATEGORIES.find(c => c.key === h.category);
   const diff = HELPDESK_DIFFICULTY[h.difficulty];
+  const vClass = VEHICLE_CLASSES.find(c => c.key === h.vehicle_class);
 
   modal(`🆘 ${escapeHtml(h.symptom)}`, `
-    <!-- Header info -->
-    <div style="background:linear-gradient(135deg,${cat?.color||'#888'},${cat?.color||'#888'}aa);color:#fff;padding:14px;border-radius:8px;margin-bottom:14px">
-      <div style="display:flex;align-items:center;gap:12px">
-        <div style="font-size:48px">${cat?.icon||'🔧'}</div>
-        <div style="flex:1">
-          <h3 style="margin:0;color:#fff">${escapeHtml(h.symptom)}</h3>
-          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
-            <span class="pill" style="background:rgba(255,255,255,.25);color:#fff;font-size:11px">${cat?.label}</span>
-            <span class="pill" style="background:rgba(255,255,255,.25);color:#fff;font-size:11px">${diff?.label}</span>
-            <span class="pill" style="background:rgba(255,255,255,.25);color:#fff;font-size:11px">⏱ ${h.time_estimate_min||60} ນາທີ</span>
-            <span class="pill" style="background:rgba(255,255,255,.25);color:#fff;font-size:11px">📖 ${h.steps?.length||0} ຂັ້ນຕອນ</span>
+    <style>
+      .hd-d-hero { background:linear-gradient(135deg,${cat?.color||'#888'} 0%,${cat?.color||'#888'}dd 100%); color:#fff; padding:22px 24px; border-radius:12px; margin-bottom:18px; box-shadow:0 4px 14px ${cat?.color||'#888'}40; }
+      .hd-d-section { background:#fff; border:1px solid var(--line); border-radius:12px; padding:18px 20px; margin-bottom:14px; }
+      .hd-d-section h4 { margin:0 0 12px; font-size:15px; color:#0F172A; font-weight:700; display:flex; align-items:center; gap:8px; padding-bottom:8px; border-bottom:2px solid ${cat?.color||'#888'}20; }
+      .hd-d-list { margin:0; padding-left:24px; line-height:1.9; font-size:14px; color:#1E293B; }
+      .hd-d-list li { margin-bottom:2px; }
+      .hd-d-step { display:flex; gap:14px; background:#FAFBFC; padding:14px 16px; border-radius:10px; border-left:5px solid ${cat?.color||'#888'}; margin-bottom:10px; transition:all .2s; }
+      .hd-d-step:hover { background:#F1F5F9; transform:translateX(2px); }
+      .hd-d-num { background:${cat?.color||'#888'}; color:#fff; width:38px; height:38px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:16px; flex-shrink:0; box-shadow:0 2px 6px ${cat?.color||'#888'}50; }
+      .hd-d-step-text { flex:1; font-size:14.5px; line-height:1.7; padding-top:6px; color:#0F172A; }
+      .hd-d-grid2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+      @media (max-width:700px){ .hd-d-grid2 { grid-template-columns:1fr; } }
+      .hd-d-feedback { background:linear-gradient(135deg,#F1F5F9 0%,#E2E8F0 100%); padding:18px; border-radius:12px; text-align:center; margin-top:14px; }
+    </style>
+
+    <!-- 🎯 Hero -->
+    <div class="hd-d-hero">
+      <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+        <div style="font-size:56px;line-height:1">${cat?.icon||'🔧'}</div>
+        <div style="flex:1;min-width:250px">
+          <h2 style="margin:0 0 6px;color:#fff;font-size:22px;line-height:1.3">${escapeHtml(h.symptom)}</h2>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            ${h.vehicle_brand ? `<span style="background:rgba(0,0,0,.3);color:#fff;padding:4px 11px;border-radius:14px;font-size:12px;font-weight:700">🏷 ${escapeHtml(h.vehicle_brand)}</span>` : ''}
+            ${vClass ? `<span style="background:rgba(255,255,255,.25);color:#fff;padding:4px 11px;border-radius:14px;font-size:12px">${vClass.icon} ${vClass.label}</span>` : ''}
+            <span style="background:rgba(255,255,255,.25);color:#fff;padding:4px 11px;border-radius:14px;font-size:12px">${cat?.label}</span>
+            <span style="background:${diff?.color};color:#fff;padding:4px 11px;border-radius:14px;font-size:12px;font-weight:700">${diff?.label}</span>
+            <span style="background:rgba(255,255,255,.25);color:#fff;padding:4px 11px;border-radius:14px;font-size:12px">⏱ ${h.time_estimate_min||60} ນາທີ</span>
+            <span style="background:rgba(255,255,255,.25);color:#fff;padding:4px 11px;border-radius:14px;font-size:12px">📖 ${h.steps?.length||0} ຂັ້ນຕອນ</span>
           </div>
         </div>
       </div>
-      ${h.symptoms_alt?.length > 0 ? `<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.2);font-size:12px"><strong>ອາການອື່ນທີ່ສຳພັນ:</strong> ${h.symptoms_alt.join(' • ')}</div>` : ''}
+      ${h.symptoms_alt?.length > 0 ? `<div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,.25);font-size:13px;line-height:1.7"><strong>📝 ອາການອື່ນທີ່ສຳພັນ:</strong> ${h.symptoms_alt.map(s => escapeHtml(s)).join(' • ')}</div>` : ''}
     </div>
 
     <!-- ⚠️ Safety -->
     ${h.safety ? `
-      <div class="alert bad" style="font-size:13px;background:#FEE2E2;color:#991B1B">
-        ⚠️ <strong>ຄວາມປອດໄພ:</strong> ${escapeHtml(h.safety)}
+      <div style="background:linear-gradient(135deg,#FEE2E2 0%,#FECACA 100%);border:2px solid #DC2626;color:#7F1D1D;padding:14px 18px;border-radius:10px;margin-bottom:14px;display:flex;gap:12px;align-items:start">
+        <div style="font-size:28px;line-height:1">⚠️</div>
+        <div><strong style="font-size:14px;display:block;margin-bottom:4px">ຂໍ້ຄວນລະວັງ — ຄວາມປອດໄພ</strong><div style="font-size:13.5px;line-height:1.6">${escapeHtml(h.safety)}</div></div>
       </div>` : ''}
 
     <!-- 🔍 Possible Causes -->
     ${h.possible_causes?.length > 0 ? `
-      <h4 style="color:var(--primary-2);margin:14px 0 6px">🔍 ສາເຫດທີ່ເປັນໄປໄດ້</h4>
-      <ul style="margin-left:20px;line-height:1.8;font-size:13px">
-        ${h.possible_causes.map(c => `<li>${escapeHtml(c)}</li>`).join('')}
-      </ul>` : ''}
+      <div class="hd-d-section">
+        <h4>🔍 ສາເຫດທີ່ເປັນໄປໄດ້</h4>
+        <ul class="hd-d-list">
+          ${h.possible_causes.map(c => `<li>${escapeHtml(c)}</li>`).join('')}
+        </ul>
+      </div>` : ''}
 
     <!-- 🧰 Tools + Parts -->
-    <div class="row">
+    <div class="hd-d-grid2">
       ${h.tools_needed?.length > 0 ? `
-        <div class="fld">
-          <h4 style="margin:0 0 6px;color:var(--primary-2)">🧰 ເຄື່ອງມືທີ່ຕ້ອງໃຊ້</h4>
-          <ul style="margin-left:20px;line-height:1.6;font-size:12px">
-            ${h.tools_needed.map(t => `<li>${escapeHtml(t)}</li>`).join('')}
+        <div class="hd-d-section" style="margin-bottom:0">
+          <h4>🧰 ເຄື່ອງມືທີ່ຕ້ອງໃຊ້</h4>
+          <ul class="hd-d-list" style="font-size:13.5px">
+            ${h.tools_needed.map(tt => `<li>${escapeHtml(tt)}</li>`).join('')}
           </ul>
-        </div>` : '<div></div>'}
+        </div>` : ''}
       ${h.parts_needed?.length > 0 ? `
-        <div class="fld">
-          <h4 style="margin:0 0 6px;color:var(--primary-2)">📦 ອາໄຫລ່ທີ່ອາດຕ້ອງປ່ຽນ</h4>
-          <ul style="margin-left:20px;line-height:1.6;font-size:12px">
+        <div class="hd-d-section" style="margin-bottom:0">
+          <h4>📦 ອາໄຫລ່ທີ່ອາດຕ້ອງປ່ຽນ</h4>
+          <ul class="hd-d-list" style="font-size:13.5px">
             ${h.parts_needed.map(p => `<li>${escapeHtml(p)}</li>`).join('')}
           </ul>
-        </div>` : '<div></div>'}
+        </div>` : ''}
     </div>
 
     <!-- 📖 Steps -->
-    <h4 style="color:var(--primary-2);margin:14px 0 6px">📖 ຂັ້ນຕອນແກ້ໄຂ — Step-by-Step</h4>
-    <div style="display:flex;flex-direction:column;gap:8px">
-      ${(h.steps||[]).map((s, i) => `
-        <div style="display:flex;gap:12px;background:var(--bg);padding:12px;border-radius:8px;border-left:4px solid ${cat?.color||'#888'}">
-          <div style="background:${cat?.color||'#888'};color:#fff;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0">${s.step||i+1}</div>
-          <div style="flex:1">
-            <div style="font-size:14px;line-height:1.6">${escapeHtml(s.instruction)}</div>
-            ${s.warning ? `<div style="background:#FEF3C7;color:#92400E;padding:6px 10px;border-radius:4px;margin-top:6px;font-size:12px">⚠️ ${escapeHtml(s.warning)}</div>` : ''}
+    <div class="hd-d-section" style="margin-top:14px">
+      <h4>📖 ຂັ້ນຕອນແກ້ໄຂ — Step-by-Step</h4>
+      <div>
+        ${(h.steps||[]).map((s, i) => `
+          <div class="hd-d-step">
+            <div class="hd-d-num">${s.step||i+1}</div>
+            <div class="hd-d-step-text">
+              ${escapeHtml(s.instruction)}
+              ${s.warning ? `<div style="background:#FEF3C7;color:#92400E;padding:8px 12px;border-radius:6px;margin-top:8px;font-size:13px;border-left:3px solid #F59E0B"><strong>⚠️ ໝາຍເຫດ:</strong> ${escapeHtml(s.warning)}</div>` : ''}
+            </div>
           </div>
-        </div>
-      `).join('')}
+        `).join('')}
+      </div>
     </div>
 
-    <!-- 👍 Was this helpful? -->
-    <div style="background:var(--bg);padding:14px;border-radius:8px;margin-top:14px;text-align:center">
-      <p style="margin:0 0 10px;font-size:13px;color:var(--muted)">ຄຳແນະນຳນີ້ຊ່ວຍແກ້ບັນຫາໄດ້ບໍ?</p>
-      <button class="btn ok" onclick="markHelpful(${h.id}, true)">👍 ໄດ້ ສຳເລັດ</button>
-      <button class="btn outline" onclick="markHelpful(${h.id}, false)">👎 ບໍ່ໄດ້</button>
-    </div>
-
-    <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:10px">
-      📊 ເບິ່ງ ${(h.views||0) + 1} ຄັ້ງ • ໄດ້ຮັບເຫັນດີ ${h.helpful_count||0}
+    <!-- 👍 Feedback -->
+    <div class="hd-d-feedback">
+      <p style="margin:0 0 12px;font-size:14px;color:#334155;font-weight:600">💬 ຄຳແນະນຳນີ້ຊ່ວຍແກ້ບັນຫາໄດ້ບໍ?</p>
+      <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+        <button class="btn ok" onclick="markHelpful(${h.id}, true)" style="font-size:14px;padding:10px 22px">👍 ໄດ້ ສຳເລັດແລ້ວ</button>
+        <button class="btn outline" onclick="markHelpful(${h.id}, false)" style="font-size:14px;padding:10px 22px">👎 ບໍ່ໄດ້</button>
+      </div>
+      <div style="font-size:12px;color:#64748B;margin-top:12px">📊 ເບິ່ງ ${(h.views||0) + 1} ຄັ້ງ • 👍 ${h.helpful_count||0} ເຫັນດີ</div>
     </div>
   `, `
     <button class="btn outline" onclick="closeModal()">${t('cancel')}</button>
     ${isAdmin() ? `<button class="btn outline" onclick="closeModal();openHelpdeskModal(${h.id})">✏️ ${t('edit')}</button>` : ''}
-    <button class="btn" style="background:#8B5CF6;color:#fff" onclick="window.print()">🖨 ພິມ</button>
-  `);
+    <button class="btn" style="background:#8B5CF6;color:#fff" onclick="window.print()">🖨 ພິມເປັນເອກະສານ</button>
+  `, 'large');
 }
 
 async function markHelpful(id, isHelpful) {
