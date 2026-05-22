@@ -1498,6 +1498,64 @@ db.version(2).stores({
   outsource: '++id, jo_id, vendor_id, status',
   settings: 'key',
 });
+// ===== v22: Helpdesk Module (Knowledge Base) =====
+db.version(22).stores({
+  vehicles: '++id, vehicle_id, plate, type, branch, status, category_id',
+  inspections: '++id, vehicle_id, date, status, frequency, driver',
+  joborders: '++id, jo_id, vehicle_id, priority, status, created',
+  parts: '++id, code, class, grade, category_id, warehouse, status',
+  partmovements: '++id, part_id, type, date',
+  drivers: '++id, driver_id, name, license_expiry, assigned_vehicle',
+  tires: '++id, tire_id, current_vehicle, position, status, install_km, install_date',
+  tire_history: '++id, tire_id, date, event_type, vehicle_id, position, km',
+  vendors: '++id, vendor_id, name, category_id, province',
+  vendorprices: '++id, vendor_id, part_code, currency, date',
+  tools: '++id, tool_id, name, calib_due, status',
+  outsource: '++id, jo_id, vendor_id, status',
+  fluids: '++id, vehicle_id, type, date, next_due_date',
+  mileage_log: '++id, vehicle_id, date, mileage',
+  categories: '++id, name, type, parent_id',
+  exchange_rates: '++id, currency, rate, valid_from',
+  pm_templates: '++id, vehicle_type, interval_type, interval_value',
+  pm_history: '++id, vehicle_id, template_id, date, mileage',
+  fuel_log: '++id, vehicle_id, date, driver, station',
+  documents: '++id, entity_type, entity_id, doc_type, expiry_date',
+  incidents: '++id, date, vehicle_id, driver_id, severity, status',
+  audit_log: '++id, timestamp, user, action, entity',
+  purchase_requests: '++id, pr_id, vendor_id, status, created, total_lak',
+  purchase_orders: '++id, po_id, vendor_id, status, created, urgency, total_lak',
+  vehicle_pm: '++id, vehicle_id, interval_type, interval_value, active',
+  gps_devices: '++id, vehicle_id, imei, model, platform, status, installed_date',
+  driver_reviews: '++id, driver_id, review_date, reviewer, period, total_score',
+  receipt_inspections: '++id, jo_id, vehicle_id, date, inspector',
+  predelivery_inspections: '++id, jo_id, vehicle_id, date, inspector, approved',
+  users: '++id, username, role, name, active, created',
+  depreciation: '++id, vehicle_id, year, month, value, accumulated',
+  parts_replacements: '++id, vehicle_id, part_type, date, km, cost, jo_id',
+  ai_chat_history: '++id, timestamp, role, content',
+  deleted_items: '++id, deleted_at, deleted_by, store, original_id, summary, restored',
+  price_change_audit: '++id, timestamp, user, entity_type, entity_id, field, old_value, new_value, summary',
+  service_rates: '++id, service_code, service_name, category, vehicle_group, base_charge, skill_required, active',
+  tech_profiles: '++id, tech_id, name, skill_level, commission_pct, walkin_commission_pct, active, branch',
+  labor_entries: '++id, entry_id, date, jo_id, vehicle_id, tech_id, service_code, charge_amount, commission_amount, status, approved_by, customer_type, intake_id',
+  customer_receipts: '++id, receipt_id, date, labor_entry_id, customer_name, customer_phone, vehicle_plate, total_amount, signed_at, signed_by_customer',
+  vehicle_intakes: '++id, intake_id, date, customer_phone, vehicle_plate, pickup_code, status, received_by_tech_id, linked_entry_id, delivered_at',
+  camera_counts: '++id, date, vehicles_in, vehicles_out, recorded_by',
+  customer_audits: '++id, audit_id, labor_entry_id, customer_phone, audit_date, called_at, response, satisfaction, received_receipt, called_by, notes',
+  branches: '++id, branch_id, name, province, address, manager, active',
+  vehicle_specs: '++id, vehicle_id, updated_at',
+  vehicle_usage: '++id, usage_id, date, vehicle_id, usage_type, billing_type, customer_phone, status, total_amount, created_by',
+  vehicle_usage_rates: '++id, vehicle_id, vehicle_type, rate_per_km, rate_per_hour, rate_per_ton, fixed_trip_rate, active',
+  locations: '++id, location_id, name, type, province, district, village, parent_id, lat, lng, active',
+  distance_matrix: '++id, from_id, to_id, distance_km, travel_time_min, route_notes, source, updated_at',
+  // 🆕 v22: Helpdesk Knowledge Base
+  // category: engine|electrical|transmission|brakes|cooling|fuel|suspension|hydraulic|body|other
+  // difficulty: L1|L2|L3
+  helpdesk_problems: '++id, problem_id, category, difficulty, symptom, vehicle_type, views, helpful_count, active, created_at',
+  helpdesk_usage: '++id, problem_id, jo_id, technician_id, was_helpful, date',
+  settings: 'key',
+});
+
 // ===== v21: Nationwide Locations (Hierarchy + GPS + Haversine) =====
 db.version(21).stores({
   vehicles: '++id, vehicle_id, plate, type, branch, status, category_id',
@@ -2493,6 +2551,7 @@ const NAV_GROUPS = [
       { page:'pm_schedule',  icon:'📅', label:'ກຳນົດການ PM' },
       { page:'pm_templates', icon:'📝', label:'ແມ່ແບບ PM' },
       { page:'predictive',   icon:'🔮', label:'Predictive Maintenance' },
+      { page:'helpdesk',     icon:'🆘', label:'Helpdesk — ຄູ່ມືແກ້ໄຂ' },
     ]
   },
   // 🚚 [ໂມດູນ 2] ການຂົນສົ່ງ — Logistics
@@ -20266,24 +20325,180 @@ function pptGetPeriodInfo() {
   return { from, to, label };
 }
 
-// 🎨 ສ້າງ Slide Cover ມາດຕະຖານ
+// 🎨 ສ້າງ Slide Cover ມືອາຊີບ — Gradient + Pattern + Modern Layout
 function pptAddCoverSlide(pres, title, subtitle, periodLabel) {
   const slide = pres.addSlide();
   slide.background = { color: PPT_THEME.bgWhite };
-  // Orange band top
-  slide.addShape('rect', { x: 0, y: 0, w: 10, h: 1.5, fill: { color: PPT_THEME.primary } });
-  // KALA Logo placeholder
-  slide.addText('KALA', { x: 0.5, y: 0.4, w: 2, h: 0.7, fontSize: 36, bold: true, color: PPT_THEME.bgWhite, fontFace: 'Calibri' });
-  slide.addText('Garage Management System', { x: 0.5, y: 1.0, w: 5, h: 0.3, fontSize: 11, color: PPT_THEME.bgWhite, italic: true });
-  // Title
-  slide.addText(title, { x: 0.5, y: 2.2, w: 9, h: 1.0, fontSize: 36, bold: true, color: PPT_THEME.primaryDk, fontFace: 'Phetsarath OT' });
-  slide.addText(subtitle, { x: 0.5, y: 3.3, w: 9, h: 0.5, fontSize: 18, color: PPT_THEME.textMute, fontFace: 'Phetsarath OT' });
-  // Period
-  slide.addShape('rect', { x: 0.5, y: 4.2, w: 4, h: 0.8, fill: { color: PPT_THEME.primaryLt }, line: { type: 'none' } });
-  slide.addText(`📅 ${periodLabel}`, { x: 0.5, y: 4.2, w: 4, h: 0.8, fontSize: 16, bold: true, color: PPT_THEME.primaryDk, align: 'center', valign: 'middle', fontFace: 'Phetsarath OT' });
-  // Footer
-  slide.addText('ມະຫາໄຊ ວັດສະດຸ ( ມະຫາໄຊ ເທຣດດິ້ງ ) • MAHAXAY Trading.co.,Ltd.', { x: 0.5, y: 6.5, w: 9, h: 0.3, fontSize: 11, color: PPT_THEME.textMute, align: 'center', fontFace: 'Phetsarath OT' });
-  slide.addText(`ສ້າງເມື່ອ: ${new Date().toLocaleDateString('lo')}`, { x: 0.5, y: 6.85, w: 9, h: 0.3, fontSize: 9, color: PPT_THEME.textMute, align: 'center' });
+  // ດ້ານຊ້າຍ: ກ່ອງສ້ມໃຫຍ່ ມີ pattern
+  slide.addShape('rect', { x: 0, y: 0, w: 4, h: 7.5, fill: { color: PPT_THEME.primary } });
+  // Pattern: ສາມຫຼ່ຽມຕົກແຕ່ງ
+  for (let i = 0; i < 8; i++) {
+    slide.addShape('rect', { x: 0, y: i * 0.94, w: 0.4, h: 0.4, fill: { color: PPT_THEME.primaryDk }, line: { type: 'none' } });
+  }
+  // KALA Logo
+  slide.addShape('rect', { x: 0.5, y: 0.5, w: 3, h: 1.4, fill: { color: PPT_THEME.bgWhite }, line: { type: 'none' } });
+  slide.addText('KALA', { x: 0.5, y: 0.5, w: 3, h: 1.0, fontSize: 44, bold: true, color: PPT_THEME.primary, align: 'center', valign: 'middle', fontFace: 'Calibri' });
+  slide.addText('Garage Management System', { x: 0.5, y: 1.4, w: 3, h: 0.4, fontSize: 11, color: PPT_THEME.primaryDk, italic: true, align: 'center', fontFace: 'Calibri' });
+  // Bottom-left text
+  slide.addText('ສະບັບລາຍງານ\nມືອາຊີບ', { x: 0.5, y: 5.5, w: 3, h: 1.5, fontSize: 24, bold: true, color: PPT_THEME.bgWhite, fontFace: 'Phetsarath OT' });
+  slide.addText('PROFESSIONAL REPORT', { x: 0.5, y: 6.5, w: 3, h: 0.3, fontSize: 10, color: PPT_THEME.primaryLt, italic: true });
+
+  // ດ້ານຂວາ: ຫົວຂໍ້ + ໄລຍະເວລາ
+  slide.addText(title, { x: 4.5, y: 1.5, w: 5.3, h: 1.5, fontSize: 38, bold: true, color: PPT_THEME.primaryDk, fontFace: 'Phetsarath OT' });
+  slide.addText(subtitle, { x: 4.5, y: 3.1, w: 5.3, h: 0.8, fontSize: 16, color: PPT_THEME.textMute, fontFace: 'Phetsarath OT' });
+  // Period card
+  slide.addShape('rect', { x: 4.5, y: 4.0, w: 5.3, h: 1.0, fill: { color: PPT_THEME.bgLight }, line: { color: PPT_THEME.primary, width: 2 } });
+  slide.addText('📅 ໄລຍະເວລາ', { x: 4.7, y: 4.1, w: 5.1, h: 0.3, fontSize: 11, color: PPT_THEME.textMute, fontFace: 'Phetsarath OT' });
+  slide.addText(periodLabel, { x: 4.7, y: 4.4, w: 5.1, h: 0.6, fontSize: 18, bold: true, color: PPT_THEME.primaryDk, fontFace: 'Phetsarath OT' });
+  // Company info
+  slide.addText('ມະຫາໄຊ ວັດສະດຸ', { x: 4.5, y: 5.2, w: 5.3, h: 0.4, fontSize: 14, bold: true, color: PPT_THEME.text, fontFace: 'Phetsarath OT' });
+  slide.addText('( ມະຫາໄຊ ເທຣດດິ້ງ ) — MAHAXAY Trading.co.,Ltd.', { x: 4.5, y: 5.6, w: 5.3, h: 0.3, fontSize: 11, color: PPT_THEME.textMute, fontFace: 'Phetsarath OT' });
+  // Generated info
+  const stg = JSON.parse(localStorage.getItem('kala_settings') || '{}');
+  slide.addText(`ສ້າງໂດຍ: ${stg.user_name||'ສາຍຟ້າ'} • ${new Date().toLocaleString('lo')}`, { x: 4.5, y: 6.8, w: 5.3, h: 0.3, fontSize: 9, color: PPT_THEME.textMute, align: 'right', italic: true, fontFace: 'Phetsarath OT' });
+}
+
+// 📑 ສະໄລ້ Table of Contents
+function pptAddTOCSlide(pres, items) {
+  const slide = pres.addSlide();
+  slide.background = { color: PPT_THEME.bgWhite };
+  slide.addShape('rect', { x: 0, y: 0, w: 10, h: 1.0, fill: { color: PPT_THEME.primary } });
+  slide.addText('📑 ສາລະບານ', { x: 0.5, y: 0.2, w: 9, h: 0.6, fontSize: 28, bold: true, color: PPT_THEME.bgWhite, fontFace: 'Phetsarath OT' });
+  slide.addText('Table of Contents', { x: 0.5, y: 0.65, w: 9, h: 0.3, fontSize: 12, color: PPT_THEME.primaryLt, italic: true });
+  // Items in 2 columns
+  const colW = 4.6;
+  items.forEach((item, i) => {
+    const col = Math.floor(i / Math.ceil(items.length / 2));
+    const row = i % Math.ceil(items.length / 2);
+    const x = 0.5 + col * (colW + 0.3);
+    const y = 1.4 + row * 0.55;
+    // Number circle
+    slide.addShape('ellipse', { x, y, w: 0.5, h: 0.5, fill: { color: PPT_THEME.primaryLt }, line: { type: 'none' } });
+    slide.addText(String(i+1).padStart(2,'0'), { x, y, w: 0.5, h: 0.5, fontSize: 14, bold: true, color: PPT_THEME.primaryDk, align: 'center', valign: 'middle' });
+    // Title
+    slide.addText(item, { x: x + 0.65, y, w: colW - 0.65, h: 0.5, fontSize: 13, color: PPT_THEME.text, valign: 'middle', fontFace: 'Phetsarath OT' });
+  });
+  pptAddFooter(slide);
+}
+
+// 📋 Executive Summary slide
+function pptAddExecSummarySlide(pres, title, summary, highlights) {
+  const slide = pres.addSlide();
+  slide.background = { color: PPT_THEME.bgWhite };
+  slide.addShape('rect', { x: 0, y: 0, w: 10, h: 1.0, fill: { color: PPT_THEME.primary } });
+  slide.addText('📋 ' + title, { x: 0.5, y: 0.2, w: 9, h: 0.6, fontSize: 24, bold: true, color: PPT_THEME.bgWhite, fontFace: 'Phetsarath OT' });
+  slide.addText('Executive Summary', { x: 0.5, y: 0.65, w: 9, h: 0.3, fontSize: 11, color: PPT_THEME.primaryLt, italic: true });
+  // Summary text box
+  slide.addShape('rect', { x: 0.5, y: 1.3, w: 9, h: 2.0, fill: { color: PPT_THEME.bgLight }, line: { color: PPT_THEME.primary, width: 1 } });
+  slide.addText(summary, { x: 0.7, y: 1.4, w: 8.6, h: 1.8, fontSize: 13, color: PPT_THEME.text, valign: 'top', fontFace: 'Phetsarath OT' });
+  // Highlights (3 boxes)
+  (highlights||[]).slice(0,3).forEach((h, i) => {
+    const x = 0.5 + i * 3.15;
+    const y = 3.6;
+    slide.addShape('rect', { x, y, w: 3.0, h: 3.5, fill: { color: h.color || PPT_THEME.bgGray }, line: { color: PPT_THEME.border, width: 1 } });
+    slide.addText(h.icon || '⭐', { x, y: y+0.2, w: 3.0, h: 0.7, fontSize: 36, align: 'center' });
+    slide.addText(h.title, { x: x+0.2, y: y+1.0, w: 2.6, h: 0.4, fontSize: 14, bold: true, color: PPT_THEME.primaryDk, align: 'center', fontFace: 'Phetsarath OT' });
+    slide.addText(String(h.value), { x: x+0.2, y: y+1.5, w: 2.6, h: 0.8, fontSize: 28, bold: true, color: h.valueColor||PPT_THEME.text, align: 'center' });
+    slide.addText(h.desc, { x: x+0.2, y: y+2.4, w: 2.6, h: 1.0, fontSize: 11, color: PPT_THEME.textMute, align: 'center', valign: 'top', fontFace: 'Phetsarath OT' });
+  });
+  pptAddFooter(slide);
+}
+
+// 🥧 Doughnut/Pie chart slide
+function pptAddPieChartSlide(pres, title, labels, values, opts) {
+  opts = opts || {};
+  const slide = pres.addSlide();
+  slide.background = { color: PPT_THEME.bgWhite };
+  slide.addShape('rect', { x: 0, y: 0, w: 10, h: 0.7, fill: { color: PPT_THEME.primary } });
+  slide.addText(title, { x: 0.5, y: 0.1, w: 9, h: 0.5, fontSize: 22, bold: true, color: PPT_THEME.bgWhite, fontFace: 'Phetsarath OT' });
+  if (opts.subtitle) {
+    slide.addText(opts.subtitle, { x: 0.5, y: 0.85, w: 9, h: 0.3, fontSize: 12, color: PPT_THEME.textMute, fontFace: 'Phetsarath OT' });
+  }
+  const hasData = values && values.some(v => v > 0);
+  if (!hasData) {
+    slide.addText('📊', { x: 0.5, y: 2.5, w: 9, h: 1, fontSize: 60, align: 'center' });
+    slide.addText(opts.emptyMsg||'ຍັງບໍ່ມີຂໍ້ມູນສຳລັບ Chart', { x: 0.5, y: 3.6, w: 9, h: 0.6, fontSize: 18, color: PPT_THEME.textMute, align: 'center', fontFace: 'Phetsarath OT' });
+    pptAddFooter(slide);
+    return;
+  }
+  slide.addChart(pres.ChartType.doughnut, [{ name: 'Data', labels: labels, values: values }], {
+    x: 0.5, y: opts.subtitle ? 1.2 : 1.0, w: 5.5, h: 5.8,
+    showLegend: true,
+    legendPos: 'r',
+    showPercent: true,
+    dataLabelFontSize: 10,
+    chartColors: [PPT_THEME.primary, PPT_THEME.accent, PPT_THEME.success, PPT_THEME.warn, PPT_THEME.danger, '#8B5CF6', '#EC4899'],
+  });
+  // ສະຫຼຸບຂ້າງ Chart
+  const total = values.reduce((s,v)=>s+v, 0);
+  slide.addShape('rect', { x: 6.3, y: 1.2, w: 3.5, h: 5.5, fill: { color: PPT_THEME.bgGray }, line: { color: PPT_THEME.border, width: 1 } });
+  slide.addText('📊 ສະຫຼຸບ', { x: 6.5, y: 1.4, w: 3.1, h: 0.4, fontSize: 16, bold: true, color: PPT_THEME.primaryDk, fontFace: 'Phetsarath OT' });
+  slide.addText(`ລວມທັງໝົດ: ${total.toLocaleString()}`, { x: 6.5, y: 1.9, w: 3.1, h: 0.4, fontSize: 13, color: PPT_THEME.text, fontFace: 'Phetsarath OT' });
+  labels.slice(0, 7).forEach((lbl, i) => {
+    const val = values[i];
+    const pct = total > 0 ? Math.round(val/total*100) : 0;
+    const y = 2.5 + i * 0.55;
+    slide.addText(`${lbl}`, { x: 6.5, y, w: 1.8, h: 0.4, fontSize: 11, color: PPT_THEME.text, fontFace: 'Phetsarath OT' });
+    slide.addText(`${val.toLocaleString()} (${pct}%)`, { x: 8.3, y, w: 1.4, h: 0.4, fontSize: 11, bold: true, color: PPT_THEME.primaryDk, align: 'right' });
+  });
+  pptAddFooter(slide);
+}
+
+// 📈 Line chart slide
+function pptAddLineChartSlide(pres, title, labels, datasets, opts) {
+  opts = opts || {};
+  const slide = pres.addSlide();
+  slide.background = { color: PPT_THEME.bgWhite };
+  slide.addShape('rect', { x: 0, y: 0, w: 10, h: 0.7, fill: { color: PPT_THEME.primary } });
+  slide.addText(title, { x: 0.5, y: 0.1, w: 9, h: 0.5, fontSize: 22, bold: true, color: PPT_THEME.bgWhite, fontFace: 'Phetsarath OT' });
+  if (opts.subtitle) {
+    slide.addText(opts.subtitle, { x: 0.5, y: 0.85, w: 9, h: 0.3, fontSize: 12, color: PPT_THEME.textMute, fontFace: 'Phetsarath OT' });
+  }
+  const hasData = datasets && datasets.length > 0 && datasets.some(d => d.values && d.values.some(v => v > 0));
+  if (!hasData) {
+    slide.addText('📈', { x: 0.5, y: 2.5, w: 9, h: 1, fontSize: 60, align: 'center' });
+    slide.addText(opts.emptyMsg||'ຍັງບໍ່ມີຂໍ້ມູນພຽງພໍ', { x: 0.5, y: 3.6, w: 9, h: 0.6, fontSize: 18, color: PPT_THEME.textMute, align: 'center', fontFace: 'Phetsarath OT' });
+    pptAddFooter(slide);
+    return;
+  }
+  const data = datasets.map(d => ({ name: d.name, labels, values: d.values }));
+  slide.addChart(pres.ChartType.line, data, {
+    x: 0.5, y: opts.subtitle ? 1.2 : 1.0, w: 9, h: 5.8,
+    showLegend: datasets.length > 1, legendPos: 't',
+    showValue: false,
+    chartColors: [PPT_THEME.primary, PPT_THEME.accent, PPT_THEME.success, PPT_THEME.warn],
+    catAxisLabelFontSize: 10,
+    valAxisLabelFontSize: 10,
+    lineSize: 3, lineDataSymbolSize: 8,
+  });
+  pptAddFooter(slide);
+}
+
+// 📊 Comparison Cards Slide — ປຽບທຽບ Period ນີ້ກັບ Period ກ່ອນ
+function pptAddComparisonSlide(pres, title, comparisons) {
+  const slide = pres.addSlide();
+  slide.background = { color: PPT_THEME.bgWhite };
+  slide.addShape('rect', { x: 0, y: 0, w: 10, h: 0.7, fill: { color: PPT_THEME.primary } });
+  slide.addText(title, { x: 0.5, y: 0.1, w: 9, h: 0.5, fontSize: 22, bold: true, color: PPT_THEME.bgWhite, fontFace: 'Phetsarath OT' });
+  comparisons.forEach((c, i) => {
+    const col = i % 2;
+    const row = Math.floor(i / 2);
+    const x = 0.5 + col * 4.7;
+    const y = 1.2 + row * 1.7;
+    slide.addShape('rect', { x, y, w: 4.5, h: 1.5, fill: { color: PPT_THEME.bgLight }, line: { color: PPT_THEME.border, width: 1 } });
+    slide.addText(c.label, { x: x+0.2, y: y+0.1, w: 4.1, h: 0.4, fontSize: 12, bold: true, color: PPT_THEME.text, fontFace: 'Phetsarath OT' });
+    // Now vs Past
+    slide.addText('ດຽວນີ້', { x: x+0.2, y: y+0.55, w: 1.5, h: 0.3, fontSize: 9, color: PPT_THEME.textMute, fontFace: 'Phetsarath OT' });
+    slide.addText(String(c.now), { x: x+0.2, y: y+0.8, w: 1.5, h: 0.5, fontSize: 18, bold: true, color: PPT_THEME.primaryDk });
+    slide.addText('ກ່ອນ', { x: x+1.8, y: y+0.55, w: 1.5, h: 0.3, fontSize: 9, color: PPT_THEME.textMute, fontFace: 'Phetsarath OT' });
+    slide.addText(String(c.prev), { x: x+1.8, y: y+0.8, w: 1.5, h: 0.5, fontSize: 18, color: PPT_THEME.textMute });
+    // Trend
+    const trend = c.prev > 0 ? ((c.now - c.prev) / c.prev * 100) : (c.now > 0 ? 100 : 0);
+    const trendIcon = trend > 0 ? '▲' : trend < 0 ? '▼' : '●';
+    const trendColor = c.goodIfHigher !== false ? (trend > 0 ? PPT_THEME.success : trend < 0 ? PPT_THEME.danger : PPT_THEME.textMute) : (trend > 0 ? PPT_THEME.danger : trend < 0 ? PPT_THEME.success : PPT_THEME.textMute);
+    slide.addText(`${trendIcon} ${Math.abs(Math.round(trend))}%`, { x: x+3.4, y: y+0.8, w: 1.0, h: 0.5, fontSize: 16, bold: true, color: trendColor, align: 'right' });
+  });
+  pptAddFooter(slide);
 }
 
 // Section header slide
@@ -20429,11 +20644,51 @@ async function generatePPTGarage() {
     pres.company = 'ມະຫາໄຊ ວັດສະດຸ (MAHAXAY Trading)';
     pres.title = `ລາຍງານການສ້ອມບຳລຸງ - ${period.label}`;
 
+    // ດຶງຂໍ້ມູນ Period ກ່ອນສຳລັບປຽບທຽບ
+    const prevPeriodFrom = (() => {
+      const d = new Date(period.from); d.setMonth(d.getMonth()-1); return d.toISOString().slice(0,10);
+    })();
+    const prevPeriodTo = (() => {
+      const d = new Date(period.to); d.setMonth(d.getMonth()-1); return d.toISOString().slice(0,10);
+    })();
+    const prevJOs = (await db.joborders.toArray()).filter(j => (j.created||'').slice(0,10) >= prevPeriodFrom && (j.created||'').slice(0,10) <= prevPeriodTo);
+    const prevLabor = (await db.labor_entries.toArray()).filter(e => (e.date||'') >= prevPeriodFrom && (e.date||'') <= prevPeriodTo);
+    const prevTotalLabor = prevLabor.reduce((s,e)=>s+(e.charge_amount||0), 0);
+    const prevTotalParts = prevLabor.reduce((s,e)=>s+(e.parts_total||0), 0);
+    const totalRevenue = totalLabor + totalParts;
+    const prevRevenue = prevTotalLabor + prevTotalParts;
+
     // Slide 1: Cover
     pptAddCoverSlide(pres, '🛠 ລາຍງານການສ້ອມບຳລຸງ', 'ການສ້ອມລົດ • ສະຕ໋ອກ ອາໄຫລ່ • ຊັບສິນ', period.label);
 
-    // Slide 2: KPI Overview
-    pptAddKPISlide(pres, '📊 ສະຫຼຸບການເຮັດງານ', [
+    // Slide 2: Table of Contents
+    pptAddTOCSlide(pres, [
+      'ສະຫຼຸບຍຸດທະສາດ (Executive Summary)',
+      'KPI ສຳຄັນ — ສະພາບລວມ',
+      'ປຽບທຽບກັບໄລຍະກ່ອນ',
+      'ສະຖານະໃບສັ່ງສ້ອມ (Status)',
+      'ແນວໂນ້ມການເຮັດງານ',
+      'ສ່ວນແບ່ງລາຍຮັບ',
+      'ຜົນງານຊ່າງ Top 10',
+      'ລົດທີ່ມີຄ່າສ້ອມສູງສຸດ',
+      'ການປຽບທຽບສາຂາ',
+      'ສະຕ໋ອກ — ສິນຄ້າຕ່ຳກວ່າ Min',
+      'ການປ່ຽນອາໄຫລ່',
+      'ບັນຫາ + ຄຳແນະນຳ',
+    ]);
+
+    // Slide 3: Executive Summary
+    const completionRate = totalJOs > 0 ? Math.round(closedJOs/totalJOs*100) : 0;
+    const revenueTrend = prevRevenue > 0 ? Math.round((totalRevenue - prevRevenue)/prevRevenue*100) : 0;
+    pptAddExecSummarySlide(pres, 'ສະຫຼຸບຍຸດທະສາດ', `ໃນ${period.label}, KALA Garage ໄດ້ປະຕິບັດໃບສັ່ງສ້ອມ ${totalJOs} ໃບ ໂດຍສຳເລັດແລ້ວ ${closedJOs} ໃບ (${completionRate}%). ລາຍຮັບລວມຈາກຄ່າແຮງ + ອາໄຫລ່ ແມ່ນ ${fmt(totalRevenue)} ກີບ (${revenueTrend>=0?'+':''}${revenueTrend}% ທຽບກັບໄລຍະກ່ອນ). ມີຊ່າງ ${techCount} ຄົນຮ່ວມໃນການເຮັດງານ ໂດຍໄດ້ຮັບຄອມມິສຊັ່ນລວມ ${fmt(totalCommission)} ກີບ. ${lowStock > 0 ? `ມີສິນຄ້າ ${lowStock} ລາຍການຢູ່ໃນລະດັບຕ່ຳ — ຕ້ອງເລັງດ່ວນ.` : 'ສະຕ໋ອກສິນຄ້າຢູ່ໃນລະດັບປົກກະຕິ.'}`,
+    [
+      { icon: '✅', title: 'ສຳເລັດ', value: completionRate+'%', desc: `${closedJOs}/${totalJOs} ໃບສັ່ງສ້ອມ`, color: 'D1FAE5', valueColor: '065F46' },
+      { icon: '💰', title: 'ລາຍຮັບລວມ', value: fmt(totalRevenue), desc: `ກີບ • ${revenueTrend>=0?'▲':'▼'} ${Math.abs(revenueTrend)}% ທຽບກ່ອນ`, color: 'FFEDD5', valueColor: 'C2410C' },
+      { icon: '👷', title: 'ຊ່າງ', value: fmt(techCount), desc: `ຄົນປະຕິບັດການ`, color: 'DBEAFE', valueColor: '1E40AF' },
+    ]);
+
+    // Slide 4: KPI Overview
+    pptAddKPISlide(pres, '📊 KPI ສຳຄັນ — ສະພາບລວມ', [
       { icon: '📋', value: fmt(totalJOs), label: 'ໃບສັ່ງສ້ອມລວມ (JO)', color: 'FFEDD5' },
       { icon: '✅', value: fmt(closedJOs), label: 'ສຳເລັດແລ້ວ', color: 'D1FAE5', valueColor: '065F46' },
       { icon: '⏳', value: fmt(openJOs), label: 'ກຳລັງດຳເນີນ', color: 'FEF3C7', valueColor: '92400E' },
@@ -20444,12 +20699,52 @@ async function generatePPTGarage() {
       { icon: '⚠️', value: fmt(lowStock), label: 'ສິນຄ້າຕ່ຳກວ່າ Min', color: 'FEE2E2', valueColor: '991B1B' },
     ]);
 
-    // Slide 3: JO Status Chart (ສະແດງສະເໝີ)
+    // Slide 5: Comparison vs Previous Period
+    pptAddComparisonSlide(pres, '📈 ປຽບທຽບກັບໄລຍະກ່ອນ', [
+      { label: '📋 ໃບສັ່ງສ້ອມ', now: totalJOs, prev: prevJOs.length, goodIfHigher: true },
+      { label: '💰 ລາຍຮັບລວມ (ກີບ)', now: fmt(totalRevenue), prev: fmt(prevRevenue), goodIfHigher: true },
+      { label: '💼 ຄ່າແຮງ (ກີບ)', now: fmt(totalLabor), prev: fmt(prevTotalLabor), goodIfHigher: true },
+      { label: '📦 ຄ່າອາໄຫລ່ (ກີບ)', now: fmt(totalParts), prev: fmt(prevTotalParts), goodIfHigher: true },
+    ]);
+
+    // Slide 6: Section Divider — ການເຮັດງານ
+    pptAddSectionSlide(pres, '📋 ການເຮັດງານ');
+
+    // Slide 7: JO Status — Doughnut Chart
     const statuses = ['receive','diag','parts','repair','qc','done','cancelled'];
     const statusLabels = { receive:'ຮັບລົດ', diag:'ວິໄຈ', parts:'ລໍຖ້າອາໄຫລ່', repair:'ກຳລັງສ້ອມ', qc:'QC', done:'ສຳເລັດ', cancelled:'ຍົກເລີກ' };
     const joStatusValues = statuses.map(s => allJOs.filter(j => j.status === s).length);
-    const joByStatus = [{ name: 'ຈຳນວນ', labels: statuses.map(s => statusLabels[s]), values: joStatusValues }];
-    pptAddBarChartSlide(pres, '📊 ສະຖານະໃບສັ່ງສ້ອມ (JO)', joByStatus, { emptyMsg: 'ຍັງບໍ່ມີໃບສັ່ງສ້ອມໃນຊ່ວງເວລານີ້' });
+    pptAddPieChartSlide(pres, '🎯 ສະຖານະໃບສັ່ງສ້ອມ (JO)', statuses.map(s => statusLabels[s]), joStatusValues, { subtitle: `ການກະຈາຍ ${totalJOs} ໃບສັ່ງສ້ອມຕາມສະຖານະ`, emptyMsg: 'ຍັງບໍ່ມີໃບສັ່ງສ້ອມໃນຊ່ວງເວລານີ້' });
+
+    // Slide 8: Daily Trend — Line Chart
+    const dailyMap = {};
+    allJOs.forEach(j => {
+      const d = (j.created||'').slice(0,10);
+      if (!d) return;
+      dailyMap[d] = (dailyMap[d]||0) + 1;
+    });
+    const dailyLaborMap = {};
+    allLabor.forEach(e => {
+      const d = (e.date||'').slice(0,10);
+      if (!d) return;
+      dailyLaborMap[d] = (dailyLaborMap[d]||0) + (e.charge_amount||0) + (e.parts_total||0);
+    });
+    const dailyDates = [...new Set([...Object.keys(dailyMap), ...Object.keys(dailyLaborMap)])].sort();
+    pptAddLineChartSlide(pres, '📈 ແນວໂນ້ມການເຮັດງານ — ປະຈຳວັນ',
+      dailyDates,
+      [
+        { name: 'ໃບສັ່ງສ້ອມ', values: dailyDates.map(d => dailyMap[d]||0) },
+        { name: 'ລາຍຮັບ (ກີບ ÷1000)', values: dailyDates.map(d => Math.round((dailyLaborMap[d]||0)/1000)) },
+      ],
+      { subtitle: `ການເຮັດງານປະຈຳວັນໃນ ${period.label}`, emptyMsg: 'ຍັງບໍ່ມີຂໍ້ມູນປະຈຳວັນ' }
+    );
+
+    // Slide 9: Revenue Breakdown — Pie Chart
+    pptAddPieChartSlide(pres, '💰 ສ່ວນແບ່ງລາຍຮັບ — Labor vs Parts vs Commission',
+      ['ຄ່າແຮງ', 'ຄ່າອາໄຫລ່', 'ຄອມມິສຊັ່ນຊ່າງ'],
+      [totalLabor, totalParts, totalCommission],
+      { subtitle: `ສ່ວນແບ່ງລາຍຮັບ ${fmt(totalLabor+totalParts+totalCommission)} ກີບ`, emptyMsg: 'ຍັງບໍ່ມີຂໍ້ມູນລາຍຮັບ' }
+    );
 
     // Slide 4: Top Technicians
     const techStats = {};
@@ -20815,6 +21110,697 @@ async function generatePPTRental() {
     console.error('PPT Rental error:', e);
     toast('❌ ສ້າງ PowerPoint ບໍ່ສຳເລັດ: '+e.message, 'bad');
   }
+}
+
+// =============================================================================
+// 🆘 HELPDESK — Knowledge Base ສຳລັບຊ່າງ
+// =============================================================================
+
+const HELPDESK_CATEGORIES = [
+  { key: 'engine',       icon: '🔧', label: 'ເຄື່ອງຍົນ',          color: '#EF4444' },
+  { key: 'electrical',   icon: '⚡', label: 'ໄຟຟ້າ + ໝໍ້ໄຟ',       color: '#F59E0B' },
+  { key: 'transmission', icon: '⚙️', label: 'ສົ່ງກຳລັງ + ເກຍ',    color: '#8B5CF6' },
+  { key: 'brakes',       icon: '🛑', label: 'ເບຣກ',                color: '#DC2626' },
+  { key: 'cooling',      icon: '🌡', label: 'ລະບົບເຢັນ',           color: '#06B6D4' },
+  { key: 'fuel',         icon: '⛽', label: 'ນ້ຳມັນ + ໄອເສຍ',     color: '#10B981' },
+  { key: 'suspension',   icon: '🛞', label: 'ຊ່ວງລ່າງ + ຢາງ',    color: '#3B82F6' },
+  { key: 'hydraulic',    icon: '🏗', label: 'ໄຮດໍລິກ (ເຄນ/ແບັກໂຮ)', color: '#7C3AED' },
+  { key: 'body',         icon: '🚗', label: 'ໂຄງລົດ + ກະຈົກ',    color: '#6B7280' },
+  { key: 'other',        icon: '🔩', label: 'ອື່ນໆ',                color: '#374151' },
+];
+
+const HELPDESK_DIFFICULTY = {
+  L1: { label: '🟢 L1 — ຊ່າງຝຶກຫັດ', color: '#10B981' },
+  L2: { label: '🟡 L2 — ຊ່າງປະຈຳ',    color: '#F59E0B' },
+  L3: { label: '🔴 L3 — ຊ່າງຊຽວຊານ',  color: '#EF4444' },
+};
+
+// 📚 25 ບັນຫາລົດທີ່ພົບເລື້ອຍ — Pre-seed Knowledge Base
+const HELPDESK_SEED = [
+  // ===== ເຄື່ອງຍົນ =====
+  {
+    category: 'engine', difficulty: 'L1',
+    symptom: 'ເຄື່ອງບໍ່ສະຕາດ — ໝົດໄຟ',
+    symptoms_alt: ['ບໍ່ສະຕາດ', 'ບໍ່ຕິດ', 'ໝົດໄຟ'],
+    possible_causes: ['ໝໍ້ໄຟໝົດ', 'ໝໍ້ໄຟຂາດ', 'ສາຍໝໍ້ໄຟຫລົມ', 'ສະວິດສະຕາດເສຍ'],
+    time_estimate_min: 30,
+    safety: 'ໃສ່ຖົງມືກ່ອນແຕະໝໍ້ໄຟ. ຫຼີກກ່ຽງປະກາຍໄຟໃກ້ໝໍ້ໄຟ.',
+    tools_needed: ['ປະແຈ 10mm', 'Voltmeter', 'ຜ້າເຊັດ'],
+    parts_needed: ['ໝໍ້ໄຟໃໝ່ (ຖ້າເສຍ)', 'ຫົວສາຍໝໍ້ໄຟ (ຖ້າຂາດ)'],
+    steps: [
+      { step: 1, instruction: 'ກວດສະພາບໝໍ້ໄຟ — ເບິ່ງມີໂກກກິກບໍ່? ມີນ້ຳກົດໄຫລອອກບໍ່?' },
+      { step: 2, instruction: 'ໃຊ້ Voltmeter ວັດໄຟ — ຄວນຢູ່ທີ່ 12.6V (ໂດຍບໍ່ສະຕາດ) ຫລື 13.8-14.4V (ເຄື່ອງດຳເນີນ).' },
+      { step: 3, instruction: 'ຖ້າຕ່ຳກວ່າ 12V → ສາກໄຟ ຫລື ປ່ຽນໝໍ້ໄຟ.' },
+      { step: 4, instruction: 'ກວດສາຍໝໍ້ໄຟ — ຂັນຫົວ + ແລະ - ໃຫ້ແໜ້ນ.' },
+      { step: 5, instruction: 'ກວດສະວິດສະຕາດ — ກົດສະຕາດ ຟັງສຽງ "ກິ໊ກ" ບໍ່? ຖ້າບໍ່ມີ → ປ່ຽນ Starter Motor.' },
+    ],
+  },
+  {
+    category: 'engine', difficulty: 'L2',
+    symptom: 'ເຄື່ອງສະຕາດ ແຕ່ດັບໄວ',
+    symptoms_alt: ['ດັບ', 'ສະຕາດ ແລ້ວ ດັບ', 'ບໍ່ຕິດທົນ'],
+    possible_causes: ['ນ້ຳມັນບໍ່ໄຫລ', 'ກອງນ້ຳມັນຕັນ', 'ປ໊ອມນ້ຳມັນເສຍ', 'Idle ສະວິດເສຍ', 'ມີນ້ຳໃນນ້ຳມັນ'],
+    time_estimate_min: 90,
+    safety: '⚠️ ປິດເຄື່ອງກ່ອນເຮັດງານທີ່ກອງນ້ຳມັນ. ຫ້າມສູບຢາໃຫ້ໃກ້.',
+    tools_needed: ['ຊຸດເຄື່ອງມືທົ່ວໄປ', 'Vacuum gauge', 'Pressure gauge', 'ຄອນເທນເນີຮັບນ້ຳມັນ'],
+    parts_needed: ['ກອງນ້ຳມັນ', 'ປ໊ອມນ້ຳມັນ (ຖ້າເສຍ)'],
+    steps: [
+      { step: 1, instruction: 'ກວດລະດັບນ້ຳມັນ — ມີນ້ຳມັນພຽງພໍບໍ່?' },
+      { step: 2, instruction: 'ປ່ຽນກອງນ້ຳມັນ — ກອງເກົ່າອາດຕັນ.' },
+      { step: 3, instruction: 'ກວດປ໊ອມນ້ຳມັນ — ໃຊ້ Pressure gauge ວັດ. ປົກກະຕິ 3-5 bar.' },
+      { step: 4, instruction: 'ກວດ Idle Air Control valve — ທຳຄວາມສະອາດ ຫລື ປ່ຽນ.' },
+      { step: 5, instruction: 'ກວດກວດນ້ຳໃນຖັງ — ໂດຍປ່ອຍຄ້າງຂ້າມຄືນ ແລ້ວດຶງຕົວຢ່າງຈາກລຸ່ມຖັງ.' },
+    ],
+  },
+  {
+    category: 'engine', difficulty: 'L2',
+    symptom: 'ຄວັນດຳ — ໄອເສຍດຳ',
+    symptoms_alt: ['ຄວັນດຳ', 'ໄອເສຍດຳ', 'ໄອເສຍດຳໜາ'],
+    possible_causes: ['ສ້ອມຄ້າງ', 'ກອງອາກາດຕັນ', 'ຕັວສະບອນຫົວ (Diesel)', 'Turbocharger ເສຍ', 'Injectors ເສຍ'],
+    time_estimate_min: 60,
+    safety: 'ໃສ່ໜ້າກາກກັນຄວັນ ໃນເວລາທົດສອບ',
+    tools_needed: ['ປະແຈເຄື່ອງມືທົ່ວໄປ', 'OBD-II Scanner'],
+    parts_needed: ['ກອງອາກາດໃໝ່', 'Injectors (ຖ້າເສຍ)'],
+    steps: [
+      { step: 1, instruction: 'ກວດກອງອາກາດ — ຖ້າເປື້ອນ → ປ່ຽນ.' },
+      { step: 2, instruction: 'ກວດການເບີນ — ດ້ວຍ OBD Scanner ກວດ Error Codes.' },
+      { step: 3, instruction: 'ກວດ Injectors — ໂດຍຖອດອອກ ກວດ spray pattern.' },
+      { step: 4, instruction: 'ກວດ Turbocharger — ມີສຽງແປກບໍ່? ມີນ້ຳມັນຮ່ວງບໍ່?' },
+      { step: 5, instruction: 'ປັບ Timing ໄຟ — ໃຊ້ Timing light.' },
+    ],
+  },
+  {
+    category: 'engine', difficulty: 'L3',
+    symptom: 'ເຄື່ອງມີສຽງດັງ — ສຽງເຄາະ',
+    symptoms_alt: ['ສຽງເຄາະ', 'ສຽງດັງ', 'ສຽງແປກ', 'knock'],
+    possible_causes: ['ນ້ຳມັນເຄື່ອງໝົດ ຫລື ສກປົກ', 'ກ້ານສຽບເສຍ', 'ໂສ້ໄຟຍຶດ', 'ກວ້ານປະຕູຫລົມ'],
+    time_estimate_min: 240,
+    safety: '⚠️ ປິດເຄື່ອງທັນທີຖ້າມີສຽງດັງຫລາຍ — ຫລີກກ່ຽງເຄື່ອງເສຍຫາຍຮ້າຍແຮງ',
+    tools_needed: ['Stethoscope', 'Compression gauge', 'ຊຸດເຄື່ອງມືເຕັມ'],
+    parts_needed: ['ນ້ຳມັນເຄື່ອງ', 'ຕັວສະບອນຫົວ', 'ໂສ້ໄຟ'],
+    steps: [
+      { step: 1, instruction: 'ກວດລະດັບນ້ຳມັນເຄື່ອງ — ຖ້າຕ່ຳ → ເຕີມທັນທີ.' },
+      { step: 2, instruction: 'ໃຊ້ Stethoscope ກວດສຽງ — ສຽງມາຈາກໃສ? ຫົວ? ກາງ? ລຸ່ມ?' },
+      { step: 3, instruction: 'ກວດ Compression — ປົກກະຕິ 9-12 bar.' },
+      { step: 4, instruction: 'ຖ້າສຽງມາຈາກຫົວ → ກວດ valve clearance.' },
+      { step: 5, instruction: 'ຖ້າສຽງມາຈາກລຸ່ມ → Overhaul ເຄື່ອງ (L3 ເທົ່ານັ້ນ).' },
+    ],
+  },
+  // ===== ໄຟຟ້າ =====
+  {
+    category: 'electrical', difficulty: 'L1',
+    symptom: 'ໄຟໜ້າບໍ່ສະຫວ່າງ',
+    symptoms_alt: ['ໄຟໜ້າມືດ', 'ໄຟຕ່ຳ', 'ບໍ່ຕິດ'],
+    possible_causes: ['ຫລອດໄຟຂາດ', 'ໝໍ້ໄຟຕ່ຳ', 'ສະວິດເສຍ', 'ສາຍຫລົມ'],
+    time_estimate_min: 30,
+    safety: 'ປິດໄຟຫລັກກ່ອນແຕະຫລອດ — ຫລອດຮ້ອນ ອາດເຮັດໃຫ້ບາດເຈັບ',
+    tools_needed: ['Voltmeter', 'ປະແຈ Phillips'],
+    parts_needed: ['ຫລອດໄຟຫົວ H4 ຫລື LED'],
+    steps: [
+      { step: 1, instruction: 'ກວດຫລອດ — ຫລົມບໍ່? ກວດດ້ວຍ Voltmeter.' },
+      { step: 2, instruction: 'ປ່ຽນຫລອດໃໝ່ — ໃຊ້ Brand ດຽວກັນ ສຳລັບໄຟສະຫວ່າງເທົ່າທຽມກັນ.' },
+      { step: 3, instruction: 'ກວດ Connector — ມີໂກກກິກບໍ່? ທຳຄວາມສະອາດ.' },
+      { step: 4, instruction: 'ກວດ Fuse — ໃນກ່ອງ Fuse ໃຕ້ Dashboard ຫລື ໃຕ້ Hood.' },
+    ],
+  },
+  {
+    category: 'electrical', difficulty: 'L2',
+    symptom: 'ໝໍ້ໄຟໝົດໄວເກີນ',
+    symptoms_alt: ['ໝົດໄຟໄວ', 'ສະຕາດບໍ່ໄດ້ຫລັງຄ້າງຄືນ'],
+    possible_causes: ['Alternator ບໍ່ສ້າງໄຟ', 'ໝໍ້ໄຟແກ່', 'ມີໂຫລດ Parasitic (ໂຫລດທີ່ກິນໄຟຕະຫລອດ)'],
+    time_estimate_min: 60,
+    safety: 'ໃສ່ຖົງມືແລະແວ່ນຕາ — ໝໍ້ໄຟມີນ້ຳກົດ',
+    tools_needed: ['Multimeter', 'Battery tester', 'ຄີມ'],
+    parts_needed: ['ໝໍ້ໄຟໃໝ່', 'ໄດສະຕາດ (Alternator) ໃໝ່ (ຖ້າເສຍ)'],
+    steps: [
+      { step: 1, instruction: 'ທົດສອບໝໍ້ໄຟ — ໃຊ້ Battery tester ກວດ CCA.' },
+      { step: 2, instruction: 'ກວດ Alternator — ດຳເນີນເຄື່ອງ ກວດໄຟ ຄວນຢູ່ທີ່ 13.8-14.4V.' },
+      { step: 3, instruction: 'ກວດ Parasitic Drain — ປິດເຄື່ອງ ຖອດສາຍ (-) ໃຊ້ Multimeter ໃນໂໝດ Amp ກວດ. ປົກກະຕິ < 50mA.' },
+      { step: 4, instruction: 'ຖ້າສູງ → ຫາ Circuit ທີ່ກິນໄຟ.' },
+    ],
+  },
+  // ===== ສົ່ງກຳລັງ =====
+  {
+    category: 'transmission', difficulty: 'L2',
+    symptom: 'ສະຫຼັບເກຍຍາກ (Manual)',
+    symptoms_alt: ['ເກຍຍາກ', 'ບໍ່ສະຫຼັບເກຍ', 'ກິນເກຍ'],
+    possible_causes: ['ນ້ຳມັນເກຍຕ່ຳ', 'ຄຣັຊບໍ່ປະຍຸກໄດ້', 'ສະປຣິງເກຍຫລົມ', 'Synchronizer ເສຍ'],
+    time_estimate_min: 120,
+    safety: 'ປະຕິບັດງານໃນບ່ອນທີ່ມີລົມຖ່າຍ — ນ້ຳມັນເກຍມີກິ່ນແຮງ',
+    tools_needed: ['ປະແຈເຮັດງານໃຕ້ລົດ', 'Drain pan'],
+    parts_needed: ['ນ້ຳມັນເກຍ (ປະເພດສະເພາະ)', 'ຊຸດຄຣັຊ (ຖ້າເສຍ)'],
+    steps: [
+      { step: 1, instruction: 'ກວດລະດັບນ້ຳມັນເກຍ — ຍົກລົດຂຶ້ນ ກວດທີ່ Fill plug.' },
+      { step: 2, instruction: 'ກວດຄຣັຊ — ກົດເຫຍຽບຄຣັຊໃຫ້ສຸດ ສະຫຼັບເກຍ. ຖ້າຍັງຍາກ → ບັນຫາຄຣັຊ.' },
+      { step: 3, instruction: 'ປ່ຽນນ້ຳມັນເກຍ — ໃຊ້ປະເພດທີ່ກຳນົດ (ເຊັ່ນ 75W-90 ສຳລັບລົດກະບະ).' },
+      { step: 4, instruction: 'ປັບສາຍຄຣັຊ — Free play ຄວນ 1-3mm.' },
+    ],
+  },
+  {
+    category: 'transmission', difficulty: 'L3',
+    symptom: 'ຄຣັຊບໍ່ປ່ອຍ — ກິນເກຍຕະຫລອດ',
+    symptoms_alt: ['ຄຣັຊໝົ້ນ', 'ຄຣັຊບໍ່ປະຍຸກ'],
+    possible_causes: ['ຄຣັຊແຜ່ນເສຍ', 'Pressure plate ເສຍ', 'Throw-out bearing ເສຍ', 'Master/Slave cylinder ຮົ່ວ'],
+    time_estimate_min: 480,
+    safety: '⚠️ ຍົກລົດໃຫ້ປອດໄພດ້ວຍ Stand — ບໍ່ໃຊ້ Jack ໂດດໆ',
+    tools_needed: ['Transmission jack', 'ຊຸດເຄື່ອງມືເຕັມ', 'Alignment tool'],
+    parts_needed: ['Clutch kit (Disc + Pressure plate + Bearing)', 'Pilot bearing'],
+    steps: [
+      { step: 1, instruction: 'ກວດ Hydraulic system — ມີນ້ຳມັນຄຣັຊໝົດບໍ່? Bleed system.' },
+      { step: 2, instruction: 'ຖ້າ Hydraulic OK → ຕ້ອງຖອດເກຍ.' },
+      { step: 3, instruction: 'ຖອດເພລົາແລະເກຍ.' },
+      { step: 4, instruction: 'ປ່ຽນຊຸດຄຣັຊທັງໝົດ (Disc + Pressure plate + Bearing).' },
+      { step: 5, instruction: 'ໃຊ້ Alignment tool ໃນເວລາປະກອບ.' },
+    ],
+  },
+  // ===== ເບຣກ =====
+  {
+    category: 'brakes', difficulty: 'L1',
+    symptom: 'ເບຣກມີສຽງ — ສຽງດັງເວລາເຫຍຽບ',
+    symptoms_alt: ['ສຽງເບຣກ', 'ສຽງດັງ', 'ສຽງສະຄຣິບ'],
+    possible_causes: ['ຜ້າເບຣກໝົດ', 'ຈານເບຣກຂັງ', 'ຜ້າເບຣກປະເພດແຂງເກີນ'],
+    time_estimate_min: 90,
+    safety: '⚠️ ລ້າງຝຸ່ນເບຣກດ້ວຍ Brake Cleaner — ບໍ່ສູບລົມ (ຝຸ່ນເບຣກອັນຕະລາຍ)',
+    tools_needed: ['Jack + Stand', 'ປະແຈ 14-17mm', 'C-clamp'],
+    parts_needed: ['ຊຸດຜ້າເບຣກ', 'Brake cleaner spray'],
+    steps: [
+      { step: 1, instruction: 'ຍົກລົດ ຖອດລໍ້.' },
+      { step: 2, instruction: 'ຖອດ Caliper — ກວດຜ້າເບຣກ. ຖ້າເຫລືອ < 3mm → ປ່ຽນ.' },
+      { step: 3, instruction: 'ກວດຈານເບຣກ — ຂັງ? ບາງເກີນຂັ້ນຕ່ຳ? ປ່ຽນ ຫລື ກວ້າງ.' },
+      { step: 4, instruction: 'ປ່ຽນຜ້າເບຣກໃໝ່ — ໃຊ້ Brake Cleaner ລ້າງກ່ອນ.' },
+      { step: 5, instruction: 'ປະກອບ — ກົດເບຣກ 3-4 ຄັ້ງ ສຳລັບໃຫ້ Piston ປະຍຸກ.' },
+    ],
+  },
+  {
+    category: 'brakes', difficulty: 'L2',
+    symptom: 'ເບຣກບໍ່ຕິດ — ເຫຍຽບແລ້ວ pedal ນຸ້ມ',
+    symptoms_alt: ['ເບຣກນຸ້ມ', 'ເບຣກບໍ່ມີແຮງ', 'ເບຣກຈົມ'],
+    possible_causes: ['ມີລົມໃນສາຍເບຣກ', 'ນ້ຳມັນເບຣກໝົດ', 'Master cylinder ເສຍ', 'Caliper ຫລົມ'],
+    time_estimate_min: 60,
+    safety: '⚠️ ບໍ່ໃຊ້ນ້ຳມັນເບຣກປະເພດຜິດ — DOT 4 ສຳລັບລົດທົ່ວໄປ',
+    tools_needed: ['Brake bleeding kit', 'ຄີມ', 'ປະແຈ 8-10mm'],
+    parts_needed: ['ນ້ຳມັນເບຣກ DOT 4'],
+    steps: [
+      { step: 1, instruction: 'ກວດລະດັບນ້ຳມັນເບຣກ ໃນ Reservoir — ເຕີມໃຫ້ເຕັມ.' },
+      { step: 2, instruction: 'Bleed Brakes — ເລີ່ມຈາກລໍ້ໄກສຸດ (ສ່ວນຫລາຍ ລໍ້ຫລັງຂວາ).' },
+      { step: 3, instruction: 'ມີຄົນ 2 ຄົນ: 1 ກົດເບຣກ + 1 ເປີດ Bleeder valve.' },
+      { step: 4, instruction: 'ເຮັດຈົນບໍ່ມີລົມອອກ — ນ້ຳມັນຄວນສະອາດ.' },
+      { step: 5, instruction: 'ທົດສອບ — ກົດເບຣກ Pedal ຄວນແຂງ.' },
+    ],
+  },
+  // ===== ລະບົບເຢັນ =====
+  {
+    category: 'cooling', difficulty: 'L1',
+    symptom: 'ເຄື່ອງຮ້ອນເກີນ — Temperature ສູງ',
+    symptoms_alt: ['ເຄື່ອງຮ້ອນ', 'Overheat', 'Temp ສູງ', 'ມີຄວັນຂາວ'],
+    possible_causes: ['ນ້ຳໝົ້ນເຢັນໝົດ', 'Radiator ຕັນ', 'ປ໊ອມນ້ຳເສຍ', 'Thermostat ເສຍ', 'Fan ບໍ່ດຳເນີນ'],
+    time_estimate_min: 60,
+    safety: '⚠️ ບໍ່ເປີດຝາ Radiator ໃນຂະນະທີ່ເຄື່ອງຮ້ອນ — ນ້ຳເດືອດອາດກະເດັນ',
+    tools_needed: ['Pressure tester', 'Thermometer'],
+    parts_needed: ['ນ້ຳໝົ້ນເຢັນ (Coolant)', 'Thermostat', 'Radiator cap'],
+    steps: [
+      { step: 1, instruction: 'ຫລັງເຄື່ອງເຢັນ — ກວດລະດັບນ້ຳໝົ້ນເຢັນ ໃນ Reservoir.' },
+      { step: 2, instruction: 'ກວດ Hose — ມີຫລົມບໍ່? ມີນ້ຳຮົ່ວບໍ່?' },
+      { step: 3, instruction: 'ກວດ Fan — ດຳເນີນເຄື່ອງຈົນ Temp ສູງ. Fan ຄວນດຳເນີນ.' },
+      { step: 4, instruction: 'ກວດ Thermostat — ດຳເນີນເຄື່ອງເຢັນ ກວດ Hose ເທິງ Radiator. ຄວນຮ້ອນຫລັງ 5-10 ນາທີ.' },
+      { step: 5, instruction: 'ຖ້າ Fan ບໍ່ດຳເນີນ → ກວດ Fuse + Relay + Temperature switch.' },
+    ],
+  },
+  {
+    category: 'cooling', difficulty: 'L2',
+    symptom: 'ຮົ່ວນ້ຳໝົ້ນເຢັນ',
+    symptoms_alt: ['ນ້ຳໝົ້ນເຢັນຮົ່ວ', 'ມີນ້ຳເຂັຽວຮົ່ວ', 'ນ້ຳໝົ້ນເຢັນຫາຍໄວ'],
+    possible_causes: ['Hose ແຕກ', 'Radiator ຮົ່ວ', 'ປ໊ອມນ້ຳ Seal ເສຍ', 'Head Gasket ເສຍ'],
+    time_estimate_min: 120,
+    safety: 'ປ່ອຍໃຫ້ເຄື່ອງເຢັນສຸດກ່ອນ — ນ້ຳໝົ້ນເຢັນຄ້ອນ',
+    tools_needed: ['Pressure tester kit', 'UV dye + UV light'],
+    parts_needed: ['Hose ໃໝ່', 'Radiator', 'Water pump'],
+    steps: [
+      { step: 1, instruction: 'Pressure test — ໃຊ້ Tester ກວດ 15 PSI. ຫາທີ່ຮົ່ວ.' },
+      { step: 2, instruction: 'ໃສ່ UV dye ໃນ Coolant — ດຳເນີນເຄື່ອງ. ໃຊ້ UV light ຫາທີ່ຮົ່ວ.' },
+      { step: 3, instruction: 'ກວດ Head Gasket — ກວດກວດ Oil ມີນ້ຳໝົ້ນເຢັນບໍ່? Combustion gas ໃນ Coolant ບໍ່?' },
+      { step: 4, instruction: 'ປ່ຽນຊິ້ນສ່ວນທີ່ຮົ່ວ.' },
+      { step: 5, instruction: 'ເຕີມ Coolant + Bleed system.' },
+    ],
+  },
+  // ===== ນ້ຳມັນ + ໄອເສຍ =====
+  {
+    category: 'fuel', difficulty: 'L1',
+    symptom: 'ໄຟ Check Engine ຕິດ',
+    symptoms_alt: ['Check Engine', 'CEL', 'ໄຟເຄື່ອງຕິດ', 'MIL'],
+    possible_causes: ['Sensor ເສຍ', 'O2 sensor', 'MAF sensor', 'EVAP leak'],
+    time_estimate_min: 45,
+    safety: 'ບໍ່ມີ Special — ໃຊ້ Scanner ປອດໄພ',
+    tools_needed: ['OBD-II Scanner'],
+    parts_needed: ['Sensor (ຫາກກວດເຫັນ)'],
+    steps: [
+      { step: 1, instruction: 'ສຽບ OBD Scanner ເຂົ້າ Port (ໃຕ້ Dashboard).' },
+      { step: 2, instruction: 'ອ່ານ Error Code — ບັນທຶກລະຫັດ (ເຊັ່ນ P0420).' },
+      { step: 3, instruction: 'ຄົ້ນຫາ Code ໃນ Internet ຫລື Manual.' },
+      { step: 4, instruction: 'ປ່ຽນ Sensor ທີ່ບອກ.' },
+      { step: 5, instruction: 'Clear Code → ດຳເນີນເຄື່ອງເພື່ອກວດວ່າແກ້ໄຂແລ້ວ.' },
+    ],
+  },
+  // ===== ຊ່ວງລ່າງ =====
+  {
+    category: 'suspension', difficulty: 'L1',
+    symptom: 'ມີສຽງດັງເວລາຜ່ານຄອນ',
+    symptoms_alt: ['ສຽງດັງ', 'ສຽງເຄາະ', 'ສຽງຄອນ'],
+    possible_causes: ['Shock absorber ເສຍ', 'Ball joint ເສຍ', 'Tie rod end ເສຍ', 'Bushing ເສຍ'],
+    time_estimate_min: 60,
+    safety: 'ຍົກລົດໃຫ້ປອດໄພ — ໃຊ້ Stand 4 ຈຸດ',
+    tools_needed: ['Jack + Stand', 'Pry bar'],
+    parts_needed: ['Shock absorber', 'Ball joint', 'Bushing'],
+    steps: [
+      { step: 1, instruction: 'Bounce test — ກົດ Hood ໃຫ້ລົງ. ຖ້າເດ້ງເກີນ 2 ຄັ້ງ → Shock ເສຍ.' },
+      { step: 2, instruction: 'ກວດ Ball joint — ໃຊ້ Pry bar ກວດການແກວ່ງ.' },
+      { step: 3, instruction: 'ກວດ Tie rod — ຍຶດລໍ້ ກວດການແກວ່ງລ້ຽວ.' },
+      { step: 4, instruction: 'ປ່ຽນຊິ້ນສ່ວນທີ່ເສຍ.' },
+      { step: 5, instruction: 'ປັບ Alignment ຫລັງປ່ຽນ Tie rod.' },
+    ],
+  },
+  {
+    category: 'suspension', difficulty: 'L1',
+    symptom: 'ຢາງສືກໄວ — ສືກບໍ່ສະເໝີ',
+    symptoms_alt: ['ຢາງສືກໜຶ່ງດ້ານ', 'ສືກສະເພາະຂ້າງ', 'ສືກສະເພາະກາງ'],
+    possible_causes: ['Alignment ຜິດ', 'ລົມຢາງຜິດ', 'Suspension ສືກ', 'ບໍ່ສະຫຼັບຢາງ'],
+    time_estimate_min: 60,
+    safety: 'ກວດລົມຢາງດ້ວຍ Pressure gauge',
+    tools_needed: ['Tire pressure gauge', 'Tread depth gauge', 'Alignment machine'],
+    parts_needed: ['ຢາງໃໝ່ (ຖ້າຈຳເປັນ)'],
+    steps: [
+      { step: 1, instruction: 'ກວດລົມຢາງ — ສະເໝີ ຄ່າທີ່ກຳນົດ (ດູຂ້າງປະຕູລົດ).' },
+      { step: 2, instruction: 'ກວດດອກຢາງ — ດ້ວຍ Tread depth gauge.' },
+      { step: 3, instruction: 'ຖ້າສືກກາງ → ລົມສູງເກີນ.' },
+      { step: 4, instruction: 'ຖ້າສືກສອງຂ້າງ → ລົມຕ່ຳເກີນ.' },
+      { step: 5, instruction: 'ຖ້າສືກໜຶ່ງຂ້າງ → ກວດ Alignment.' },
+      { step: 6, instruction: 'ສະຫຼັບຢາງທຸກ 10,000 km.' },
+    ],
+  },
+  // ===== ໄຮດໍລິກ (Crane / Backhoe) =====
+  {
+    category: 'hydraulic', difficulty: 'L2',
+    symptom: 'ເຄນບໍ່ຍົກ — ບໍ່ມີແຮງຍົກ',
+    symptoms_alt: ['ເຄນບໍ່ໄດ້', 'ບໍ່ມີແຮງ', 'Hydraulic ອ່ອນ'],
+    possible_causes: ['ນ້ຳມັນໄຮດໍລິກໝົດ', 'ປ໊ອມໄຮດໍລິກເສຍ', 'Hose ຮົ່ວ', 'Control valve ເສຍ'],
+    time_estimate_min: 120,
+    safety: '⚠️ ໄຮດໍລິກມີຄວາມດັນສູງ — ກວດ Pressure ກ່ອນເຮັດງານ',
+    tools_needed: ['Hydraulic pressure gauge', 'ປະແຈ', 'Drain pan'],
+    parts_needed: ['ນ້ຳມັນໄຮດໍລິກ (ISO VG 46)', 'Hose', 'Seal kit'],
+    steps: [
+      { step: 1, instruction: 'ກວດລະດັບນ້ຳມັນໄຮດໍລິກ — ໃນ Reservoir.' },
+      { step: 2, instruction: 'ກວດ Hose — ມີຮົ່ວບໍ່? ບີບແຮງ ສັງເກດ.' },
+      { step: 3, instruction: 'Pressure test — ປົກກະຕິ 200-250 bar.' },
+      { step: 4, instruction: 'ກວດປ໊ອມ — ມີສຽງແປກບໍ່?' },
+      { step: 5, instruction: 'ປ່ຽນ Filter ໄຮດໍລິກ.' },
+    ],
+  },
+  {
+    category: 'hydraulic', difficulty: 'L3',
+    symptom: 'ບຸ້ງກີ໋ແບັກໂຮບໍ່ມີແຮງຂຸດ',
+    symptoms_alt: ['ບຸ້ງກີ໋ອ່ອນ', 'ບໍ່ມີແຮງຂຸດ', 'ຂຸດໄດ້ນ້ອຍ'],
+    possible_causes: ['ປ໊ອມໄຮດໍລິກອ່ອນ', 'Relief valve ເສຍ', 'Cylinder seal ຮົ່ວ'],
+    time_estimate_min: 240,
+    safety: 'ປ່ອຍແຮງດັນອອກກ່ອນຖອດທໍ່',
+    tools_needed: ['Pressure gauge ສຳລັບແບັກໂຮ', 'ຊຸດເຄື່ອງມືເຕັມ'],
+    parts_needed: ['Cylinder seal kit', 'Relief valve'],
+    steps: [
+      { step: 1, instruction: 'ກວດ Cylinder — ມີນ້ຳມັນຮົ່ວແຄມບໍ່?' },
+      { step: 2, instruction: 'ກວດ Relief valve — Pressure ສູງສຸດຕ້ອງຮອດ specs.' },
+      { step: 3, instruction: 'ກວດປ໊ອມ — Flow test.' },
+      { step: 4, instruction: 'ປ່ຽນ Seal kit ໃນ Cylinder.' },
+      { step: 5, instruction: 'ປັບ Relief valve ໃຫ້ຖືກ specs.' },
+    ],
+  },
+  // ===== ໂຄງລົດ =====
+  {
+    category: 'body', difficulty: 'L1',
+    symptom: 'ປະຕູປິດບໍ່ສະນິດ',
+    symptoms_alt: ['ປະຕູຫົມບໍ່ສະນິດ', 'ປະຕູຍຸ່ນ', 'ມີສຽງລົມຮົ່ວ'],
+    possible_causes: ['ບານພັບສືກ', 'ບໍ່ໄດ້ປັບ Striker', 'Weather strip ເສຍ'],
+    time_estimate_min: 30,
+    safety: 'ບໍ່ມີພິເສດ',
+    tools_needed: ['ປະແຈ 10-13mm', 'Grease'],
+    parts_needed: ['Weather strip ໃໝ່ (ຖ້າເສຍ)'],
+    steps: [
+      { step: 1, instruction: 'ກວດບານພັບ — ມີສຽງດັງບໍ່? ໃສ່ Grease.' },
+      { step: 2, instruction: 'ປັບ Striker — ປະຕູຄວນປິດສະນິດ.' },
+      { step: 3, instruction: 'ກວດ Weather strip — ມີຮອຍແຕກບໍ່? ປ່ຽນ.' },
+    ],
+  },
+  // ===== ອື່ນໆ =====
+  {
+    category: 'other', difficulty: 'L1',
+    symptom: 'ແອບໍ່ເຢັນ — ລົມເຢັນບໍ່ຫົມ',
+    symptoms_alt: ['ແອບໍ່ເຢັນ', 'ບໍ່ມີລົມເຢັນ', 'ແອບໍ່ຕິດ'],
+    possible_causes: ['ນ້ຳຢາແອໝົດ', 'Compressor ບໍ່ດຳເນີນ', 'Filter ຕັນ', 'Condenser ສກປົກ'],
+    time_estimate_min: 90,
+    safety: '⚠️ ນ້ຳຢາແອ R-134a ບໍ່ໃຊ້ Brand ຜິດ — ກວດ Sticker ກ່ອນເຕີມ',
+    tools_needed: ['Manifold gauge', 'AC vacuum pump', 'ນ້ຳຢາແອ'],
+    parts_needed: ['ນ້ຳຢາແອ R-134a', 'AC filter', 'O-ring kit'],
+    steps: [
+      { step: 1, instruction: 'ກວດ Compressor — ດຳເນີນເຄື່ອງ ເປີດແອ. Clutch ຕິດບໍ່?' },
+      { step: 2, instruction: 'ກວດ Pressure — Low ຄວນຢູ່ 25-35 PSI, High ຄວນຢູ່ 200-250 PSI.' },
+      { step: 3, instruction: 'ຖ້າ Low ຕ່ຳ → ນ້ຳຢາໝົດ. ກວດຮົ່ວດ້ວຍ UV dye.' },
+      { step: 4, instruction: 'Vacuum + ເຕີມ ນ້ຳຢາ ໂດຍລະອຽດ.' },
+      { step: 5, instruction: 'ທຳຄວາມສະອາດ Condenser (ດ້ານໜ້າ).' },
+    ],
+  },
+  {
+    category: 'other', difficulty: 'L1',
+    symptom: 'ກະຈົກໄຟຟ້າບໍ່ເຮັດງານ',
+    symptoms_alt: ['ກະຈົກບໍ່ຂຶ້ນ', 'ກະຈົກບໍ່ລົງ', 'ກະຈົກຄ້າງ'],
+    possible_causes: ['Fuse ຂາດ', 'Switch ເສຍ', 'Motor ກະຈົກເສຍ', 'Regulator ເສຍ'],
+    time_estimate_min: 60,
+    safety: 'ຖອດ Negative terminal ກ່ອນເຮັດງານ Electrical',
+    tools_needed: ['Multimeter', 'ປະແຈ Phillips + Torx'],
+    parts_needed: ['Window motor', 'Switch'],
+    steps: [
+      { step: 1, instruction: 'ກວດ Fuse — ໃນກ່ອງ Fuse.' },
+      { step: 2, instruction: 'ກວດ Switch — ໃຊ້ Multimeter ກວດການນຳໄຟ.' },
+      { step: 3, instruction: 'ກວດ Motor — ໃຊ້ໄຟ 12V ໂດຍກົງເຂົ້າ Motor.' },
+      { step: 4, instruction: 'ປ່ຽນ Motor ຫລື Switch ທີ່ເສຍ.' },
+    ],
+  },
+];
+
+async function nextHelpdeskId() {
+  const all = await db.helpdesk_problems.toArray();
+  const max = all.reduce((m,h) => {
+    const n = parseInt((h.problem_id||'').replace('HP-','')) || 0;
+    return n > m ? n : m;
+  }, 0);
+  return `HP-${String(max+1).padStart(4,'0')}`;
+}
+
+// ໂຫລດ 25 ບັນຫາມາດຕະຖານ
+async function seedHelpdesk() {
+  if (!confirm(`ໂຫລດ ${HELPDESK_SEED.length} ບັນຫາລົດທີ່ພົບເລື້ອຍເຂົ້າ Helpdesk?\n(ເຄື່ອງຍົນ, ໄຟຟ້າ, ເບຣກ, ສົ່ງກຳລັງ, ໄຮດໍລິກ...)`)) return;
+  const all = await db.helpdesk_problems.toArray();
+  let added = 0, skipped = 0;
+  for (const s of HELPDESK_SEED) {
+    const existing = all.find(h => h.symptom === s.symptom && h.category === s.category);
+    if (existing) { skipped++; continue; }
+    await db.helpdesk_problems.add({
+      problem_id: await nextHelpdeskId(),
+      ...s,
+      views: 0,
+      helpful_count: 0,
+      active: true,
+      created_at: new Date().toISOString(),
+      created_by: 'seed',
+    });
+    added++;
+  }
+  toast(`📚 ໂຫລດ ${added} ບັນຫາ${skipped>0?` • ມີຢູ່ແລ້ວ ${skipped}`:''}`);
+  pages.helpdesk();
+}
+
+// 🆘 ໜ້າຫຼັກ Helpdesk
+window._hdFilter = window._hdFilter || { category: '', difficulty: '', q: '' };
+
+pages.helpdesk = async () => {
+  const all = await db.helpdesk_problems.toArray();
+  const f = window._hdFilter;
+  let filtered = all.filter(h => h.active !== false);
+  if (f.category) filtered = filtered.filter(h => h.category === f.category);
+  if (f.difficulty) filtered = filtered.filter(h => h.difficulty === f.difficulty);
+  if (f.q) {
+    const q = f.q.toLowerCase();
+    filtered = filtered.filter(h =>
+      (h.symptom||'').toLowerCase().includes(q) ||
+      (h.symptoms_alt||[]).some(s => s.toLowerCase().includes(q)) ||
+      (h.possible_causes||[]).some(c => c.toLowerCase().includes(q))
+    );
+  }
+  // Sort: ຄວາມຖີ່ນຳໃຊ້ສູງສຸດ ກ່ອນ
+  filtered.sort((a,b) => (b.views||0) - (a.views||0));
+
+  // ນັບຕາມໝວດ
+  const catCounts = {};
+  HELPDESK_CATEGORIES.forEach(c => { catCounts[c.key] = all.filter(h => h.category === c.key && h.active !== false).length; });
+
+  $('#main').innerHTML = `
+    <div class="crumbs">🛠 ການສ້ອມບຳລຸງ › Helpdesk</div>
+    <div class="page-title">🆘 Helpdesk — ຄູ່ມືແກ້ໄຂລົດສຳລັບຊ່າງ <small style="font-weight:400;color:var(--muted);font-size:13px">— ${filtered.length}/${all.length} ບັນຫາ</small></div>
+    <div class="alert info" style="font-size:13px">💡 ຄົ້ນຫາອາການລົດ ໄດ້ຮັບຄຳແນະນຳ Step-by-Step + ເຄື່ອງມືທີ່ໃຊ້ + ອາໄຫລ່ທີ່ຄວນປ່ຽນ. ສະນັບສະໜູນຊ່າງລະດັບ L1-L3.</div>
+
+    <div class="kpi-grid">
+      <div class="kpi"><div class="label">📚 ບັນຫາທັງໝົດ</div><div class="val">${all.length}</div></div>
+      <div class="kpi"><div class="label">🟢 ງ່າຍ (L1)</div><div class="val" style="color:var(--ok)">${all.filter(h => h.difficulty==='L1').length}</div></div>
+      <div class="kpi"><div class="label">🟡 ປະຈຳ (L2)</div><div class="val" style="color:var(--warn)">${all.filter(h => h.difficulty==='L2').length}</div></div>
+      <div class="kpi"><div class="label">🔴 ຍາກ (L3)</div><div class="val" style="color:var(--bad)">${all.filter(h => h.difficulty==='L3').length}</div></div>
+    </div>
+
+    <div class="toolbar" style="flex-wrap:wrap;gap:8px">
+      <input type="search" placeholder="🔍 ຄົ້ນຫາ ອາການ ('ເຄື່ອງບໍ່ສະຕາດ', 'ສຽງເບຣກ'...)" value="${escapeHtml(f.q)}"
+        oninput="window._hdFilter.q=this.value;clearTimeout(window._hdt);window._hdt=setTimeout(()=>pages.helpdesk(),300)"
+        style="padding:9px 12px;border:1px solid var(--line);border-radius:8px;font-size:14px;min-width:300px;font-family:inherit"/>
+      <select onchange="window._hdFilter.difficulty=this.value;pages.helpdesk()" style="padding:9px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px">
+        <option value="">🎓 ທຸກລະດັບ</option>
+        <option value="L1" ${f.difficulty==='L1'?'selected':''}>🟢 L1 — ຊ່າງຝຶກຫັດ</option>
+        <option value="L2" ${f.difficulty==='L2'?'selected':''}>🟡 L2 — ຊ່າງປະຈຳ</option>
+        <option value="L3" ${f.difficulty==='L3'?'selected':''}>🔴 L3 — ຊຽວຊານ</option>
+      </select>
+      <button class="btn outline" onclick="window._hdFilter={category:'',difficulty:'',q:''};pages.helpdesk()">🔄 ລ້າງ</button>
+      <div style="flex:1"></div>
+      <button class="btn outline" onclick="seedHelpdesk()">📥 ໂຫລດ ${HELPDESK_SEED.length} ບັນຫາມາດຕະຖານ</button>
+      <button class="btn ok" onclick="openHelpdeskModal()">+ ເພີ່ມບັນຫາໃໝ່</button>
+    </div>
+
+    <!-- Category Cards -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:14px 0">
+      ${HELPDESK_CATEGORIES.map(c => `
+        <div onclick="window._hdFilter.category='${f.category===c.key?'':c.key}';pages.helpdesk()"
+          style="cursor:pointer;padding:14px;background:${f.category===c.key?c.color:'var(--bg)'};color:${f.category===c.key?'#fff':'var(--text)'};border-radius:10px;border:2px solid ${c.color};text-align:center;transition:all .2s">
+          <div style="font-size:32px">${c.icon}</div>
+          <div style="font-weight:600;font-size:13px;margin-top:4px">${c.label}</div>
+          <div style="font-size:11px;opacity:.8;margin-top:2px">${catCounts[c.key]||0} ບັນຫາ</div>
+        </div>
+      `).join('')}
+    </div>
+
+    ${filtered.length === 0 ? `
+      <div class="card empty" style="padding:40px">
+        <div class="icon">🆘</div>
+        <p>${all.length === 0 ? 'ຍັງບໍ່ມີຂໍ້ມູນ — ກົດ "📥 ໂຫລດ ບັນຫາມາດຕະຖານ" ເພື່ອເລີ່ມຕົ້ນ' : 'ບໍ່ພົບບັນຫາທີ່ຄົ້ນຫາ'}</p>
+      </div>
+    ` : `
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:12px">
+        ${filtered.map(h => {
+          const cat = HELPDESK_CATEGORIES.find(c => c.key === h.category);
+          const diff = HELPDESK_DIFFICULTY[h.difficulty];
+          return `
+          <div class="card" style="border-left:4px solid ${cat?.color||'#888'};cursor:pointer" onclick="openHelpdeskDetail(${h.id})">
+            <div style="display:flex;align-items:start;gap:10px">
+              <div style="font-size:32px">${cat?.icon||'🔧'}</div>
+              <div style="flex:1">
+                <div style="font-weight:700;font-size:15px;color:var(--primary)">${escapeHtml(h.symptom)}</div>
+                <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+                  <span class="pill" style="background:${cat?.color};color:#fff;font-size:10px">${cat?.label}</span>
+                  <span class="pill" style="background:${diff?.color};color:#fff;font-size:10px">${diff?.label}</span>
+                  <span class="pill gray" style="font-size:10px">⏱ ${h.time_estimate_min||60} ນາທີ</span>
+                </div>
+              </div>
+            </div>
+            ${h.possible_causes?.length > 0 ? `
+              <div style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--line);font-size:11.5px;color:var(--muted)">
+                <strong>ສາເຫດທີ່ເປັນໄປໄດ້:</strong><br>${h.possible_causes.slice(0,3).map(c => '• '+escapeHtml(c)).join('<br>')}${h.possible_causes.length>3?'<br>• ...':''}
+              </div>` : ''}
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;font-size:11px;color:var(--muted)">
+              <span>📖 ${h.steps?.length||0} ຂັ້ນຕອນ</span>
+              <span>👁 ${h.views||0} • 👍 ${h.helpful_count||0}</span>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    `}
+  `;
+};
+
+async function openHelpdeskDetail(id) {
+  const h = await db.helpdesk_problems.get(id);
+  if (!h) return;
+  // ນັບການເບິ່ງ
+  await db.helpdesk_problems.update(id, { views: (h.views||0) + 1 });
+
+  const cat = HELPDESK_CATEGORIES.find(c => c.key === h.category);
+  const diff = HELPDESK_DIFFICULTY[h.difficulty];
+
+  modal(`🆘 ${escapeHtml(h.symptom)}`, `
+    <!-- Header info -->
+    <div style="background:linear-gradient(135deg,${cat?.color||'#888'},${cat?.color||'#888'}aa);color:#fff;padding:14px;border-radius:8px;margin-bottom:14px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="font-size:48px">${cat?.icon||'🔧'}</div>
+        <div style="flex:1">
+          <h3 style="margin:0;color:#fff">${escapeHtml(h.symptom)}</h3>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+            <span class="pill" style="background:rgba(255,255,255,.25);color:#fff;font-size:11px">${cat?.label}</span>
+            <span class="pill" style="background:rgba(255,255,255,.25);color:#fff;font-size:11px">${diff?.label}</span>
+            <span class="pill" style="background:rgba(255,255,255,.25);color:#fff;font-size:11px">⏱ ${h.time_estimate_min||60} ນາທີ</span>
+            <span class="pill" style="background:rgba(255,255,255,.25);color:#fff;font-size:11px">📖 ${h.steps?.length||0} ຂັ້ນຕອນ</span>
+          </div>
+        </div>
+      </div>
+      ${h.symptoms_alt?.length > 0 ? `<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.2);font-size:12px"><strong>ອາການອື່ນທີ່ສຳພັນ:</strong> ${h.symptoms_alt.join(' • ')}</div>` : ''}
+    </div>
+
+    <!-- ⚠️ Safety -->
+    ${h.safety ? `
+      <div class="alert bad" style="font-size:13px;background:#FEE2E2;color:#991B1B">
+        ⚠️ <strong>ຄວາມປອດໄພ:</strong> ${escapeHtml(h.safety)}
+      </div>` : ''}
+
+    <!-- 🔍 Possible Causes -->
+    ${h.possible_causes?.length > 0 ? `
+      <h4 style="color:var(--primary-2);margin:14px 0 6px">🔍 ສາເຫດທີ່ເປັນໄປໄດ້</h4>
+      <ul style="margin-left:20px;line-height:1.8;font-size:13px">
+        ${h.possible_causes.map(c => `<li>${escapeHtml(c)}</li>`).join('')}
+      </ul>` : ''}
+
+    <!-- 🧰 Tools + Parts -->
+    <div class="row">
+      ${h.tools_needed?.length > 0 ? `
+        <div class="fld">
+          <h4 style="margin:0 0 6px;color:var(--primary-2)">🧰 ເຄື່ອງມືທີ່ຕ້ອງໃຊ້</h4>
+          <ul style="margin-left:20px;line-height:1.6;font-size:12px">
+            ${h.tools_needed.map(t => `<li>${escapeHtml(t)}</li>`).join('')}
+          </ul>
+        </div>` : '<div></div>'}
+      ${h.parts_needed?.length > 0 ? `
+        <div class="fld">
+          <h4 style="margin:0 0 6px;color:var(--primary-2)">📦 ອາໄຫລ່ທີ່ອາດຕ້ອງປ່ຽນ</h4>
+          <ul style="margin-left:20px;line-height:1.6;font-size:12px">
+            ${h.parts_needed.map(p => `<li>${escapeHtml(p)}</li>`).join('')}
+          </ul>
+        </div>` : '<div></div>'}
+    </div>
+
+    <!-- 📖 Steps -->
+    <h4 style="color:var(--primary-2);margin:14px 0 6px">📖 ຂັ້ນຕອນແກ້ໄຂ — Step-by-Step</h4>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      ${(h.steps||[]).map((s, i) => `
+        <div style="display:flex;gap:12px;background:var(--bg);padding:12px;border-radius:8px;border-left:4px solid ${cat?.color||'#888'}">
+          <div style="background:${cat?.color||'#888'};color:#fff;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0">${s.step||i+1}</div>
+          <div style="flex:1">
+            <div style="font-size:14px;line-height:1.6">${escapeHtml(s.instruction)}</div>
+            ${s.warning ? `<div style="background:#FEF3C7;color:#92400E;padding:6px 10px;border-radius:4px;margin-top:6px;font-size:12px">⚠️ ${escapeHtml(s.warning)}</div>` : ''}
+          </div>
+        </div>
+      `).join('')}
+    </div>
+
+    <!-- 👍 Was this helpful? -->
+    <div style="background:var(--bg);padding:14px;border-radius:8px;margin-top:14px;text-align:center">
+      <p style="margin:0 0 10px;font-size:13px;color:var(--muted)">ຄຳແນະນຳນີ້ຊ່ວຍແກ້ບັນຫາໄດ້ບໍ?</p>
+      <button class="btn ok" onclick="markHelpful(${h.id}, true)">👍 ໄດ້ ສຳເລັດ</button>
+      <button class="btn outline" onclick="markHelpful(${h.id}, false)">👎 ບໍ່ໄດ້</button>
+    </div>
+
+    <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:10px">
+      📊 ເບິ່ງ ${(h.views||0) + 1} ຄັ້ງ • ໄດ້ຮັບເຫັນດີ ${h.helpful_count||0}
+    </div>
+  `, `
+    <button class="btn outline" onclick="closeModal()">${t('cancel')}</button>
+    ${isAdmin() ? `<button class="btn outline" onclick="closeModal();openHelpdeskModal(${h.id})">✏️ ${t('edit')}</button>` : ''}
+    <button class="btn" style="background:#8B5CF6;color:#fff" onclick="window.print()">🖨 ພິມ</button>
+  `);
+}
+
+async function markHelpful(id, isHelpful) {
+  const h = await db.helpdesk_problems.get(id);
+  if (isHelpful) {
+    await db.helpdesk_problems.update(id, { helpful_count: (h.helpful_count||0) + 1 });
+    toast('🙏 ຂອບໃຈ — ບັນທຶກແລ້ວ');
+  } else {
+    toast('💡 ຂອບໃຈ — ກະລຸນາແຈ້ງຫົວໜ້າຊ່າງເພື່ອປັບປຸງຄຳແນະນຳ');
+  }
+  closeModal();
+  pages.helpdesk();
+}
+
+async function openHelpdeskModal(id) {
+  let h = { category:'engine', difficulty:'L2', symptom:'', symptoms_alt:[], possible_causes:[], time_estimate_min:60, safety:'', tools_needed:[], parts_needed:[], steps:[], active:true };
+  if (id) h = Object.assign(h, await db.helpdesk_problems.get(id));
+  modal(id ? '✏️ ແກ້ໄຂບັນຫາ' : '+ ເພີ່ມບັນຫາໃໝ່', `
+    <div class="row">
+      <div class="fld"><label>ໝວດ <small style="color:var(--bad)">*</small></label>
+        <select id="hd_category">
+          ${HELPDESK_CATEGORIES.map(c => `<option value="${c.key}" ${h.category===c.key?'selected':''}>${c.icon} ${c.label}</option>`).join('')}
+        </select>
+      </div>
+      <div class="fld"><label>ລະດັບຊ່າງ <small style="color:var(--bad)">*</small></label>
+        <select id="hd_difficulty">
+          <option value="L1" ${h.difficulty==='L1'?'selected':''}>🟢 L1 — ຊ່າງຝຶກຫັດ</option>
+          <option value="L2" ${h.difficulty==='L2'?'selected':''}>🟡 L2 — ຊ່າງປະຈຳ</option>
+          <option value="L3" ${h.difficulty==='L3'?'selected':''}>🔴 L3 — ຊຽວຊານ</option>
+        </select>
+      </div>
+    </div>
+    <div class="fld"><label>ອາການ <small style="color:var(--bad)">*</small></label>
+      <input id="hd_symptom" value="${escapeHtml(h.symptom||'')}" placeholder="ເຄື່ອງບໍ່ສະຕາດ — ໝົດໄຟ"/>
+    </div>
+    <div class="fld"><label>ອາການອື່ນທີ່ຄ້າຍກັນ (ໃຊ້ , ແຍກ)</label>
+      <input id="hd_symptoms_alt" value="${escapeHtml((h.symptoms_alt||[]).join(', '))}" placeholder="ບໍ່ສະຕາດ, ບໍ່ຕິດ, ໝົດໄຟ"/>
+    </div>
+    <div class="row">
+      <div class="fld"><label>ເວລາທີ່ຄາດໝາຍ (ນາທີ)</label><input id="hd_time" type="number" value="${h.time_estimate_min||60}"/></div>
+      <div class="fld"><label>ສະຖານະ</label><select id="hd_active">
+        <option value="true" ${h.active!==false?'selected':''}>ໃຊ້ງານ</option>
+        <option value="false" ${h.active===false?'selected':''}>ປິດ</option>
+      </select></div>
+    </div>
+    <div class="fld"><label>⚠️ ຄຳເຕືອນຄວາມປອດໄພ</label>
+      <textarea id="hd_safety" rows="2" placeholder="ໃສ່ຖົງມື ກ່ອນແຕະໝໍ້ໄຟ...">${escapeHtml(h.safety||'')}</textarea>
+    </div>
+    <div class="fld"><label>🔍 ສາເຫດທີ່ເປັນໄປໄດ້ (1 ບັນທັດ = 1 ສາເຫດ)</label>
+      <textarea id="hd_causes" rows="4" placeholder="ໝໍ້ໄຟໝົດ&#10;ໝໍ້ໄຟຂາດ&#10;ສາຍໝໍ້ໄຟຫລົມ">${escapeHtml((h.possible_causes||[]).join('\n'))}</textarea>
+    </div>
+    <div class="row">
+      <div class="fld"><label>🧰 ເຄື່ອງມືທີ່ຕ້ອງໃຊ້ (1 ບັນທັດ = 1 ເຄື່ອງມື)</label>
+        <textarea id="hd_tools" rows="4" placeholder="ປະແຈ 10mm&#10;Voltmeter">${escapeHtml((h.tools_needed||[]).join('\n'))}</textarea>
+      </div>
+      <div class="fld"><label>📦 ອາໄຫລ່ທີ່ອາດຕ້ອງປ່ຽນ</label>
+        <textarea id="hd_parts" rows="4" placeholder="ໝໍ້ໄຟໃໝ່&#10;ຫົວສາຍໝໍ້ໄຟ">${escapeHtml((h.parts_needed||[]).join('\n'))}</textarea>
+      </div>
+    </div>
+    <div class="fld"><label>📖 ຂັ້ນຕອນແກ້ໄຂ Step-by-Step (1 ບັນທັດ = 1 ຂັ້ນ)</label>
+      <textarea id="hd_steps" rows="8" placeholder="ກວດສະພາບໝໍ້ໄຟ — ເບິ່ງມີໂກກກິກບໍ່?&#10;ໃຊ້ Voltmeter ວັດໄຟ — ຄວນຢູ່ທີ່ 12.6V&#10;...">${escapeHtml((h.steps||[]).map(s => s.instruction).join('\n'))}</textarea>
+    </div>
+  `, `
+    <button class="btn outline" onclick="closeModal()">${t('cancel')}</button>
+    <button class="btn ok" onclick="saveHelpdesk(${id||'null'})">💾 ${t('save')}</button>
+  `);
+}
+
+async function saveHelpdesk(id) {
+  const symptom = $('#hd_symptom').value.trim();
+  if (!symptom) { toast('ກະລຸນາໃສ່ອາການ','bad'); return; }
+  const stepsText = $('#hd_steps').value.split('\n').filter(Boolean);
+  const data = {
+    category: $('#hd_category').value,
+    difficulty: $('#hd_difficulty').value,
+    symptom,
+    symptoms_alt: $('#hd_symptoms_alt').value.split(',').map(s => s.trim()).filter(Boolean),
+    time_estimate_min: parseInt($('#hd_time').value)||60,
+    safety: $('#hd_safety').value.trim(),
+    possible_causes: $('#hd_causes').value.split('\n').map(s => s.trim()).filter(Boolean),
+    tools_needed: $('#hd_tools').value.split('\n').map(s => s.trim()).filter(Boolean),
+    parts_needed: $('#hd_parts').value.split('\n').map(s => s.trim()).filter(Boolean),
+    steps: stepsText.map((s, i) => ({ step: i+1, instruction: s })),
+    active: $('#hd_active').value === 'true',
+  };
+  if (id) await db.helpdesk_problems.update(id, data);
+  else {
+    data.problem_id = await nextHelpdeskId();
+    data.views = 0;
+    data.helpful_count = 0;
+    data.created_at = new Date().toISOString();
+    data.created_by = (typeof cloud!=='undefined' && cloud.profile?.username) || 'local';
+    await db.helpdesk_problems.add(data);
+  }
+  closeModal(); toast('💾 ບັນທຶກສຳເລັດ');
+  pages.helpdesk();
 }
 
 pages.about = async () => {
