@@ -19372,10 +19372,12 @@ async function delLocation(id) {
 }
 
 // ===== Distance Matrix =====
-async function openDistanceMatrix() {
-  const locs = (await db.locations.toArray()).filter(l => l.active !== false).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+// mode: 'branches' (default — ສະຖານທີ່ × ສາຂາ) | 'full' (ທຸກຄູ່)
+async function openDistanceMatrix(mode) {
+  mode = mode || 'branches';
+  const allActive = (await db.locations.toArray()).filter(l => l.active !== false).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
   const matrix = await db.distance_matrix.toArray();
-  if (locs.length < 2) { toast('ກະລຸນາມີສະຖານທີ່ຢ່າງໜ້ອຍ 2 ຈຸດກ່ອນ', 'warn'); return; }
+  if (allActive.length < 2) { toast('ກະລຸນາມີສະຖານທີ່ຢ່າງໜ້ອຍ 2 ຈຸດກ່ອນ', 'warn'); return; }
 
   // ສ້າງ map ໄລຍະ
   const distMap = {};
@@ -19384,50 +19386,160 @@ async function openDistanceMatrix() {
     distMap[key] = d;
   });
 
-  // ສ້າງ table ໝວດເຄິ່ງ (ບໍ່ຊ້ຳ)
-  let html = `<div class="alert info" style="font-size:12px;margin-bottom:10px">💡 ໃສ່ໄລຍະທາງ (km) ລະຫວ່າງ 2 ຈຸດ — ໃຊ້ກັນສອງທາງ (A→B = B→A). ກົດ Save ຫຼັງປ້ອນ.</div>
-    <div style="max-height:500px;overflow:auto"><table style="font-size:11px;min-width:600px">
-    <tr><th style="position:sticky;left:0;background:var(--bg);z-index:1">ຈາກ \\ ໄປ</th>`;
-  locs.forEach(l => { html += `<th style="font-size:10px;writing-mode:vertical-rl;white-space:nowrap;height:80px">${escapeHtml(l.name.slice(0,20))}</th>`; });
+  // ໃນ branches mode: ROWS = ສະຂາ KALA, COLUMNS = ສະຖານທີ່ປາຍທາງທັງໝົດ (ບໍ່ໃຊ່ສາຂາ)
+  const branches = allActive.filter(l => l.type === 'branch');
+  const destinations = allActive.filter(l => l.type !== 'branch');
+
+  let rows, cols, title;
+  if (mode === 'branches') {
+    rows = branches;
+    cols = destinations;
+    title = '🏢 Matrix ໄລຍະທາງ — ສາຂາ KALA → ສະຖານທີ່';
+  } else {
+    rows = allActive;
+    cols = allActive;
+    title = '🛣 Matrix ໄລຍະທາງ — ທຸກຈຸດ → ທຸກຈຸດ';
+  }
+
+  // ກວດສະຖິຕິ: ມີ GPS ຈັກສະຖານທີ່ + ໄລຍະທີ່ມີຢູ່ + ສາມາດ Auto-fill ໄດ້ຈັກຄູ່
+  const withGPS = allActive.filter(l => l.lat && l.lng).length;
+  const manualDist = matrix.filter(d => d.source !== 'haversine').length;
+  // ນັບຄູ່ທີ່ໃນ scope ນີ້ ແລະ ສາມາດ auto-fill ໄດ້
+  let autoFillCandidates = 0;
+  rows.forEach(l1 => {
+    cols.forEach(l2 => {
+      if (l1.id === l2.id) return;
+      const k = `${Math.min(l1.id,l2.id)}_${Math.max(l1.id,l2.id)}`;
+      if (distMap[k]) return; // ມີໄລຍະປ້ອນເອງແລ້ວ
+      if (l1.lat && l1.lng && l2.lat && l2.lng) autoFillCandidates++;
+    });
+  });
+
+  // ສ້າງ Matrix
+  let html = `
+    <div class="alert info" style="font-size:12px;margin-bottom:10px">💡 ໃສ່ໄລຍະທາງ (km) — ໃຊ້ໄດ້ສອງທາງ (A↔B). ສະຖານທີ່ມີ GPS: <strong>${withGPS}/${allActive.length}</strong> • ໄລຍະປ້ອນເອງ: <strong>${manualDist}</strong></div>
+
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">
+      <button class="btn sm ${mode==='branches'?'':'outline'}" onclick="openDistanceMatrix('branches')">🏢 ສະຂາ × ສະຖານທີ່ (${branches.length}×${destinations.length}) — ແນະນຳ</button>
+      <button class="btn sm ${mode==='full'?'':'outline'}" onclick="openDistanceMatrix('full')">📂 Full Matrix (${allActive.length}×${allActive.length})</button>
+      ${autoFillCandidates > 0 ? `<button class="btn sm" style="background:#7C3AED;color:#fff" onclick="autoFillDistancesFromGPS('${mode}')">⚡ Auto-Fill ${autoFillCandidates} ຄູ່ ຈາກ GPS</button>` : ''}
+    </div>
+    <div style="max-height:500px;overflow:auto"><table style="font-size:11px;min-width:600px;border-collapse:separate;border-spacing:0">
+    <tr><th style="position:sticky;left:0;top:0;background:var(--primary);color:#fff;z-index:3;padding:6px">ຈາກ ↓ \\ ໄປ →</th>`;
+  cols.forEach(l => {
+    html += `<th style="font-size:10px;writing-mode:vertical-rl;white-space:nowrap;height:90px;position:sticky;top:0;background:var(--bg-2);z-index:2;padding:4px;min-width:24px"><div title="${escapeHtml(l.name)}${l.province?' ('+escapeHtml(l.province)+')':''}">${l.lat?'🌐':' '} ${escapeHtml(l.name.slice(0,25))}</div></th>`;
+  });
   html += '</tr>';
-  locs.forEach((l1, i) => {
-    html += `<tr><th style="position:sticky;left:0;background:var(--bg);z-index:1;text-align:left;font-size:11px">${escapeHtml(l1.name.slice(0,25))}</th>`;
-    locs.forEach((l2, j) => {
-      if (i === j) { html += `<td style="background:#1F2937;color:#fff;text-align:center">—</td>`; }
-      else if (j < i) { html += `<td style="background:var(--bg)"></td>`; }
+  rows.forEach((l1) => {
+    html += `<tr><th style="position:sticky;left:0;background:#FEF3C7;z-index:1;text-align:left;font-size:11px;padding:6px;font-weight:600">${l1.lat?'🌐':''} ${escapeHtml(l1.name.slice(0,30))}</th>`;
+    cols.forEach((l2) => {
+      if (l1.id === l2.id) { html += `<td style="background:#1F2937;color:#fff;text-align:center;padding:4px">—</td>`; }
       else {
         const key = `${Math.min(l1.id,l2.id)}_${Math.max(l1.id,l2.id)}`;
         const d = distMap[key];
-        html += `<td style="padding:2px"><input type="number" data-from="${l1.id}" data-to="${l2.id}" value="${d?d.distance_km:''}" placeholder="km" style="width:55px;padding:3px;font-size:11px;border:1px solid var(--line);border-radius:4px;text-align:center" class="dist-cell"/></td>`;
+        // Bg color: ມີໄລຍະປ້ອນເອງ=ຂຽວ, GPS auto=ຟ້າ, ບໍ່ມີ=ຂາວ
+        let bg = '';
+        if (d && d.source === 'haversine') bg = 'background:#EFF6FF';
+        else if (d) bg = 'background:#ECFDF5';
+        html += `<td style="padding:1px"><input type="number" step="0.1" data-from="${l1.id}" data-to="${l2.id}" value="${d?d.distance_km:''}" placeholder="-" style="width:55px;padding:3px;font-size:11px;border:1px solid var(--line);border-radius:4px;text-align:center;${bg}" class="dist-cell"/></td>`;
       }
     });
     html += '</tr>';
   });
   html += '</table></div>';
+  html += '<div style="margin-top:8px;font-size:11px;color:var(--muted)">🟩 ປ້ອນເອງ • 🟦 GPS Auto • ⚪ ບໍ່ມີຂໍ້ມູນ</div>';
 
-  modal('🛣 Matrix ໄລຍະທາງ — ທຸກຈຸດ → ທຸກຈຸດ', html, `
+  modal(title, html, `
     <button class="btn outline" onclick="closeModal()">${t('cancel')}</button>
-    <button class="btn ok" onclick="saveDistanceMatrix()">💾 ບັນທຶກທັງໝົດ</button>
+    <button class="btn ok" onclick="saveDistanceMatrix()">💾 ບັນທຶກທີ່ປ່ຽນແປງ</button>
   `);
+}
+
+// ⚡ Auto-fill ໄລຍະທາງທຸກຄູ່ທີ່ມີ GPS — ໃຊ້ Haversine × 1.4
+async function autoFillDistancesFromGPS(returnMode) {
+  const all = (await db.locations.toArray()).filter(l => l.active !== false);
+  const branches = all.filter(l => l.type === 'branch');
+  const matrix = await db.distance_matrix.toArray();
+  const distMap = {};
+  matrix.forEach(d => { distMap[`${Math.min(d.from_id,d.to_id)}_${Math.max(d.from_id,d.to_id)}`] = d; });
+
+  if (!confirm(`⚡ Auto-Fill ໄລຍະທາງຈາກ GPS:\n• ໃຊ້ສູດ Haversine × 1.4 (factor ຖະໜົນລາວ)\n• ບໍ່ທັບໄລຍະທີ່ປ້ອນເອງແລ້ວ\n• ບັນທຶກລົງ Database\n\nດຳເນີນຕໍ່?`)) return;
+
+  let added = 0, skipped = 0;
+  // 2 loops: branches × all, all × all (ຖ້າ Full mode)
+  // ໃຫ້ປະຫຍັດ — ໃຊ້ branches × destinations + (ຖ້າ full) destinations × destinations
+  const pairs = [];
+  if (returnMode === 'full') {
+    // ທຸກຄູ່
+    for (let i = 0; i < all.length; i++) {
+      for (let j = i+1; j < all.length; j++) {
+        pairs.push([all[i], all[j]]);
+      }
+    }
+  } else {
+    // ສະຂາ × ປາຍທາງ ທັງໝົດ
+    const dests = all.filter(l => l.type !== 'branch');
+    branches.forEach(b => dests.forEach(d => pairs.push([b, d])));
+    // ບວກ ສະຂາ × ສະຂາ
+    for (let i = 0; i < branches.length; i++) {
+      for (let j = i+1; j < branches.length; j++) {
+        pairs.push([branches[i], branches[j]]);
+      }
+    }
+  }
+
+  // Process in chunks ສຳລັບ performance
+  toast('🔄 ກຳລັງຄຳນວນ... ກະລຸນາລໍຖ້າ', 'info');
+  for (const [l1, l2] of pairs) {
+    if (!l1.lat || !l1.lng || !l2.lat || !l2.lng) { skipped++; continue; }
+    const k = `${Math.min(l1.id, l2.id)}_${Math.max(l1.id, l2.id)}`;
+    if (distMap[k]) { skipped++; continue; } // ມີຢູ່ແລ້ວ
+    const km = estimateRoadKm(l1, l2);
+    if (!km || km <= 0) { skipped++; continue; }
+    await db.distance_matrix.add({
+      from_id: Math.min(l1.id, l2.id),
+      to_id: Math.max(l1.id, l2.id),
+      distance_km: km,
+      source: 'haversine',
+      route_notes: 'Auto from GPS',
+      updated_at: new Date().toISOString()
+    });
+    added++;
+  }
+  closeModal();
+  toast(`✅ Auto-Fill ສຳເລັດ: ເພີ່ມ ${added} ໄລຍະ • ຂ້າມ ${skipped}`, 'ok');
+  // ເປີດໃໝ່
+  setTimeout(() => openDistanceMatrix(returnMode), 500);
 }
 
 async function saveDistanceMatrix() {
   const cells = document.querySelectorAll('.dist-cell');
-  let saved = 0, deleted = 0;
+  // Pre-load ໄລຍະທັງໝົດເຂົ້າ Map (ໄວກວ່າ query per-cell)
+  const allDists = await db.distance_matrix.toArray();
+  const distByKey = {};
+  allDists.forEach(d => { distByKey[`${Math.min(d.from_id,d.to_id)}_${Math.max(d.from_id,d.to_id)}`] = d; });
+
+  let saved = 0, deleted = 0, unchanged = 0;
   for (const cell of cells) {
     const fromId = parseInt(cell.dataset.from);
     const toId = parseInt(cell.dataset.to);
     const km = parseFloat(cell.value);
     const minId = Math.min(fromId, toId);
     const maxId = Math.max(fromId, toId);
-    const existing = (await db.distance_matrix.where('from_id').equals(minId).toArray()).find(d => d.to_id === maxId);
+    const key = `${minId}_${maxId}`;
+    const existing = distByKey[key];
+
     if (isNaN(km) || km <= 0) {
-      if (existing) { await db.distance_matrix.delete(existing.id); deleted++; }
+      // ຄ່າວ່າງ — ລົບຖ້າມີ existing manual entry (ບໍ່ລົບ haversine ບໍ່ໄດ້ປ້ອນເອງ)
+      if (existing && existing.source !== 'haversine') { await db.distance_matrix.delete(existing.id); deleted++; }
       continue;
     }
+    // ມີຄ່າ — ກວດວ່າຄືກັນຫຼືບໍ່
+    if (existing && existing.distance_km === km && existing.source === 'manual') { unchanged++; continue; }
     const data = {
       from_id: minId, to_id: maxId,
       distance_km: km,
+      source: 'manual',
       updated_at: new Date().toISOString(),
     };
     if (existing) await db.distance_matrix.update(existing.id, data);
@@ -19435,7 +19547,7 @@ async function saveDistanceMatrix() {
     saved++;
   }
   closeModal();
-  toast(`💾 ບັນທຶກ ${saved} ໄລຍະ${deleted>0?` • ລຶບ ${deleted}`:''}`);
+  toast(`💾 ບັນທຶກ ${saved} ໄລຍະ${deleted>0?` • ລຶບ ${deleted}`:''}${unchanged>0?` • ບໍ່ປ່ຽນ ${unchanged}`:''}`);
   if (currentPage === 'locations') pages.locations();
 }
 
