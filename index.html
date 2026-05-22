@@ -18191,7 +18191,7 @@ async function openVehicleUsageModal(prefillVehicleId, editId, forcedType) {
       <h4 style="margin:0 0 8px;color:#92400E;font-size:13px">🎯 ຈຸດໝາຍ — ເລືອກລະອຽດ 4 ຂັ້ນ</h4>
       <div class="row">
         <div class="fld"><label>1️⃣ ແຂວງ <small style="color:var(--bad)">*</small></label>
-          <select id="uy_end_province" onchange="cascadeDest()">
+          <select id="uy_end_province" onchange="cascadeDest('province')">
             <option value="">— ເລືອກແຂວງ —</option>
             ${PROVINCE_ORDER.filter(p => allLocations.some(l => l.province === p)).map(p =>
               `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`
@@ -18199,20 +18199,20 @@ async function openVehicleUsageModal(prefillVehicleId, editId, forcedType) {
           </select>
         </div>
         <div class="fld"><label>2️⃣ ເມືອງ</label>
-          <select id="uy_end_district" onchange="cascadeDest()" disabled>
+          <select id="uy_end_district" onchange="cascadeDest('district')" disabled>
             <option value="">— ກະລຸນາເລືອກແຂວງກ່ອນ —</option>
           </select>
         </div>
       </div>
       <div class="row">
         <div class="fld"><label>3️⃣ ບ້ານ / ສະຖານທີ່</label>
-          <select id="uy_end_village" onchange="cascadeDest()" disabled>
+          <select id="uy_end_village" onchange="cascadeDest('village')" disabled>
             <option value="">— ກະລຸນາເລືອກເມືອງກ່ອນ —</option>
           </select>
           <small style="font-size:11px;color:var(--muted)">ຖ້າບໍ່ມີບ້ານໃນລາຍການ → ປ້ອນຊື່ໃນຊ່ອງ "ແຄມທາງ/ຊອຍ"</small>
         </div>
         <div class="fld"><label>4️⃣ ແຄມທາງ/ຊອຍ <small style="color:var(--muted)">(ບໍ່ບັງຄັບ)</small></label>
-          <input id="uy_end_extra_addr" placeholder="ຊອຍ 5, ໂຄງການ ABC, ໃກ້ໂຮງຮຽນ..."/>
+          <input id="uy_end_extra_addr" placeholder="ຊອຍ 5, ໂຄງການ ABC, ໃກ້ໂຮງຮຽນ..." oninput="cascadeDest('addr')"/>
         </div>
       </div>
       <div class="row">
@@ -18289,7 +18289,8 @@ async function openVehicleUsageModal(prefillVehicleId, editId, forcedType) {
 }
 
 // 🎯 Cascading Destination — ແຂວງ → ເມືອງ → ບ້ານ → ຊອຍ + extra km
-function cascadeDest() {
+// changedLevel: 'province' | 'district' | 'village' | 'addr' — ບອກວ່າຜູ້ໃຊ້ປ່ຽນຂັ້ນໃດ
+function cascadeDest(changedLevel) {
   const provSel = $('#uy_end_province');
   const distSel = $('#uy_end_district');
   const villSel = $('#uy_end_village');
@@ -18300,43 +18301,56 @@ function cascadeDest() {
   const province = provSel.value;
   const all = window._locAll || [];
 
-  // ====== ຂັ້ນ 2: ສ້າງ Dropdown ເມືອງ ຕາມແຂວງທີ່ເລືອກ ======
-  if (province) {
-    const districts = [...new Set(all.filter(l => l.province === province && l.district)
-      .map(l => l.district))].sort();
-    distSel.innerHTML = `<option value="">— ເລືອກເມືອງ —</option>` +
-      districts.map(d => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join('');
-    distSel.disabled = false;
-  } else {
-    distSel.innerHTML = `<option value="">— ກະລຸນາເລືອກແຂວງກ່ອນ —</option>`;
-    distSel.disabled = true;
-    villSel.innerHTML = `<option value="">— ກະລຸນາເລືອກເມືອງກ່ອນ —</option>`;
-    villSel.disabled = true;
+  // ====== ຂັ້ນ 2: ສ້າງ Dropdown ເມືອງ — Rebuild ສະເພາະເມື່ອປ່ຽນແຂວງ ======
+  if (changedLevel === 'province' || changedLevel === undefined) {
+    if (province) {
+      const districts = [...new Set(all.filter(l => l.province === province && l.district)
+        .map(l => l.district))].sort();
+      distSel.innerHTML = `<option value="">— ເລືອກເມືອງ —</option>` +
+        districts.map(d => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join('');
+      distSel.disabled = false;
+      // ຈຳ pre-fill ຖ້າມີ
+      if (window._cascadePending?.district) {
+        distSel.value = window._cascadePending.district;
+        // ກວດວ່າຍັງມີຄ່ານີ້ໃນ options ບໍ
+        if (distSel.value !== window._cascadePending.district) distSel.value = '';
+      }
+    } else {
+      distSel.innerHTML = `<option value="">— ກະລຸນາເລືອກແຂວງກ່ອນ —</option>`;
+      distSel.disabled = true;
+      villSel.innerHTML = `<option value="">— ກະລຸນາເລືອກເມືອງກ່ອນ —</option>`;
+      villSel.disabled = true;
+    }
   }
 
-  // ====== ຂັ້ນ 3: ສ້າງ Dropdown ບ້ານ ຕາມເມືອງທີ່ເລືອກ ======
+  // ====== ຂັ້ນ 3: ສ້າງ Dropdown ບ້ານ — Rebuild ສະເພາະເມື່ອປ່ຽນແຂວງ/ເມືອງ ======
   const district = distSel.value;
-  if (province && district) {
-    // ດຶງບ້ານ + POI + Landmark + Construction site ໃນເມືອງນັ້ນ
-    const villages = all.filter(l => l.province === province && l.district === district &&
-      ['village', 'landmark', 'customer_site', 'construction_site', 'market', 'poi', 'town'].includes(l.type))
-      .sort((a,b) => (a.name||'').localeCompare(b.name||''));
-    // ເພີ່ມຕົວເລືອກ "ຕົວເມືອງ (ບໍ່ລະບຸບ້ານ)" ສຳລັບເລືອກລະດັບເມືອງເທົ່ານັ້ນ
-    const districtMaster = all.find(l => l.type === 'district' && l.district === district && l.province === province);
-    let opts = '<option value="">— ເລືອກບ້ານ (ຫຼື "ບໍ່ລະບຸ" ສຳລັບລະດັບເມືອງ) —</option>';
-    if (districtMaster) opts += `<option value="__district__">📍 ບໍ່ລະບຸບ້ານ — ໄປໂດຍກົງເຂົ້າຕົວເມືອງ ${escapeHtml(district)}</option>`;
-    opts += villages.map(v => {
-      const lt = LOCATION_TYPES.find(t => t.key === v.type);
-      return `<option value="${v.id}">${lt?.icon||'📍'} ${escapeHtml(v.name)}</option>`;
-    }).join('');
-    villSel.innerHTML = opts;
-    villSel.disabled = false;
-  } else if (province) {
-    villSel.innerHTML = `<option value="">— ກະລຸນາເລືອກເມືອງກ່ອນ —</option>`;
-    villSel.disabled = true;
+  if (changedLevel === 'province' || changedLevel === 'district' || changedLevel === undefined) {
+    if (province && district) {
+      const villages = all.filter(l => l.province === province && l.district === district &&
+        ['village', 'landmark', 'customer_site', 'construction_site', 'market', 'poi', 'town'].includes(l.type))
+        .sort((a,b) => (a.name||'').localeCompare(b.name||''));
+      const districtMaster = all.find(l => l.type === 'district' && l.district === district && l.province === province);
+      let opts = '<option value="">— ເລືອກບ້ານ (ຫຼື "ບໍ່ລະບຸ" ສຳລັບລະດັບເມືອງ) —</option>';
+      if (districtMaster) opts += `<option value="__district__">📍 ບໍ່ລະບຸບ້ານ — ໄປໂດຍກົງເຂົ້າຕົວເມືອງ ${escapeHtml(district)}</option>`;
+      opts += villages.map(v => {
+        const lt = LOCATION_TYPES.find(t => t.key === v.type);
+        return `<option value="${v.id}">${lt?.icon||'📍'} ${escapeHtml(v.name)}</option>`;
+      }).join('');
+      villSel.innerHTML = opts;
+      villSel.disabled = false;
+      // Pre-fill
+      if (window._cascadePending?.village) {
+        villSel.value = window._cascadePending.village;
+        if (villSel.value !== window._cascadePending.village) villSel.value = '';
+      }
+    } else if (province) {
+      villSel.innerHTML = `<option value="">— ກະລຸນາເລືອກເມືອງກ່ອນ —</option>`;
+      villSel.disabled = true;
+    }
   }
 
-  // ====== ຂັ້ນ 4: ສ້າງ Display + ກຳນົດ End Location ID ======
+  // ====== ສ້າງ Display + ກຳນົດ End Location ID — ເຮັດທຸກຄັ້ງ ======
   const villVal = villSel.value;
   let chosenId = null;
   let chosenName = '';
@@ -18348,17 +18362,19 @@ function cascadeDest() {
     const loc = all.find(l => l.id == villVal);
     if (loc) { chosenId = loc.id; chosenName = loc.name; }
   } else if (district) {
-    // ບໍ່ໄດ້ເລືອກບ້ານ — ໃຊ້ເມືອງເປັນ default
     const districtMaster = all.find(l => l.type === 'district' && l.district === district && l.province === province);
     if (districtMaster) { chosenId = districtMaster.id; chosenName = `ຕົວເມືອງ ${district}`; }
+  } else if (province) {
+    // ບໍ່ໄດ້ເລືອກເມືອງ — ໃຊ້ແຂວງເປັນ default
+    const provMaster = all.find(l => l.type === 'province' && l.name === province);
+    if (provMaster) { chosenId = provMaster.id; chosenName = `ແຂວງ ${province}`; }
   }
-  // ສ້າງ display text ລະອຽດ
   const parts = [];
   if (chosenName) parts.push(chosenName);
   const addr = extraAddr?.value || '';
   if (addr) parts.push(addr);
   if (district && !chosenName.includes(district)) parts.push(`ເມືອງ ${district}`);
-  if (province) parts.push(`ແຂວງ ${province}`);
+  if (province && !chosenName.includes(province)) parts.push(`ແຂວງ ${province}`);
   endLoc.value = parts.filter(Boolean).join(' • ');
   endLocId.value = chosenId || '';
 
@@ -18372,18 +18388,19 @@ async function initCascadeDestFromExisting(u) {
   const all = window._locAll || [];
   const loc = all.find(l => l.id == u.end_location_id);
   if (!loc) return;
+  // ກຳນົດ pending values ກ່ອນ trigger cascade
+  window._cascadePending = {
+    district: loc.district || '',
+    village: loc.type === 'district' ? '__district__' : String(loc.id),
+  };
   if ($('#uy_end_province')) $('#uy_end_province').value = loc.province || '';
-  cascadeDest();
+  cascadeDest('province');
   // ສຳລັບ district + village
   setTimeout(() => {
-    if ($('#uy_end_district')) $('#uy_end_district').value = loc.district || '';
-    cascadeDest();
+    cascadeDest('district');
     setTimeout(() => {
-      if ($('#uy_end_village')) {
-        if (loc.type === 'district') $('#uy_end_village').value = '__district__';
-        else $('#uy_end_village').value = loc.id;
-        cascadeDest();
-      }
+      window._cascadePending = null;
+      cascadeDest('village');
     }, 50);
   }, 50);
 }
