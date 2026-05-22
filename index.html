@@ -19396,30 +19396,61 @@ async function saveDistanceMatrix() {
 }
 
 // ໄລຍະຂອງສະຖານທີ່ດຽວ — ສະແດງລາຍການ
-async function openLocationDistances(id) {
+// mode: 'branches' (default) | 'all' — Sayfa ນຳໃຊ້ "branches" ສ່ວນຫຼາຍ
+async function openLocationDistances(id, mode) {
+  mode = mode || 'branches';
   const loc = await db.locations.get(id);
   if (!loc) return;
-  const allLocs = (await db.locations.toArray()).filter(l => l.id !== id && l.active !== false).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  const allLocs = (await db.locations.toArray()).filter(l => l.id !== id && l.active !== false);
+  // Filter ສະຖານທີ່ສະແດງ — ຖ້າຕົວເລືອກນີ້ເປັນສາຂາ ສະແດງທຸກສະຖານທີ່. ຖ້າເປັນສະຖານທີ່ອື່ນ ສະແດງສະເພາະສາຂາ
+  const isThisBranch = loc.type === 'branch';
+  let displayLocs;
+  if (isThisBranch || mode === 'all') {
+    // ສະຖານທີ່ນີ້ເປັນສາຂາ → ສະແດງທຸກສະຖານທີ່ (ເພາະຈຸດອອກສະເພາະສາຂາ)
+    displayLocs = allLocs.sort((a,b) => {
+      // ສາຂາກ່ອນ
+      if (a.type === 'branch' && b.type !== 'branch') return -1;
+      if (a.type !== 'branch' && b.type === 'branch') return 1;
+      return (a.province||'').localeCompare(b.province||'') || (a.name||'').localeCompare(b.name||'');
+    });
+  } else {
+    // ສະຖານທີ່ນີ້ບໍ່ໃຊ່ສາຂາ → ສະແດງສະເພາະ 8 ສາຂາ KALA
+    displayLocs = allLocs.filter(l => l.type === 'branch').sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  }
   const matrix = await db.distance_matrix.toArray();
   const myDistances = matrix.filter(d => d.from_id === id || d.to_id === id);
   const distMap = {};
   myDistances.forEach(d => { distMap[d.from_id === id ? d.to_id : d.from_id] = d; });
 
+  const branchCount = allLocs.filter(l => l.type === 'branch').length;
+  const totalOthers = allLocs.length;
+
   modal(`🛣 ໄລຍະທາງຈາກ "${escapeHtml(loc.name)}"`, `
-    <div class="alert info" style="font-size:12px;margin-bottom:10px">ໃສ່ໄລຍະຈາກ <strong>${escapeHtml(loc.name)}</strong> ໄປແຕ່ລະຈຸດ (km)</div>
+    <div class="alert info" style="font-size:12px;margin-bottom:10px">
+      ${isThisBranch
+        ? `💡 ໃສ່ໄລຍະຈາກ <strong>${escapeHtml(loc.name)}</strong> (ສາຂາ) ໄປແຕ່ລະຈຸດ (km)`
+        : `💡 ໃສ່ໄລຍະຈາກ <strong>${escapeHtml(loc.name)}</strong> ໄປແຕ່ລະ <strong>ສາຂາ KALA</strong> (km) — ສ່ວນຫຼາຍຈະວັດຈາກສາຂາມາຈຸດນີ້`}
+    </div>
+    ${!isThisBranch ? `
+      <div style="display:flex;gap:6px;margin-bottom:10px">
+        <button class="btn sm ${mode==='branches'?'':'outline'}" onclick="openLocationDistances(${id},'branches')">🏢 ສະເພາະສາຂາ (${branchCount}) — ແນະນຳ</button>
+        <button class="btn sm ${mode==='all'?'':'outline'}" onclick="openLocationDistances(${id},'all')">📂 ສະຖານທີ່ທັງໝົດ (${totalOthers})</button>
+      </div>` : ''}
     <div style="max-height:400px;overflow-y:auto">
+      ${displayLocs.length === 0 ? '<div class="empty" style="padding:20px"><p>ບໍ່ມີຂໍ້ມູນ</p></div>' : `
       <table style="font-size:12px">
-        <tr><th>ສະຖານທີ່</th><th>ປະເພດ</th><th>km</th></tr>
-        ${allLocs.map(l2 => {
+        <tr><th>ສະຖານທີ່</th><th>ປະເພດ</th><th style="width:100px">km</th></tr>
+        ${displayLocs.map(l2 => {
           const d = distMap[l2.id];
           const lt = LOCATION_TYPES.find(t => t.key === l2.type);
-          return `<tr>
-            <td><strong>${escapeHtml(l2.name)}</strong> <small class="muted">${escapeHtml(l2.village||'')}</small></td>
+          const isBranch = l2.type === 'branch';
+          return `<tr ${isBranch?'style="background:#FFFBEB"':''}>
+            <td><strong>${escapeHtml(l2.name)}</strong>${l2.district?` <small class="muted">— ${escapeHtml(l2.district)}</small>`:''}${l2.province?` <small class="muted">• ${escapeHtml(l2.province)}</small>`:''}</td>
             <td><span class="pill" style="background:${lt?.color||'#888'};color:#fff;font-size:10px">${lt?.label||l2.type}</span></td>
-            <td><input type="number" data-other="${l2.id}" value="${d?d.distance_km:''}" placeholder="km" style="width:80px;padding:4px;font-size:12px;border:1px solid var(--line);border-radius:4px" class="dist-row"/></td>
+            <td><input type="number" step="0.1" data-other="${l2.id}" value="${d?d.distance_km:''}" placeholder="km" style="width:90px;padding:4px;font-size:12px;border:1px solid var(--line);border-radius:4px${isBranch?';background:#FEF3C7;font-weight:600':''}" class="dist-row"/></td>
           </tr>`;
         }).join('')}
-      </table>
+      </table>`}
     </div>
   `, `
     <button class="btn outline" onclick="closeModal()">${t('cancel')}</button>
