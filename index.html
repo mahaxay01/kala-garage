@@ -20222,6 +20222,14 @@ function pptAddTableSlide(pres, title, headers, rows, opts) {
   if (opts.subtitle) {
     slide.addText(opts.subtitle, { x: 0.5, y: 0.85, w: 9, h: 0.3, fontSize: 12, color: PPT_THEME.textMute, fontFace: 'Phetsarath OT' });
   }
+  // ສະແດງ Empty State ຖ້າບໍ່ມີຂໍ້ມູນ
+  if (!rows || rows.length === 0) {
+    slide.addText('📭', { x: 0.5, y: 2.5, w: 9, h: 1, fontSize: 60, align: 'center' });
+    slide.addText(opts.emptyMsg || 'ຍັງບໍ່ມີຂໍ້ມູນໃນຊ່ວງເວລານີ້', { x: 0.5, y: 3.6, w: 9, h: 0.6, fontSize: 18, color: PPT_THEME.textMute, align: 'center', fontFace: 'Phetsarath OT' });
+    slide.addText('ກະລຸນາບັນທຶກຂໍ້ມູນໃນລະບົບກ່ອນ', { x: 0.5, y: 4.3, w: 9, h: 0.4, fontSize: 13, color: PPT_THEME.textMute, align: 'center', italic: true, fontFace: 'Phetsarath OT' });
+    pptAddFooter(slide);
+    return;
+  }
   const tableRows = [
     headers.map(h => ({ text: h, options: { bold: true, color: PPT_THEME.bgWhite, fill: { color: PPT_THEME.primaryDk }, fontFace: 'Phetsarath OT' } })),
     ...rows.slice(0, 15).map((row, i) => row.map(c => ({
@@ -20234,11 +20242,21 @@ function pptAddTableSlide(pres, title, headers, rows, opts) {
 }
 
 // Bar chart slide
-function pptAddBarChartSlide(pres, title, data) {
+function pptAddBarChartSlide(pres, title, data, opts) {
+  opts = opts || {};
   const slide = pres.addSlide();
   slide.background = { color: PPT_THEME.bgWhite };
   slide.addShape('rect', { x: 0, y: 0, w: 10, h: 0.7, fill: { color: PPT_THEME.primary } });
   slide.addText(title, { x: 0.5, y: 0.1, w: 9, h: 0.5, fontSize: 22, bold: true, color: PPT_THEME.bgWhite, fontFace: 'Phetsarath OT' });
+  // ກວດ Empty State
+  const hasData = data && data.length > 0 && data.some(d => d.values && d.values.some(v => v > 0));
+  if (!hasData) {
+    slide.addText('📊', { x: 0.5, y: 2.5, w: 9, h: 1, fontSize: 60, align: 'center' });
+    slide.addText(opts.emptyMsg || 'ຍັງບໍ່ມີຂໍ້ມູນພຽງພໍສຳລັບ Chart', { x: 0.5, y: 3.6, w: 9, h: 0.6, fontSize: 18, color: PPT_THEME.textMute, align: 'center', fontFace: 'Phetsarath OT' });
+    slide.addText('Chart ຈະປະກົດເມື່ອມີຂໍ້ມູນຢ່າງໜ້ອຍ 2 ໄລຍະ', { x: 0.5, y: 4.3, w: 9, h: 0.4, fontSize: 13, color: PPT_THEME.textMute, align: 'center', italic: true, fontFace: 'Phetsarath OT' });
+    pptAddFooter(slide);
+    return;
+  }
   slide.addChart(pres.ChartType.bar, data, {
     x: 0.5, y: 1.0, w: 9, h: 6,
     barDir: 'bar',
@@ -20314,13 +20332,12 @@ async function generatePPTGarage() {
       { icon: '⚠️', value: fmt(lowStock), label: 'ສິນຄ້າຕ່ຳກວ່າ Min', color: 'FEE2E2', valueColor: '991B1B' },
     ]);
 
-    // Slide 3: JO Status Chart
+    // Slide 3: JO Status Chart (ສະແດງສະເໝີ)
     const statuses = ['receive','diag','parts','repair','qc','done','cancelled'];
     const statusLabels = { receive:'ຮັບລົດ', diag:'ວິໄຈ', parts:'ລໍຖ້າອາໄຫລ່', repair:'ກຳລັງສ້ອມ', qc:'QC', done:'ສຳເລັດ', cancelled:'ຍົກເລີກ' };
-    const joByStatus = statuses.map(s => ({ name: statusLabels[s], labels: [statusLabels[s]], values: [allJOs.filter(j => j.status === s).length] }));
-    if (totalJOs > 0) {
-      pptAddBarChartSlide(pres, '📊 ສະຖານະໃບສັ່ງສ້ອມ (JO)', joByStatus);
-    }
+    const joStatusValues = statuses.map(s => allJOs.filter(j => j.status === s).length);
+    const joByStatus = [{ name: 'ຈຳນວນ', labels: statuses.map(s => statusLabels[s]), values: joStatusValues }];
+    pptAddBarChartSlide(pres, '📊 ສະຖານະໃບສັ່ງສ້ອມ (JO)', joByStatus, { emptyMsg: 'ຍັງບໍ່ມີໃບສັ່ງສ້ອມໃນຊ່ວງເວລານີ້' });
 
     // Slide 4: Top Technicians
     const techStats = {};
@@ -20332,13 +20349,11 @@ async function generatePPTGarage() {
       techStats[e.tech_id].commission += (e.commission_amount||0);
     });
     const topTechs = Object.values(techStats).sort((a,b)=>b.charge-a.charge).slice(0,10);
-    if (topTechs.length > 0) {
-      pptAddTableSlide(pres, '👷 Top 10 ຊ່າງ — ຜົນງານ',
-        ['ອັນດັບ','ຊ່າງ','ຈຳນວນວຽກ','ຄ່າແຮງລວມ','ຄອມມິສຊັ່ນ'],
-        topTechs.map((t,i)=>[i+1, t.name, t.jobs, fmt(t.charge), fmt(t.commission)]),
-        { subtitle: `ສະຖິຕິການເຮັດງານຂອງຊ່າງໃນ ${period.label}` }
-      );
-    }
+    pptAddTableSlide(pres, '👷 Top 10 ຊ່າງ — ຜົນງານ',
+      ['ອັນດັບ','ຊ່າງ','ຈຳນວນວຽກ','ຄ່າແຮງລວມ','ຄອມມິສຊັ່ນ'],
+      topTechs.map((t,i)=>[i+1, t.name, t.jobs, fmt(t.charge), fmt(t.commission)]),
+      { subtitle: `ສະຖິຕິການເຮັດງານຂອງຊ່າງໃນ ${period.label}`, emptyMsg: 'ຍັງບໍ່ມີຊ່າງປະຕິບັດການໃນຊ່ວງເວລານີ້' }
+    );
 
     // Slide 5: Top Vehicles by Cost
     const vehStats = {};
@@ -20349,25 +20364,22 @@ async function generatePPTGarage() {
       vehStats[e.vehicle_id].cost += (e.charge_amount||0) + (e.parts_total||0);
     });
     const topVehs = Object.entries(vehStats).sort((a,b)=>b[1].cost-a[1].cost).slice(0,10);
-    if (topVehs.length > 0) {
-      pptAddTableSlide(pres, '🚗 Top 10 ລົດ — ຄ່າສ້ອມສູງສຸດ',
-        ['ອັນດັບ','ລົດ','ຈຳນວນວຽກ','ຄ່າສ້ອມລວມ (ກີບ)'],
-        topVehs.map(([vid,st],i) => {
-          const v = allVehicles.find(x => x.vehicle_id === vid);
-          return [i+1, v ? `${v.plate||vid} - ${v.type||''}` : vid, st.jobs, fmt(st.cost)];
-        })
-      );
-    }
+    pptAddTableSlide(pres, '🚗 Top 10 ລົດ — ຄ່າສ້ອມສູງສຸດ',
+      ['ອັນດັບ','ລົດ','ຈຳນວນວຽກ','ຄ່າສ້ອມລວມ (ກີບ)'],
+      topVehs.map(([vid,st],i) => {
+        const v = allVehicles.find(x => x.vehicle_id === vid);
+        return [i+1, v ? `${v.plate||vid} - ${v.type||''}` : vid, st.jobs, fmt(st.cost)];
+      }),
+      { emptyMsg: 'ຍັງບໍ່ມີລົດເຂົ້າສ້ອມໃນຊ່ວງເວລານີ້' }
+    );
 
     // Slide 6: Low Stock Alert
     const lowStockParts = allParts.filter(p => p.stock < p.min).sort((a,b)=>(a.stock/a.min)-(b.stock/b.min)).slice(0,12);
-    if (lowStockParts.length > 0) {
-      pptAddTableSlide(pres, '⚠️ ສິນຄ້າຕ່ຳກວ່າ Min — ຕ້ອງສັ່ງຊື້ດ່ວນ',
-        ['ລະຫັດ','ຊື່ສິນຄ້າ','ສະຕ໋ອກ','Min','Class'],
-        lowStockParts.map(p => [p.code, (p.name||'').slice(0,30), p.stock, p.min, p.class||'-']),
-        { subtitle: `${lowStockParts.length} ລາຍການ ຕ່ຳກວ່າເກນ — ກະລຸນາສ້າງ PR/PO` }
-      );
-    }
+    pptAddTableSlide(pres, '⚠️ ສິນຄ້າຕ່ຳກວ່າ Min — ຕ້ອງສັ່ງຊື້ດ່ວນ',
+      ['ລະຫັດ','ຊື່ສິນຄ້າ','ສະຕ໋ອກ','Min','Class'],
+      lowStockParts.map(p => [p.code, (p.name||'').slice(0,30), p.stock, p.min, p.class||'-']),
+      { subtitle: `${lowStockParts.length} ລາຍການ ຕ່ຳກວ່າເກນ`, emptyMsg: '✅ ສະຕ໋ອກສິນຄ້າທຸກລາຍການຢູ່ໃນລະດັບປົກກະຕິ' }
+    );
 
     // Slide 7: Parts Replacement Cost
     const replByType = {};
@@ -20377,13 +20389,11 @@ async function generatePPTGarage() {
       replByType[r.part_type].cost += (r.cost||0);
     });
     const replList = Object.entries(replByType).sort((a,b)=>b[1].cost-a[1].cost).slice(0,10);
-    if (replList.length > 0) {
-      pptAddTableSlide(pres, '🔧 ການປ່ຽນອາໄຫລ່ — ສະຖິຕິ',
-        ['ປະເພດອາໄຫລ່','ຈຳນວນຄັ້ງ','ຄ່າໃຊ້ຈ່າຍລວມ','ສະເລ່ຍ/ຄັ້ງ'],
-        replList.map(([t,st]) => [t, st.count, fmt(st.cost), fmt(Math.round(st.cost/st.count))]),
-        { subtitle: `ການປ່ຽນອາໄຫລ່ໃນ ${period.label} • ລວມ ${fmt(totalReplCost)} ກີບ` }
-      );
-    }
+    pptAddTableSlide(pres, '🔧 ການປ່ຽນອາໄຫລ່ — ສະຖິຕິ',
+      ['ປະເພດອາໄຫລ່','ຈຳນວນຄັ້ງ','ຄ່າໃຊ້ຈ່າຍລວມ','ສະເລ່ຍ/ຄັ້ງ'],
+      replList.map(([t,st]) => [t, st.count, fmt(st.cost), fmt(Math.round(st.cost/st.count))]),
+      { subtitle: `ການປ່ຽນອາໄຫລ່ • ລວມ ${fmt(totalReplCost)} ກີບ`, emptyMsg: 'ຍັງບໍ່ມີການປ່ຽນອາໄຫລ່ໃນຊ່ວງເວລານີ້' }
+    );
 
     // Slide 8: Branch Comparison
     const branchStats = {};
@@ -20395,12 +20405,11 @@ async function generatePPTGarage() {
       branchStats[branch].revenue += (e.charge_amount||0) + (e.parts_total||0);
     });
     const branches = Object.entries(branchStats).sort((a,b)=>b[1].revenue-a[1].revenue);
-    if (branches.length > 0) {
-      pptAddTableSlide(pres, '🏢 ການປຽບທຽບສາຂາ',
-        ['ສາຂາ','ຈຳນວນວຽກ','ລາຍຮັບລວມ (ກີບ)'],
-        branches.map(([b,st]) => [b, st.jobs, fmt(st.revenue)])
-      );
-    }
+    pptAddTableSlide(pres, '🏢 ການປຽບທຽບສາຂາ',
+      ['ສາຂາ','ຈຳນວນວຽກ','ລາຍຮັບລວມ (ກີບ)'],
+      branches.map(([b,st]) => [b, st.jobs, fmt(st.revenue)]),
+      { emptyMsg: 'ຍັງບໍ່ມີຂໍ້ມູນສາຂາສຳລັບການປຽບທຽບ' }
+    );
 
     // Slide 9: Conclusion
     const recs = [
@@ -20468,7 +20477,7 @@ async function generatePPTLogistics() {
       { icon: '⏱', value: totalHours.toFixed(1), label: 'ຊົ່ວໂມງ', color: 'FFEDD5' },
     ]);
 
-    // 3. Monthly Trend (if quarter/year)
+    // 3. Monthly Trend (ສະແດງສະເໝີ)
     const monthlyMap = {};
     allLog.forEach(u => {
       const m = (u.date||'').slice(0,7);
@@ -20478,12 +20487,10 @@ async function generatePPTLogistics() {
       if (u.usage_type === 'customer_delivery') monthlyMap[m].revenue += (u.total_amount||0);
     });
     const months = Object.keys(monthlyMap).sort();
-    if (months.length > 1) {
-      const chartData = [
-        { name: 'ຈຳນວນຂົນສົ່ງ', labels: months, values: months.map(m => monthlyMap[m].trips) }
-      ];
-      pptAddBarChartSlide(pres, '📈 ແນວໂນ້ມການຂົນສົ່ງລາຍເດືອນ', chartData);
-    }
+    const chartData = months.length > 0 ? [
+      { name: 'ຈຳນວນຂົນສົ່ງ', labels: months, values: months.map(m => monthlyMap[m].trips) }
+    ] : [];
+    pptAddBarChartSlide(pres, '📈 ແນວໂນ້ມການຂົນສົ່ງລາຍເດືອນ', chartData, { emptyMsg: 'ຍັງບໍ່ມີຂໍ້ມູນຂົນສົ່ງເພື່ອສ້າງ Chart' });
 
     // 4. Top Customers
     const custStats = {};
@@ -20494,12 +20501,11 @@ async function generatePPTLogistics() {
       custStats[key].revenue += (u.total_amount||0);
     });
     const topCust = Object.values(custStats).sort((a,b)=>b.revenue-a.revenue).slice(0,10);
-    if (topCust.length > 0) {
-      pptAddTableSlide(pres, '👥 Top 10 ລູກຄ້າ — ລາຍຮັບສູງສຸດ',
-        ['ອັນດັບ','ລູກຄ້າ','ຈຳນວນຄັ້ງ','ລາຍຮັບລວມ (ກີບ)'],
-        topCust.map((c,i)=>[i+1, (c.name||'-').slice(0,30), c.count, fmt(c.revenue)])
-      );
-    }
+    pptAddTableSlide(pres, '👥 Top 10 ລູກຄ້າ — ລາຍຮັບສູງສຸດ',
+      ['ອັນດັບ','ລູກຄ້າ','ຈຳນວນຄັ້ງ','ລາຍຮັບລວມ (ກີບ)'],
+      topCust.map((c,i)=>[i+1, (c.name||'-').slice(0,30), c.count, fmt(c.revenue)]),
+      { emptyMsg: 'ຍັງບໍ່ມີລູກຄ້າຂົນສົ່ງໃນຊ່ວງເວລານີ້' }
+    );
 
     // 5. Top Routes
     const routeStats = {};
@@ -20511,12 +20517,11 @@ async function generatePPTLogistics() {
       if (u.usage_type === 'customer_delivery') routeStats[route].revenue += (u.total_amount||0);
     });
     const topRoutes = Object.entries(routeStats).sort((a,b)=>b[1].trips-a[1].trips).slice(0,10);
-    if (topRoutes.length > 0) {
-      pptAddTableSlide(pres, '🛣 Top 10 ເສັ້ນທາງ — ຄວາມຖີ່ສູງສຸດ',
-        ['ເສັ້ນທາງ','ຈຳນວນຄັ້ງ','km ລວມ','ລາຍຮັບ (ກີບ)'],
-        topRoutes.map(([r,st]) => [r, st.trips, Math.round(st.km), fmt(st.revenue)])
-      );
-    }
+    pptAddTableSlide(pres, '🛣 Top 10 ເສັ້ນທາງ — ຄວາມຖີ່ສູງສຸດ',
+      ['ເສັ້ນທາງ','ຈຳນວນຄັ້ງ','km ລວມ','ລາຍຮັບ (ກີບ)'],
+      topRoutes.map(([r,st]) => [r, st.trips, Math.round(st.km), fmt(st.revenue)]),
+      { emptyMsg: 'ຍັງບໍ່ມີຂໍ້ມູນເສັ້ນທາງ' }
+    );
 
     // 6. Vehicle Utilization
     const vehStats = {};
@@ -20527,26 +20532,23 @@ async function generatePPTLogistics() {
       if (u.usage_type === 'customer_delivery') vehStats[u.vehicle_id].revenue += (u.total_amount||0);
     });
     const topVehs = Object.entries(vehStats).sort((a,b)=>b[1].km-a[1].km).slice(0,10);
-    if (topVehs.length > 0) {
-      pptAddTableSlide(pres, '🚗 ການໃຊ້ງານລົດ — Top 10',
-        ['ລົດ','ຈຳນວນຄັ້ງ','km ລວມ','ລາຍຮັບ (ກີບ)'],
-        topVehs.map(([vid,st]) => {
-          const v = allVehicles.find(x => x.vehicle_id === vid);
-          return [v ? (v.plate||vid) : vid, st.trips, Math.round(st.km), fmt(st.revenue)];
-        })
-      );
-    }
+    pptAddTableSlide(pres, '🚗 ການໃຊ້ງານລົດ — Top 10',
+      ['ລົດ','ຈຳນວນຄັ້ງ','km ລວມ','ລາຍຮັບ (ກີບ)'],
+      topVehs.map(([vid,st]) => {
+        const v = allVehicles.find(x => x.vehicle_id === vid);
+        return [v ? (v.plate||vid) : vid, st.trips, Math.round(st.km), fmt(st.revenue)];
+      }),
+      { emptyMsg: 'ຍັງບໍ່ມີລົດໃຊ້ໃນການຂົນສົ່ງ' }
+    );
 
     // 7. Pending Payments
     const pending = allLog.filter(u => u.usage_type === 'customer_delivery' && u.payment_status === 'pending' && u.total_amount > 0)
       .sort((a,b)=>(b.total_amount||0)-(a.total_amount||0)).slice(0,12);
-    if (pending.length > 0) {
-      pptAddTableSlide(pres, '⏳ ບິນຄ້າງຮັບ — ຕ້ອງຕິດຕາມ',
-        ['ວັນທີ','ເລກທີ','ລູກຄ້າ','ຍອດ (ກີບ)'],
-        pending.map(u => [u.date, u.usage_id, (u.customer_name||'-').slice(0,25), fmt(u.total_amount)]),
-        { subtitle: `${pending.length} ບິນ — ລວມ ${fmt(pendingRev)} ກີບ` }
-      );
-    }
+    pptAddTableSlide(pres, '⏳ ບິນຄ້າງຮັບ — ຕ້ອງຕິດຕາມ',
+      ['ວັນທີ','ເລກທີ','ລູກຄ້າ','ຍອດ (ກີບ)'],
+      pending.map(u => [u.date, u.usage_id, (u.customer_name||'-').slice(0,25), fmt(u.total_amount)]),
+      { subtitle: `${pending.length} ບິນ — ລວມ ${fmt(pendingRev)} ກີບ`, emptyMsg: '✅ ບໍ່ມີຍອດຄ້າງຮັບ — ລູກຄ້າຊຳລະຄົບໝົດ' }
+    );
 
     // 8. Conclusion
     const recs = [
@@ -20620,15 +20622,14 @@ async function generatePPTRental() {
       equipStats[u.vehicle_id].revenue += (u.total_amount||0);
     });
     const topEquip = Object.entries(equipStats).sort((a,b)=>b[1].revenue-a[1].revenue).slice(0,10);
-    if (topEquip.length > 0) {
-      pptAddTableSlide(pres, '🏗 Top 10 ເຄື່ອງມື — ການໃຊ້ງານ',
-        ['ເຄື່ອງມື','ຈຳນວນຄັ້ງ','ຊມ ລວມ','ລາຍຮັບ (ກີບ)'],
-        topEquip.map(([vid,st]) => {
-          const v = allVehicles.find(x => x.vehicle_id === vid);
-          return [v ? `${v.plate||vid} - ${v.type||''}` : vid, st.bookings, st.hours.toFixed(1), fmt(st.revenue)];
-        })
-      );
-    }
+    pptAddTableSlide(pres, '🏗 Top 10 ເຄື່ອງມື — ການໃຊ້ງານ',
+      ['ເຄື່ອງມື','ຈຳນວນຄັ້ງ','ຊມ ລວມ','ລາຍຮັບ (ກີບ)'],
+      topEquip.map(([vid,st]) => {
+        const v = allVehicles.find(x => x.vehicle_id === vid);
+        return [v ? `${v.plate||vid} - ${v.type||''}` : vid, st.bookings, st.hours.toFixed(1), fmt(st.revenue)];
+      }),
+      { emptyMsg: 'ຍັງບໍ່ມີເຄື່ອງມືທີ່ໃຊ້ໃນການເຊົ່າ' }
+    );
 
     // 4. Top Customers
     const custStats = {};
@@ -20639,12 +20640,11 @@ async function generatePPTRental() {
       custStats[key].revenue += (u.total_amount||0);
     });
     const topCust = Object.values(custStats).sort((a,b)=>b.revenue-a.revenue).slice(0,10);
-    if (topCust.length > 0) {
-      pptAddTableSlide(pres, '👥 Top 10 ລູກຄ້າເຊົ່າ',
-        ['ອັນດັບ','ລູກຄ້າ','ຈຳນວນຄັ້ງ','ລາຍຮັບ (ກີບ)'],
-        topCust.map((c,i)=>[i+1, (c.name||'-').slice(0,30), c.count, fmt(c.revenue)])
-      );
-    }
+    pptAddTableSlide(pres, '👥 Top 10 ລູກຄ້າເຊົ່າ',
+      ['ອັນດັບ','ລູກຄ້າ','ຈຳນວນຄັ້ງ','ລາຍຮັບ (ກີບ)'],
+      topCust.map((c,i)=>[i+1, (c.name||'-').slice(0,30), c.count, fmt(c.revenue)]),
+      { emptyMsg: 'ຍັງບໍ່ມີລູກຄ້າເຊົ່າ' }
+    );
 
     // 5. Monthly Trend
     const monthlyMap = {};
@@ -20656,12 +20656,10 @@ async function generatePPTRental() {
       monthlyMap[m].revenue += (u.total_amount||0);
     });
     const months = Object.keys(monthlyMap).sort();
-    if (months.length > 1) {
-      const chartData = [
-        { name: 'ລາຍຮັບ', labels: months, values: months.map(m => monthlyMap[m].revenue) }
-      ];
-      pptAddBarChartSlide(pres, '📈 ແນວໂນ້ມລາຍຮັບລາຍເດືອນ', chartData);
-    }
+    const chartData = months.length > 0 ? [
+      { name: 'ລາຍຮັບ', labels: months, values: months.map(m => monthlyMap[m].revenue) }
+    ] : [];
+    pptAddBarChartSlide(pres, '📈 ແນວໂນ້ມລາຍຮັບລາຍເດືອນ', chartData, { emptyMsg: 'ຍັງບໍ່ມີຂໍ້ມູນລາຍຮັບເພື່ອສ້າງ Chart' });
 
     // 6. Operator Performance
     const opStats = {};
@@ -20673,23 +20671,20 @@ async function generatePPTRental() {
       opStats[op].hours += (u.total_hours||0);
     });
     const topOps = Object.entries(opStats).sort((a,b)=>b[1].revenue-a[1].revenue).slice(0,10);
-    if (topOps.length > 0) {
-      pptAddTableSlide(pres, '👷 ຜູ້ປະຕິບັດການ — ຜົນງານ',
-        ['ຜູ້ປະຕິບັດການ','ຈຳນວນຄັ້ງ','ຊມ ລວມ','ລາຍຮັບ (ກີບ)'],
-        topOps.map(([op,st]) => [op.slice(0,25), st.count, st.hours.toFixed(1), fmt(st.revenue)])
-      );
-    }
+    pptAddTableSlide(pres, '👷 ຜູ້ປະຕິບັດການ — ຜົນງານ',
+      ['ຜູ້ປະຕິບັດການ','ຈຳນວນຄັ້ງ','ຊມ ລວມ','ລາຍຮັບ (ກີບ)'],
+      topOps.map(([op,st]) => [op.slice(0,25), st.count, st.hours.toFixed(1), fmt(st.revenue)]),
+      { emptyMsg: 'ຍັງບໍ່ມີຜູ້ປະຕິບັດການ' }
+    );
 
     // 7. Pending Payments
     const pending = allRent.filter(u => u.payment_status === 'pending' && u.total_amount > 0)
       .sort((a,b)=>(b.total_amount||0)-(a.total_amount||0)).slice(0,12);
-    if (pending.length > 0) {
-      pptAddTableSlide(pres, '⏳ ບິນຄ້າງຮັບ — ຕິດຕາມດ່ວນ',
-        ['ວັນທີ','ເລກທີ','ລູກຄ້າ','ຍອດ (ກີບ)'],
-        pending.map(u => [u.date, u.usage_id, (u.customer_name||'-').slice(0,25), fmt(u.total_amount)]),
-        { subtitle: `${pending.length} ບິນ — ລວມ ${fmt(pendingRev)} ກີບ` }
-      );
-    }
+    pptAddTableSlide(pres, '⏳ ບິນຄ້າງຮັບ — ຕິດຕາມດ່ວນ',
+      ['ວັນທີ','ເລກທີ','ລູກຄ້າ','ຍອດ (ກີບ)'],
+      pending.map(u => [u.date, u.usage_id, (u.customer_name||'-').slice(0,25), fmt(u.total_amount)]),
+      { subtitle: `${pending.length} ບິນ — ລວມ ${fmt(pendingRev)} ກີບ`, emptyMsg: '✅ ບໍ່ມີຍອດຄ້າງຮັບ — ລູກຄ້າຊຳລະຄົບໝົດ' }
+    );
 
     // 8. Conclusion
     const recs = [
