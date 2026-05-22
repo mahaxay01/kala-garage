@@ -15633,6 +15633,181 @@ async function seedServiceRates() {
     { name:'Detailing — Wax + Polish',                                cat:'Other', vg:'all',         hr:3,   charge:280000,  sk:'L1' },
     { name:'Inspection ກ່ອນສົ່ງມອບ — Pre-delivery',                  cat:'Diagnostic', vg:'all',    hr:1,   charge:80000,   sk:'L1' },
     { name:'ກວດປະຈຳວັນ Daily Inspection',                            cat:'PM',    vg:'all',         hr:0.5, charge:50000,   sk:'L1' },
+
+    // ====================================================
+    // 🛻 TOYOTA Hilux/Vigo/Revo/Fortuner (Pickup)
+    // ====================================================
+    { name:'[TOYOTA Hilux] DPF Force Regeneration',                          cat:'Engine', vg:'pickup', hr:1,   charge:180000, sk:'L2' },
+    { name:'[TOYOTA Hilux] Clean DPF Filter (ຖອດ + ລ້າງ)',                   cat:'Engine', vg:'pickup', hr:4,   charge:550000, sk:'L2' },
+    { name:'[TOYOTA Hilux] ປ່ຽນ Injector + Seal Kit (4 ຊິ້ນ)',              cat:'Engine', vg:'pickup', hr:5,   charge:850000, sk:'L2' },
+    { name:'[TOYOTA Vigo/Revo] ATF Auto Trans Service (ສະຫຼັບ ATF + Reset)', cat:'Other', vg:'pickup',  hr:2,   charge:380000, sk:'L2' },
+    { name:'[TOYOTA Hilux] ປ່ຽນ 1KD/2KD Fuel Injection Pump',                cat:'Engine', vg:'pickup', hr:6,   charge:1200000,sk:'L3' },
+    { name:'[TOYOTA] Techstream Diagnostic + Reset',                          cat:'Diagnostic', vg:'pickup',hr:1, charge:180000, sk:'L2' },
+    { name:'[TOYOTA Fortuner] ປ່ຽນ 4WD Actuator + Vacuum Hose',             cat:'Other', vg:'pickup',  hr:3,   charge:480000, sk:'L2' },
+    { name:'[TOYOTA Hilux] ປ່ຽນ Intercooler + Boost Hose',                  cat:'Engine', vg:'pickup', hr:2,   charge:380000, sk:'L2' },
+
+    // ====================================================
+    // 🛻 ISUZU D-Max/MU-X/TFR (Pickup)
+    // ====================================================
+    { name:'[ISUZU D-Max] Clean EGR Valve + Carbon',                         cat:'Engine', vg:'pickup', hr:2.5, charge:420000, sk:'L2' },
+    { name:'[ISUZU D-Max] ປ່ຽນ EGR Valve ໃໝ່',                              cat:'Engine', vg:'pickup', hr:3,   charge:680000, sk:'L2' },
+    { name:'[ISUZU D-Max] ປ່ຽນ Fuel Pump (4JJ1/4JK1)',                       cat:'Engine', vg:'pickup', hr:3.5, charge:520000, sk:'L2' },
+    { name:'[ISUZU] Tech 2 Diagnostic + ECU Programming',                    cat:'Diagnostic', vg:'pickup',hr:1.5,charge:250000, sk:'L2' },
+    { name:'[ISUZU D-Max] ປ່ຽນ DPF + Soot Sensor',                          cat:'Engine', vg:'pickup', hr:5,   charge:1500000,sk:'L3' },
+    { name:'[ISUZU MU-X] ATF + Auto Trans Adaptive Reset',                   cat:'Other', vg:'pickup',  hr:2.5, charge:420000, sk:'L2' },
+
+    // ====================================================
+    // 🚐 HYUNDAI H1/H100/Porter/Starex (Van)
+    // ====================================================
+    { name:'[HYUNDAI H1] ປ່ຽນ Glow Plug 4 ຊິ້ນ',                            cat:'Engine', vg:'van', hr:1.5, charge:220000, sk:'L1' },
+    { name:'[HYUNDAI H100/Porter] ປ່ຽນ Timing Belt + Tensioner',           cat:'Engine', vg:'van', hr:5,   charge:680000, sk:'L2' },
+    { name:'[HYUNDAI Starex] ATF Auto Trans Service',                         cat:'Other', vg:'van',  hr:2,   charge:380000, sk:'L2' },
+    { name:'[HYUNDAI] GDS Diagnostic Scan',                                   cat:'Diagnostic', vg:'van', hr:1, charge:180000, sk:'L2' },
+    { name:'[HYUNDAI Porter] ປ່ຽນຄຣັຊ Clutch Kit',                          cat:'Other', vg:'van',  hr:8,   charge:1100000,sk:'L3' },
+    { name:'[HYUNDAI H1] ປ່ຽນ Sliding Door Roller + Cable',                  cat:'Body', vg:'van',   hr:3,   charge:380000, sk:'L2' },
+    { name:'[HYUNDAI H1] ປ່ຽນ AC Climate Control Module',                    cat:'AC', vg:'van',     hr:1.5, charge:280000, sk:'L2' },
+
+    // ====================================================
+    // 🚚 JAC Light Truck (1040, 1041, N56, N75)
+    // ====================================================
+    { name:'[JAC] ປ່ຽນ Alternator 14V 90A',                                   cat:'Electrical', vg:'light_truck', hr:2.5, charge:450000, sk:'L2' },
+    { name:'[JAC] Clean + ປັບ Idle Air Control + Reset ECU',                 cat:'Engine', vg:'light_truck', hr:1.5, charge:220000, sk:'L2' },
+    { name:'[JAC N56/N75] ປ່ຽນ Clutch Master + Slave Cylinder',              cat:'Other', vg:'light_truck',  hr:4,   charge:580000, sk:'L2' },
+    { name:'[JAC] Cummins Diagnostic + Live Data',                            cat:'Diagnostic', vg:'light_truck', hr:1.5, charge:220000, sk:'L2' },
+    { name:'[JAC 1040] ປ່ຽນ Leaf Spring (1 ຄູ່)',                            cat:'Other', vg:'light_truck', hr:5,   charge:780000, sk:'L2' },
+
+    // ====================================================
+    // 🚚 FOTON Light Truck (Aumark, Forland, TX)
+    // ====================================================
+    { name:'[FOTON Aumark] ປ່ຽນ Dashboard Bulb',                              cat:'Electrical', vg:'light_truck', hr:1,  charge:120000, sk:'L1' },
+    { name:'[FOTON] ປ່ຽນ Turbocharger',                                       cat:'Engine', vg:'light_truck', hr:5, charge:1500000,sk:'L3' },
+    { name:'[FOTON Forland] ປ່ຽນ Brake Pad Heavy Duty',                       cat:'Brake', vg:'light_truck',  hr:2, charge:220000, sk:'L1' },
+    { name:'[FOTON] ປ່ຽນ Water Pump + Coolant Flush',                         cat:'Other', vg:'light_truck',  hr:3,   charge:480000, sk:'L2' },
+    { name:'[FOTON] ປ່ຽນ Glow Plug 4 ຊິ້ນ',                                  cat:'Engine', vg:'light_truck', hr:1.5,charge:220000, sk:'L1' },
+
+    // ====================================================
+    // 🚚 FAW Light Truck (Jiefang J6/J7)
+    // ====================================================
+    { name:'[FAW Jiefang] ສ້ອມ PTO + Solenoid Replace',                       cat:'Other', vg:'light_truck',  hr:3,   charge:520000, sk:'L2' },
+    { name:'[FAW] ປ່ຽນ Fuel Filter Primary + Secondary',                      cat:'Engine', vg:'light_truck', hr:1,  charge:150000, sk:'L1' },
+    { name:'[FAW J6] ປ່ຽນ Air Brake Chamber',                                 cat:'Brake', vg:'light_truck',  hr:3,   charge:480000, sk:'L2' },
+    { name:'[FAW] ປ່ຽນ Cabin Tilt Cylinder',                                  cat:'Hydraulic', vg:'light_truck', hr:4, charge:780000, sk:'L3' },
+
+    // ====================================================
+    // 🛻 ISUZU NPR/NQR/FRR (Light/Medium Truck)
+    // ====================================================
+    { name:'[ISUZU NPR/NQR] DPF Force Regen ດ້ວຍ Tech 2',                    cat:'Engine', vg:'light_truck', hr:1.5,charge:280000, sk:'L2' },
+    { name:'[ISUZU NPR] Clean DPF + Differential Pressure Sensor',          cat:'Engine', vg:'light_truck', hr:5, charge:850000, sk:'L2' },
+    { name:'[ISUZU FRR] ປ່ຽນ Exhaust Brake Valve',                            cat:'Brake', vg:'light_truck',  hr:2, charge:380000, sk:'L2' },
+
+    // ====================================================
+    // 🚛 HOWO Heavy Truck (ZZ3257, ZZ4257, A7, T7H)
+    // ====================================================
+    { name:'[HOWO ZZ3257] PM 15,000km — Full Service',                        cat:'PM', vg:'heavy_truck',  hr:5,   charge:850000, sk:'L2' },
+    { name:'[HOWO WD615] Head Gasket Replace + Bolts ໃໝ່',                  cat:'Engine', vg:'heavy_truck', hr:14, charge:2800000, sk:'L3' },
+    { name:'[HOWO] Hi-Lo Range Cylinder Replace',                             cat:'Other', vg:'heavy_truck',  hr:4, charge:880000, sk:'L3' },
+    { name:'[HOWO] ປ່ຽນ Air Dryer Cartridge + Filter',                       cat:'Brake', vg:'heavy_truck',  hr:1, charge:180000, sk:'L1' },
+    { name:'[HOWO] ປ່ຽນ Cabin Air Shock (ສະບອນຫ້ອງຄົນຂັບ)',                 cat:'Other', vg:'heavy_truck',  hr:2, charge:380000, sk:'L2' },
+    { name:'[HOWO] 10-Speed Transmission Air Range Valve',                    cat:'Other', vg:'heavy_truck',  hr:4, charge:780000, sk:'L3' },
+    { name:'[HOWO ZZ4257] ປ່ຽນ 5th Wheel Plate Service',                     cat:'Other', vg:'heavy_truck',  hr:5, charge:880000, sk:'L3' },
+    { name:'[HOWO A7] ປ່ຽນ Air Compressor 24V',                              cat:'Brake', vg:'heavy_truck',  hr:5, charge:1200000,sk:'L3' },
+
+    // ====================================================
+    // 🚛 DONGFENG Heavy Truck (DFL, Kingrun)
+    // ====================================================
+    { name:'[DONGFENG] Diagnostic Cummins Insite',                            cat:'Diagnostic', vg:'heavy_truck', hr:1.5, charge:250000, sk:'L2' },
+    { name:'[DONGFENG DFL] ປ່ຽນ Fuel Filter Primary + Secondary',            cat:'Engine', vg:'heavy_truck', hr:1, charge:180000, sk:'L1' },
+    { name:'[DONGFENG] ປ່ຽນ Alternator 24V 80A',                              cat:'Electrical', vg:'heavy_truck',hr:3,charge:680000, sk:'L2' },
+    { name:'[DONGFENG] Boost Pressure Test + Turbo Service',                  cat:'Engine', vg:'heavy_truck', hr:3, charge:550000, sk:'L3' },
+    { name:'[DONGFENG] Clean Injector + Carbon Wash',                         cat:'Engine', vg:'heavy_truck', hr:6, charge:980000, sk:'L3' },
+    { name:'[DONGFENG] ປ່ຽນ Cylinder Liner Kit (1 cyl)',                     cat:'Engine', vg:'heavy_truck', hr:10,charge:2200000,sk:'L3' },
+
+    // ====================================================
+    // 🚛 SHACMAN Heavy Truck (F3000, X3000, M3000)
+    // ====================================================
+    { name:'[SHACMAN] ປ່ຽນ Fan Clutch (Viscous)',                             cat:'Other', vg:'heavy_truck',  hr:2, charge:480000, sk:'L2' },
+    { name:'[SHACMAN F3000] ປ່ຽນ Radiator Heavy Duty',                       cat:'Other', vg:'heavy_truck',  hr:4, charge:780000, sk:'L2' },
+    { name:'[SHACMAN] ປ່ຽນ Compressor Air Brake',                             cat:'Brake', vg:'heavy_truck',  hr:4.5,charge:980000, sk:'L3' },
+    { name:'[SHACMAN] ປ່ຽນ Differential Oil (Front + Rear)',                  cat:'PM', vg:'heavy_truck',     hr:1.5, charge:220000, sk:'L1' },
+    { name:'[SHACMAN] ປ່ຽນ Cabin Tilt Pump',                                  cat:'Hydraulic', vg:'heavy_truck',hr:3, charge:480000, sk:'L2' },
+    { name:'[SHACMAN] WG/Fast Gear Box Service + Oil',                        cat:'Other', vg:'heavy_truck',  hr:3, charge:580000, sk:'L2' },
+
+    // ====================================================
+    // 🚜 KUBOTA Tractor (L4508, M9540, M7040, M8540)
+    // ====================================================
+    { name:'[KUBOTA] ປ່ຽນ Hydraulic Oil Super UDT2 (10L)',                    cat:'Hydraulic', vg:'tractor',  hr:1.5, charge:380000, sk:'L1' },
+    { name:'[KUBOTA M-Series] 3-Point Hitch Calibration',                     cat:'Hydraulic', vg:'tractor',  hr:2, charge:280000, sk:'L2' },
+    { name:'[KUBOTA] ປ່ຽນ Glow Plug 3-4 ຊິ້ນ',                               cat:'Engine', vg:'tractor', hr:1.5, charge:220000, sk:'L1' },
+    { name:'[KUBOTA] ປ່ຽນ Fuel Filter + Air Bleed',                           cat:'Engine', vg:'tractor', hr:1, charge:120000, sk:'L1' },
+    { name:'[KUBOTA] PTO Clutch Disc Replace',                                cat:'Other', vg:'tractor',  hr:6, charge:980000, sk:'L3' },
+    { name:'[KUBOTA] ປ່ຽນ Rear Tire 1 ເສັ້ນ (Agriculture)',                  cat:'Tire', vg:'tractor',     hr:2, charge:380000, sk:'L2' },
+    { name:'[KUBOTA L4508] Front Loader Hydraulic Service',                   cat:'Hydraulic', vg:'tractor', hr:3, charge:480000, sk:'L2' },
+
+    // ====================================================
+    // 🏗 HELI Forklift (CPCD30, CPCD50, CPYD)
+    // ====================================================
+    { name:'[HELI Diesel] ປ່ຽນ Lift Cylinder Seal Kit',                      cat:'Hydraulic', vg:'forklift', hr:5, charge:880000, sk:'L3' },
+    { name:'[HELI] ປ່ຽນ Mast Chain (Lift Chain)',                            cat:'Other', vg:'forklift',     hr:4, charge:680000, sk:'L2' },
+    { name:'[HELI LPG] ປ່ຽນ LPG Vaporizer + Solenoid',                       cat:'Other', vg:'forklift',     hr:2.5, charge:480000, sk:'L2' },
+    { name:'[HELI CPCD50] PM 1,000 ຊມ. Major Service',                       cat:'PM', vg:'forklift',        hr:6, charge:850000, sk:'L2' },
+    { name:'[HELI] Forks Inspection + Repair (Crack Welding)',                cat:'Welding', vg:'forklift',  hr:3, charge:380000, sk:'L2' },
+    { name:'[HELI] ປ່ຽນ Drive Axle Oil',                                      cat:'PM', vg:'forklift',        hr:1, charge:120000, sk:'L1' },
+
+    // ====================================================
+    // 🏗 TOYOTA Forklift (7FG30, 8FG25, 62-7FD)
+    // ====================================================
+    { name:'[TOYOTA Forklift] Service Tool Diagnostic',                       cat:'Diagnostic', vg:'forklift', hr:1, charge:180000, sk:'L2' },
+    { name:'[TOYOTA 7FG] ປ່ຽນ Mast Roller',                                  cat:'Other', vg:'forklift',     hr:3, charge:480000, sk:'L2' },
+    { name:'[TOYOTA 8FG] PM 600 ຊມ. Full Service',                           cat:'PM', vg:'forklift',        hr:5, charge:680000, sk:'L2' },
+    { name:'[TOYOTA Forklift] Tilt Cylinder Seal Kit',                        cat:'Hydraulic', vg:'forklift', hr:4, charge:680000, sk:'L3' },
+
+    // ====================================================
+    // 🏗 XCMG Forklift (XCB-LF30, XCBD30)
+    // ====================================================
+    { name:'[XCMG] Tilt Cylinder Seal Replace (ສ້ອມ Drift)',                cat:'Hydraulic', vg:'forklift', hr:5, charge:780000, sk:'L3' },
+    { name:'[XCMG XCB-LF30] PM 500 ຊມ.',                                     cat:'PM', vg:'forklift',        hr:5, charge:650000, sk:'L2' },
+    { name:'[XCMG] ປ່ຽນ Lift Chain + Roller',                                 cat:'Other', vg:'forklift',     hr:4.5,charge:780000, sk:'L2' },
+
+    // ====================================================
+    // 🏗 CRANE TRUCK — TADANO / HIAB / KANGLIM / UNIC
+    // ====================================================
+    { name:'[TADANO] Boom Telescope Cylinder Seal Service',                   cat:'Hydraulic', vg:'crane_truck', hr:8, charge:1800000, sk:'L3' },
+    { name:'[TADANO] Wire Rope Replacement (ສາຍສະລິງ)',                      cat:'Other', vg:'crane_truck',      hr:6, charge:1200000, sk:'L3' },
+    { name:'[TADANO] Load Moment Indicator (LMI) Calibration',                cat:'Diagnostic', vg:'crane_truck', hr:3, charge:580000, sk:'L3' },
+    { name:'[HIAB] Slewing Bearing Inspection + Grease',                      cat:'PM', vg:'crane_truck',         hr:2, charge:280000, sk:'L2' },
+    { name:'[HIAB] Control Valve Block Service',                              cat:'Hydraulic', vg:'crane_truck', hr:5, charge:980000, sk:'L3' },
+    { name:'[KANGLIM] Wireless Remote Pairing + Battery',                     cat:'Electrical', vg:'crane_truck',hr:1, charge:180000, sk:'L2' },
+    { name:'[KANGLIM] Outrigger Cylinder Seal Replace',                       cat:'Hydraulic', vg:'crane_truck', hr:6, charge:1100000, sk:'L3' },
+    { name:'[UNIC] Boom Slider Pad Replace',                                  cat:'Other', vg:'crane_truck',      hr:4, charge:580000, sk:'L2' },
+    { name:'[CRANE] Yearly Load Test + Certification',                        cat:'Diagnostic', vg:'crane_truck', hr:4, charge:780000, sk:'L3' },
+
+    // ====================================================
+    // 🚜 KOMATSU Excavator (PC60, PC120, PC200, PC300)
+    // ====================================================
+    { name:'[KOMATSU PC60] PM 250 ຊມ.',                                       cat:'PM', vg:'excavator',     hr:3, charge:380000, sk:'L1' },
+    { name:'[KOMATSU PC120] PM 500 ຊມ.',                                      cat:'PM', vg:'excavator',     hr:5, charge:650000, sk:'L2' },
+    { name:'[KOMATSU PC200] PM 1,000 ຊມ. Major',                              cat:'PM', vg:'excavator',     hr:8, charge:1200000,sk:'L2' },
+    { name:'[KOMATSU PC300] PM 2,000 ຊມ. (Hydraulic Oil + Filter)',          cat:'PM', vg:'excavator',     hr:10,charge:1800000,sk:'L3' },
+    { name:'[KOMATSU] Swing Motor Bearing Replace',                           cat:'Hydraulic', vg:'excavator',hr:8, charge:2200000, sk:'L3' },
+    { name:'[KOMATSU] Final Drive Repair (1 side)',                           cat:'Hydraulic', vg:'excavator',hr:10,charge:2500000, sk:'L3' },
+    { name:'[KOMATSU] Track Chain Replace (1 side)',                          cat:'Other', vg:'excavator',     hr:6, charge:1400000, sk:'L3' },
+    { name:'[KOMATSU] Track Sprocket Replace',                                cat:'Other', vg:'excavator',     hr:5, charge:980000, sk:'L3' },
+    { name:'[KOMATSU] Bucket Bushing + Pin Replace',                          cat:'Other', vg:'excavator',     hr:3, charge:520000, sk:'L2' },
+    { name:'[KOMATSU] Boom Cylinder Seal Kit',                                cat:'Hydraulic', vg:'excavator',hr:8, charge:1500000, sk:'L3' },
+    { name:'[KOMATSU] Arm Cylinder Seal Kit',                                 cat:'Hydraulic', vg:'excavator',hr:7, charge:1300000, sk:'L3' },
+    { name:'[KOMATSU] Bucket Cylinder Seal Kit',                              cat:'Hydraulic', vg:'excavator',hr:6, charge:1100000, sk:'L3' },
+    { name:'[KOMATSU] Diagnostic + Force Regen DPF/SCR',                      cat:'Diagnostic', vg:'excavator',hr:2,charge:380000, sk:'L2' },
+    { name:'[KOMATSU] AdBlue Tank + NOx Sensor Service',                      cat:'Engine', vg:'excavator',    hr:2.5,charge:480000, sk:'L2' },
+
+    // ====================================================
+    // 🚚 TRAILER / Mixer / Pwong (ໂມ່ປູນ + ລົດພວງ)
+    // ====================================================
+    { name:'[Trailer] Air Coupling + O-ring Replace',                          cat:'Brake', vg:'trailer',       hr:1, charge:120000, sk:'L1' },
+    { name:'[Trailer] ABS Module Service + Wiring',                           cat:'Electrical', vg:'trailer', hr:2.5, charge:380000, sk:'L2' },
+    { name:'[ໂມ່ປູນ] Drum Hydraulic Motor Replace',                          cat:'Hydraulic', vg:'trailer', hr:6, charge:1500000, sk:'L3' },
+    { name:'[ໂມ່ປູນ] Water Pump + Tank Inspection',                          cat:'Other', vg:'trailer',       hr:1.5, charge:220000, sk:'L1' },
+    { name:'[ໂມ່ປູນ] Chute Hydraulic Cylinder Service',                      cat:'Hydraulic', vg:'trailer', hr:3, charge:580000, sk:'L2' },
+    { name:'[Trailer] King Pin + 5th Wheel Inspection',                       cat:'PM', vg:'trailer',          hr:2, charge:280000, sk:'L2' },
   ];
 
   // ສ້າງລະຫັດ RP-0001+ ໃຫ້ແຕ່ລະລາຍການ
