@@ -2691,12 +2691,57 @@ const ADMIN_ONLY_PAGES = {
   'branches':         ['owner','it','asset_manager'],
   'recycle':          ['owner','it'],
 };
+
+// 🚧 Role → Module Access (Whitelist Group IDs ທີ່ບົດບາດນັ້ນເບິ່ງໄດ້)
+// undefined = ເບິ່ງທຸກກຸ່ມ (Admin/IT/Owner/Manager)
+// array = ສະເພາະກຸ່ມເຫຼົ່ານີ້ເທົ່ານັ້ນ
+const ROLE_MODULE_ACCESS = {
+  // 🔧 ຊ່າງ — ບໍ່ເຫັນ Logistics/Rental/ຄຸ້ມຄອງ
+  'tech_l1':       ['fleet','repair','warehouse'],
+  'tech_l2':       ['fleet','repair','warehouse','reports'],
+  'tech_l3':       ['fleet','repair','warehouse','antifraud','reports'],
+  // 🚚 ຄົນຂັບ — ບໍ່ເຫັນ Repair/Rental/ສ້ອມ
+  'driver':        ['fleet','logistics'],
+  // 📦 Procurement — ສະເພາະ Warehouse + Reports
+  'procurement':   ['warehouse','reports'],
+  // ✅ QC — ສ້ອມ + ກວດສອບ
+  'qc':            ['fleet','repair','antifraud','reports'],
+  // 💰 Accounting — ບໍ່ມີ block (ເຫັນທຸກກຸ່ມ)
+  'accounting':    undefined,
+  // 🏠 Asset Manager — Logistics + Rental + Asset/Settings
+  'asset_manager': ['fleet','logistics','rental','warehouse','reports','settings'],
+};
+
+// ກວດສິດ Group-level
+function canSeeGroup(groupId) {
+  if (typeof cloud==='undefined' || !cloud.profile) return true; // Local mode
+  const allowed = ROLE_MODULE_ACCESS[cloud.profile.role];
+  if (!allowed) return true; // undefined = ເບິ່ງທຸກກຸ່ມ
+  return allowed.includes(groupId);
+}
+
 function canSeePage(page) {
+  // ກວດສິດ Page-level ກ່ອນ (ບາງໜ້າສະຫງວນພິເສດ)
   const allowedRoles = ADMIN_ONLY_PAGES[page];
-  if (!allowedRoles) return true;  // ໜ້າທົ່ວໄປ — ທຸກຄົນເຫັນໄດ້
-  // ບໍ່ໄດ້ Login → ໃຫ້ເຫັນຊົ່ວຄາວ (Local Mode)
-  if (typeof cloud==='undefined' || !cloud.profile) return true;
-  return allowedRoles.includes(cloud.profile.role);
+  if (allowedRoles && typeof cloud!=='undefined' && cloud.profile) {
+    if (!allowedRoles.includes(cloud.profile.role)) return false;
+  }
+  // ກວດສິດ Group-level
+  if (typeof cloud!=='undefined' && cloud.profile) {
+    const role = cloud.profile.role;
+    const allowedGroups = ROLE_MODULE_ACCESS[role];
+    if (allowedGroups) {
+      // ຫາ group ທີ່ page ນີ້ສັງກັດ
+      for (const grp of NAV_GROUPS) {
+        if (grp.pinned) continue;
+        if (grp.items.some(it => it.page === page)) {
+          if (!allowedGroups.includes(grp.id)) return false;
+          break;
+        }
+      }
+    }
+  }
+  return true;
 }
 
 function renderNav() {
@@ -2712,6 +2757,8 @@ function renderNav() {
   `;
 
   NAV_GROUPS.forEach(grp => {
+    // ກວດສິດ Group ກ່ອນ — ຊ່າງ/ຄົນຂັບອາດບໍ່ເຫັນບາງກຸ່ມເລີຍ
+    if (!grp.pinned && !canSeeGroup(grp.id)) return;
     // Filter items by permission
     const visibleItems = grp.items.filter(it => canSeePage(it.page));
     if (visibleItems.length === 0) return;  // ກຸ່ມຫວ່າງ → ບໍ່ສະແດງ
@@ -2813,8 +2860,308 @@ async function go(page) {
 
 const pages = {};
 
+// =============================================================================
+// 🎨 WORKER DASHBOARDS — ສະບັບງ່າຍສຳລັບຊ່າງ/ຄົນຂັບ — ໄອຄອນໃຫຍ່ + ສີສັນສົດ
+// =============================================================================
+
+// 🔧 Dashboard ສຳລັບຊ່າງ
+async function renderTechDashboard() {
+  const today = todayISO();
+  const yymm = today.slice(0,7);
+  const myUsername = cloud.profile?.username || '';
+  const myName = cloud.profile?.name || myUsername;
+
+  // ດຶງຂໍ້ມູນວຽກຂອງຊ່າງ
+  const allLabor = await db.labor_entries.toArray();
+  const myLabor = allLabor.filter(e => e.tech_id === myUsername || (e.team_splits||[]).some(t => t.tech_id === myUsername));
+  const todayLabor = myLabor.filter(e => (e.date||'') === today);
+  const monthLabor = myLabor.filter(e => (e.date||'').startsWith(yymm));
+
+  // ຄິດເງິນ
+  const todayCommission = todayLabor.reduce((s,e) => s + (e.commission_amount||0), 0);
+  const monthCommission = monthLabor.reduce((s,e) => s + (e.commission_amount||0), 0);
+  const todayJobs = todayLabor.length;
+  const monthJobs = monthLabor.length;
+
+  // ຮັບ JO ໃໝ່ໆ
+  const openJOs = (await db.joborders.toArray()).filter(j => j.status !== 'done' && j.status !== 'cancelled');
+
+  // ດຶງ Greeting ຕາມເວລາ
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? '🌅 ສະບາຍດີຕອນເຊົ້າ' : hour < 17 ? '☀️ ສະບາຍດີຕອນບ່າຍ' : '🌙 ສະບາຍດີຕອນແລງ';
+
+  $('#main').innerHTML = `
+    <!-- Welcome Banner -->
+    <div style="background:linear-gradient(135deg,#F97316,#C2410C);color:#fff;padding:24px;border-radius:14px;margin-bottom:20px;box-shadow:0 4px 12px rgba(249,115,22,.3)">
+      <div style="display:flex;align-items:center;gap:16px">
+        <div style="font-size:56px">🔧</div>
+        <div style="flex:1">
+          <div style="font-size:14px;opacity:.9">${greeting}</div>
+          <h1 style="margin:4px 0;font-size:28px">${escapeHtml(myName)}</h1>
+          <div style="font-size:13px;opacity:.9">🎓 ${ROLE_LABELS?.[cloud.profile.role] || cloud.profile.role}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:12px;opacity:.9">${new Date().toLocaleDateString('lo', {weekday:'long', day:'numeric', month:'long', year:'numeric'})}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ໂຕເລກສຳຄັນ -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:20px">
+      <div style="background:#ECFDF5;border-left:6px solid #10B981;padding:20px;border-radius:12px">
+        <div style="font-size:13px;color:var(--muted);margin-bottom:4px">🔧 ວຽກສຳເລັດມື້ນີ້</div>
+        <div style="font-size:36px;font-weight:700;color:#065F46">${todayJobs}</div>
+        <div style="font-size:12px;color:var(--muted)">ໃບ</div>
+      </div>
+      <div style="background:#FFFBEB;border-left:6px solid #F59E0B;padding:20px;border-radius:12px">
+        <div style="font-size:13px;color:var(--muted);margin-bottom:4px">💰 ຄອມມິສຊັ່ນມື້ນີ້</div>
+        <div style="font-size:36px;font-weight:700;color:#92400E">${fmt(todayCommission)}</div>
+        <div style="font-size:12px;color:var(--muted)">ກີບ</div>
+      </div>
+      <div style="background:#EFF6FF;border-left:6px solid #3B82F6;padding:20px;border-radius:12px">
+        <div style="font-size:13px;color:var(--muted);margin-bottom:4px">📅 ວຽກລວມເດືອນນີ້</div>
+        <div style="font-size:36px;font-weight:700;color:#1E40AF">${monthJobs}</div>
+        <div style="font-size:12px;color:var(--muted)">ໃບ</div>
+      </div>
+      <div style="background:#FAF5FF;border-left:6px solid #8B5CF6;padding:20px;border-radius:12px">
+        <div style="font-size:13px;color:var(--muted);margin-bottom:4px">💵 ຄອມມິສຊັ່ນເດືອນນີ້</div>
+        <div style="font-size:36px;font-weight:700;color:#6D28D9">${fmt(monthCommission)}</div>
+        <div style="font-size:12px;color:var(--muted)">ກີບ</div>
+      </div>
+    </div>
+
+    <!-- ປຸ່ມໃຫຍ່ — ການເຮັດງານປະຈຳວັນ -->
+    <h2 style="color:var(--primary);margin:20px 0 12px;font-size:20px">⚡ ການເຮັດງານປະຈຳວັນ</h2>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px">
+      <!-- 1. ບັນທຶກວຽກ -->
+      <div onclick="go('labor_entries')" style="cursor:pointer;background:#fff;border:2px solid #F97316;padding:24px;border-radius:14px;text-align:center;transition:all .2s;box-shadow:0 2px 6px rgba(0,0,0,.05)" onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='0 8px 20px rgba(249,115,22,.2)'" onmouseout="this.style.transform='';this.style.boxShadow='0 2px 6px rgba(0,0,0,.05)'">
+        <div style="font-size:64px;margin-bottom:8px">💼</div>
+        <div style="font-weight:700;font-size:16px;color:#C2410C;margin-bottom:4px">ບັນທຶກວຽກສ້ອມ</div>
+        <div style="font-size:12px;color:var(--muted)">ບັນທຶກຄ່າແຮງ + ຄອມມິສຊັ່ນ</div>
+      </div>
+      <!-- 2. ໃບສັ່ງສ້ອມ -->
+      <div onclick="go('jo')" style="cursor:pointer;background:#fff;border:2px solid #3B82F6;padding:24px;border-radius:14px;text-align:center;transition:all .2s" onmouseover="this.style.transform='translateY(-4px)'" onmouseout="this.style.transform=''">
+        <div style="font-size:64px;margin-bottom:8px">📋</div>
+        <div style="font-weight:700;font-size:16px;color:#1E40AF;margin-bottom:4px">ໃບສັ່ງສ້ອມ (JO)</div>
+        <div style="font-size:12px;color:var(--muted)">${openJOs.length} ໃບ ກຳລັງດຳເນີນ</div>
+      </div>
+      <!-- 3. Helpdesk -->
+      <div onclick="go('helpdesk')" style="cursor:pointer;background:#fff;border:2px solid #EF4444;padding:24px;border-radius:14px;text-align:center;transition:all .2s" onmouseover="this.style.transform='translateY(-4px)'" onmouseout="this.style.transform=''">
+        <div style="font-size:64px;margin-bottom:8px">🆘</div>
+        <div style="font-weight:700;font-size:16px;color:#991B1B;margin-bottom:4px">Helpdesk — ຄູ່ມືແກ້ໄຂ</div>
+        <div style="font-size:12px;color:var(--muted)">ຄົ້ນຫາວິທີສ້ອມ — Step-by-Step</div>
+      </div>
+      <!-- 4. ກວດປະຈຳວັນ -->
+      <div onclick="go('daily')" style="cursor:pointer;background:#fff;border:2px solid #10B981;padding:24px;border-radius:14px;text-align:center;transition:all .2s" onmouseover="this.style.transform='translateY(-4px)'" onmouseout="this.style.transform=''">
+        <div style="font-size:64px;margin-bottom:8px">✅</div>
+        <div style="font-weight:700;font-size:16px;color:#065F46;margin-bottom:4px">ກວດປະຈຳວັນ</div>
+        <div style="font-size:12px;color:var(--muted)">ກວດສະພາບລົດກ່ອນສ້ອມ</div>
+      </div>
+      <!-- 5. ສາງອາໄຫລ່ -->
+      <div onclick="go('inv')" style="cursor:pointer;background:#fff;border:2px solid #8B5CF6;padding:24px;border-radius:14px;text-align:center;transition:all .2s" onmouseover="this.style.transform='translateY(-4px)'" onmouseout="this.style.transform=''">
+        <div style="font-size:64px;margin-bottom:8px">📦</div>
+        <div style="font-weight:700;font-size:16px;color:#6D28D9;margin-bottom:4px">ສາງອາໄຫລ່</div>
+        <div style="font-size:12px;color:var(--muted)">ກວດ stock + ຂໍເບີກ</div>
+      </div>
+      <!-- 6. ຜົນງານ -->
+      <div onclick="go('tech_performance')" style="cursor:pointer;background:#fff;border:2px solid #F59E0B;padding:24px;border-radius:14px;text-align:center;transition:all .2s" onmouseover="this.style.transform='translateY(-4px)'" onmouseout="this.style.transform=''">
+        <div style="font-size:64px;margin-bottom:8px">🏆</div>
+        <div style="font-weight:700;font-size:16px;color:#92400E;margin-bottom:4px">ຜົນງານຂອງຂ້ອຍ</div>
+        <div style="font-size:12px;color:var(--muted)">ສະຖິຕິ + Leaderboard</div>
+      </div>
+    </div>
+
+    <!-- ວຽກລ່າສຸດ -->
+    ${todayLabor.length > 0 ? `
+      <h2 style="color:var(--primary);margin:24px 0 12px;font-size:20px">📋 ວຽກມື້ນີ້ (${todayLabor.length})</h2>
+      <div style="background:#fff;border-radius:12px;overflow:hidden;border:1px solid var(--line)">
+        <table style="font-size:13px;margin:0">
+          <tr><th>ເລກທີ</th><th>ບໍລິການ</th><th>ລົດ/ລູກຄ້າ</th><th style="text-align:right">ຄ່າແຮງ</th><th style="text-align:right">ຄອມມິສຊັ່ນ</th><th>ສະຖານະ</th></tr>
+          ${todayLabor.slice(0,10).map(e => `
+            <tr>
+              <td><strong style="font-family:monospace;font-size:11px">${e.entry_id||'-'}</strong></td>
+              <td>${escapeHtml(e.service_name||'-')}</td>
+              <td>${escapeHtml(e.vehicle_id || e.customer_name || '-')}</td>
+              <td style="text-align:right;font-weight:600">${fmt(e.charge_amount||0)}</td>
+              <td style="text-align:right;font-weight:700;color:var(--ok)">${fmt(e.commission_amount||0)}</td>
+              <td><span class="pill ${e.status==='approved'?'ok':e.status==='pending'?'warn':'gray'}">${e.status}</span></td>
+            </tr>
+          `).join('')}
+        </table>
+      </div>
+    ` : `
+      <div style="background:#FEF3C7;border-left:6px solid #F59E0B;padding:20px;border-radius:12px;margin-top:20px;text-align:center">
+        <div style="font-size:48px">📭</div>
+        <p style="margin:8px 0 4px;font-size:14px;color:#92400E;font-weight:600">ຍັງບໍ່ມີວຽກໃນມື້ນີ້</p>
+        <p style="margin:0;font-size:12px;color:#92400E">ກົດປຸ່ມ "💼 ບັນທຶກວຽກສ້ອມ" ດ້ານເທິງເພື່ອເລີ່ມຕົ້ນ</p>
+      </div>
+    `}
+  `;
+}
+
+// 🚚 Dashboard ສຳລັບຄົນຂັບ
+async function renderDriverDashboard() {
+  const today = todayISO();
+  const yymm = today.slice(0,7);
+  const myUsername = cloud.profile?.username || '';
+  const myName = cloud.profile?.name || myUsername;
+
+  // ດຶງຂໍ້ມູນຂົນສົ່ງ
+  const allUsage = await db.vehicle_usage.toArray();
+  const myDeliveries = allUsage.filter(u => u.driver_id === myUsername);
+  const todayDeliveries = myDeliveries.filter(u => (u.date||'') === today);
+  const monthDeliveries = myDeliveries.filter(u => (u.date||'').startsWith(yymm));
+
+  // ສະຖິຕິ
+  const todayKm = todayDeliveries.reduce((s,u) => s + (u.total_km||0), 0);
+  const monthKm = monthDeliveries.reduce((s,u) => s + (u.total_km||0), 0);
+  const pendingDeliveries = monthDeliveries.filter(u => u.status === 'planned' || u.status === 'in_progress').length;
+  const completedToday = todayDeliveries.filter(u => u.status === 'completed').length;
+
+  // ກວດປະຈຳວັນ
+  const todayInsp = (await db.inspections.toArray()).filter(i => (i.date||'') === today && i.driver === myUsername);
+  const inspectionDone = todayInsp.length > 0;
+
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? '🌅 ສະບາຍດີຕອນເຊົ້າ' : hour < 17 ? '☀️ ສະບາຍດີຕອນບ່າຍ' : '🌙 ສະບາຍດີຕອນແລງ';
+
+  $('#main').innerHTML = `
+    <!-- Welcome Banner -->
+    <div style="background:linear-gradient(135deg,#0EA5E9,#0369A1);color:#fff;padding:24px;border-radius:14px;margin-bottom:20px;box-shadow:0 4px 12px rgba(14,165,233,.3)">
+      <div style="display:flex;align-items:center;gap:16px">
+        <div style="font-size:56px">🚚</div>
+        <div style="flex:1">
+          <div style="font-size:14px;opacity:.9">${greeting}</div>
+          <h1 style="margin:4px 0;font-size:28px">${escapeHtml(myName)}</h1>
+          <div style="font-size:13px;opacity:.9">🚗 ຄົນຂັບ</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:12px;opacity:.9">${new Date().toLocaleDateString('lo', {weekday:'long', day:'numeric', month:'long', year:'numeric'})}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ກວດປະຈຳວັນ Alert -->
+    ${!inspectionDone ? `
+      <div onclick="go('daily')" style="cursor:pointer;background:#FEE2E2;border-left:6px solid #EF4444;padding:16px;border-radius:10px;margin-bottom:16px;display:flex;align-items:center;gap:12px">
+        <div style="font-size:36px">⚠️</div>
+        <div style="flex:1">
+          <div style="font-weight:700;color:#991B1B;font-size:15px">ຍັງບໍ່ໄດ້ກວດປະຈຳວັນ</div>
+          <div style="font-size:12px;color:#7F1D1D">ກະລຸນາກວດສະພາບລົດກ່ອນອອກຂັບ — ກົດທີ່ນີ້</div>
+        </div>
+        <div style="font-size:24px;color:#EF4444">→</div>
+      </div>
+    ` : `
+      <div style="background:#D1FAE5;border-left:6px solid #10B981;padding:14px;border-radius:10px;margin-bottom:16px;display:flex;align-items:center;gap:12px">
+        <div style="font-size:32px">✅</div>
+        <div style="flex:1">
+          <div style="font-weight:700;color:#065F46;font-size:14px">ກວດປະຈຳວັນສຳເລັດແລ້ວ</div>
+          <div style="font-size:12px;color:#047857">ສະພາບລົດປະຈຸບັນ: ${todayInsp[0].status==='pass'?'✅ ຜ່ານ':'⚠️ ມີຂໍ້ບົກພ່ອງ'}</div>
+        </div>
+      </div>
+    `}
+
+    <!-- ໂຕເລກສຳຄັນ -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:20px">
+      <div style="background:#ECFDF5;border-left:6px solid #10B981;padding:20px;border-radius:12px">
+        <div style="font-size:13px;color:var(--muted);margin-bottom:4px">📦 ສົ່ງສຳເລັດມື້ນີ້</div>
+        <div style="font-size:36px;font-weight:700;color:#065F46">${completedToday}</div>
+        <div style="font-size:12px;color:var(--muted)">ຄັ້ງ</div>
+      </div>
+      <div style="background:#EFF6FF;border-left:6px solid #3B82F6;padding:20px;border-radius:12px">
+        <div style="font-size:13px;color:var(--muted);margin-bottom:4px">🛣 ໄລຍະທາງມື້ນີ້</div>
+        <div style="font-size:36px;font-weight:700;color:#1E40AF">${fmt(Math.round(todayKm))}</div>
+        <div style="font-size:12px;color:var(--muted)">km</div>
+      </div>
+      <div style="background:#FFFBEB;border-left:6px solid #F59E0B;padding:20px;border-radius:12px">
+        <div style="font-size:13px;color:var(--muted);margin-bottom:4px">⏳ ຄ້າງສົ່ງ</div>
+        <div style="font-size:36px;font-weight:700;color:#92400E">${pendingDeliveries}</div>
+        <div style="font-size:12px;color:var(--muted)">ໃບ</div>
+      </div>
+      <div style="background:#FAF5FF;border-left:6px solid #8B5CF6;padding:20px;border-radius:12px">
+        <div style="font-size:13px;color:var(--muted);margin-bottom:4px">📅 ການຂັບເດືອນນີ້</div>
+        <div style="font-size:36px;font-weight:700;color:#6D28D9">${monthDeliveries.length}</div>
+        <div style="font-size:12px;color:var(--muted)">ຄັ້ງ • ${fmt(Math.round(monthKm))} km</div>
+      </div>
+    </div>
+
+    <!-- ປຸ່ມໃຫຍ່ — ການເຮັດງານປະຈຳວັນ -->
+    <h2 style="color:var(--primary);margin:20px 0 12px;font-size:20px">⚡ ການເຮັດງານປະຈຳວັນ</h2>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px">
+      <div onclick="go('deliveries')" style="cursor:pointer;background:#fff;border:2px solid #10B981;padding:24px;border-radius:14px;text-align:center;transition:all .2s" onmouseover="this.style.transform='translateY(-4px)'" onmouseout="this.style.transform=''">
+        <div style="font-size:64px;margin-bottom:8px">📦</div>
+        <div style="font-weight:700;font-size:16px;color:#065F46;margin-bottom:4px">ສ້າງໃບສົ່ງສິນຄ້າ</div>
+        <div style="font-size:12px;color:var(--muted)">ບັນທຶກການສົ່ງສິນຄ້າໃໝ່</div>
+      </div>
+      <div onclick="go('inter_branch')" style="cursor:pointer;background:#fff;border:2px solid #3B82F6;padding:24px;border-radius:14px;text-align:center;transition:all .2s" onmouseover="this.style.transform='translateY(-4px)'" onmouseout="this.style.transform=''">
+        <div style="font-size:64px;margin-bottom:8px">🔄</div>
+        <div style="font-weight:700;font-size:16px;color:#1E40AF;margin-bottom:4px">ໂອນສາຂາ</div>
+        <div style="font-size:12px;color:var(--muted)">ໂອນສິນຄ້າພາຍໃນ</div>
+      </div>
+      <div onclick="go('daily')" style="cursor:pointer;background:#fff;border:2px solid ${inspectionDone?'#10B981':'#EF4444'};padding:24px;border-radius:14px;text-align:center;transition:all .2s" onmouseover="this.style.transform='translateY(-4px)'" onmouseout="this.style.transform=''">
+        <div style="font-size:64px;margin-bottom:8px">${inspectionDone?'✅':'⚠️'}</div>
+        <div style="font-weight:700;font-size:16px;color:${inspectionDone?'#065F46':'#991B1B'};margin-bottom:4px">ກວດປະຈຳວັນ</div>
+        <div style="font-size:12px;color:var(--muted)">${inspectionDone?'ສຳເລັດແລ້ວ':'ຍັງບໍ່ໄດ້ກວດ ⚠️'}</div>
+      </div>
+      <div onclick="go('fuel')" style="cursor:pointer;background:#fff;border:2px solid #F59E0B;padding:24px;border-radius:14px;text-align:center;transition:all .2s" onmouseover="this.style.transform='translateY(-4px)'" onmouseout="this.style.transform=''">
+        <div style="font-size:64px;margin-bottom:8px">⛽</div>
+        <div style="font-weight:700;font-size:16px;color:#92400E;margin-bottom:4px">ບິນນ້ຳມັນ</div>
+        <div style="font-size:12px;color:var(--muted)">ບັນທຶກບິນເຕີມນ້ຳມັນ</div>
+      </div>
+      <div onclick="go('mileage')" style="cursor:pointer;background:#fff;border:2px solid #8B5CF6;padding:24px;border-radius:14px;text-align:center;transition:all .2s" onmouseover="this.style.transform='translateY(-4px)'" onmouseout="this.style.transform=''">
+        <div style="font-size:64px;margin-bottom:8px">📏</div>
+        <div style="font-weight:700;font-size:16px;color:#6D28D9;margin-bottom:4px">ບັນທຶກເລກໄມ</div>
+        <div style="font-size:12px;color:var(--muted)">ບັນທຶກ km ປະຈຸບັນ</div>
+      </div>
+      <div onclick="go('locations')" style="cursor:pointer;background:#fff;border:2px solid #0EA5E9;padding:24px;border-radius:14px;text-align:center;transition:all .2s" onmouseover="this.style.transform='translateY(-4px)'" onmouseout="this.style.transform=''">
+        <div style="font-size:64px;margin-bottom:8px">📍</div>
+        <div style="font-weight:700;font-size:16px;color:#0369A1;margin-bottom:4px">ສະຖານທີ່ + ໄລຍະທາງ</div>
+        <div style="font-size:12px;color:var(--muted)">ເບິ່ງເສັ້ນທາງສົ່ງ</div>
+      </div>
+    </div>
+
+    <!-- ການຂັບລ່າສຸດ -->
+    ${todayDeliveries.length > 0 ? `
+      <h2 style="color:var(--primary);margin:24px 0 12px;font-size:20px">📋 ການຂັບມື້ນີ້ (${todayDeliveries.length})</h2>
+      <div style="background:#fff;border-radius:12px;overflow:hidden;border:1px solid var(--line)">
+        <table style="font-size:13px;margin:0">
+          <tr><th>ເລກທີ</th><th>ປະເພດ</th><th>ຈຸດໝາຍ</th><th style="text-align:right">km</th><th>ສະຖານະ</th></tr>
+          ${todayDeliveries.slice(0,10).map(u => `
+            <tr>
+              <td><strong style="font-family:monospace;font-size:11px">${u.usage_id||'-'}</strong></td>
+              <td>${u.usage_type==='customer_delivery'?'📦 ສົ່ງລູກຄ້າ':u.usage_type==='inter_branch'?'🔄 ໂອນສາຂາ':'🚙 ສ່ວນຕົວ'}</td>
+              <td>${escapeHtml((u.end_location||u.customer_name||'-').slice(0,40))}</td>
+              <td style="text-align:right;font-weight:600">${fmt(u.total_km||0)}</td>
+              <td><span class="pill ${u.status==='completed'?'ok':u.status==='in_progress'?'info':'warn'}">${u.status}</span></td>
+            </tr>
+          `).join('')}
+        </table>
+      </div>
+    ` : `
+      <div style="background:#FEF3C7;border-left:6px solid #F59E0B;padding:20px;border-radius:12px;margin-top:20px;text-align:center">
+        <div style="font-size:48px">📭</div>
+        <p style="margin:8px 0 4px;font-size:14px;color:#92400E;font-weight:600">ຍັງບໍ່ມີການຂັບໃນມື້ນີ້</p>
+        <p style="margin:0;font-size:12px;color:#92400E">ກົດປຸ່ມ "📦 ສ້າງໃບສົ່ງສິນຄ້າ" ດ້ານເທິງເພື່ອເລີ່ມຕົ້ນ</p>
+      </div>
+    `}
+  `;
+}
+
+
+
 // ===================== DASHBOARD =====================
 pages.dashboard = async () => {
+  // 🆕 ກວດບົດບາດ — ສະແດງ Worker Dashboard ສຳລັບຊ່າງ/ຄົນຂັບ
+  if (typeof cloud!=='undefined' && cloud.profile) {
+    const role = cloud.profile.role;
+    if (['tech_l1','tech_l2','tech_l3'].includes(role)) {
+      return await renderTechDashboard();
+    }
+    if (role === 'driver') {
+      return await renderDriverDashboard();
+    }
+  }
+  // ===== Admin/Manager Dashboard ປົກກະຕິ =====
   const vehicles = await db.vehicles.toArray();
   const jos = await db.joborders.toArray();
   const insps = await db.inspections.toArray();
