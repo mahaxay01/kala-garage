@@ -15367,15 +15367,15 @@ async function aiTireLife() {
 //   5) pages.commission — ສະຫຼຸບຄອມມິສຊັ່ນລາຍເດືອນ + Approval
 
 // Constants
+// 🔧 ໝວດງານ — KALA ສ້ອມແປງໃຫ້ໃຊ້ງານໄດ້ເທົ່ານັ້ນ (ບໍ່ມີ Body/ສີ/ເສີມຄວາມງາມ)
 const SVC_CATEGORIES = [
   { id:'PM', label:'🛢 PM / ບຳລຸງຮັກສາ', color:'#10B981' },
   { id:'Brake', label:'🛑 ເບຣກ', color:'#EF4444' },
   { id:'Engine', label:'⚙️ ເຄື່ອງຍົນ', color:'#F59E0B' },
   { id:'Electrical', label:'⚡ ໄຟຟ້າ', color:'#3B82F6' },
   { id:'Tire', label:'🛞 ຢາງ', color:'#8B5CF6' },
-  { id:'Body', label:'🚗 ໂຄງລົດ / ສີ', color:'#EC4899' },
   { id:'Hydraulic', label:'🔧 Hydraulic', color:'#0891B2' },
-  { id:'Welding', label:'🔥 ເຊື່ອມ', color:'#F97316' },
+  { id:'Welding', label:'🔥 ເຊື່ອມ (ໂຄງສ້າງ)', color:'#F97316' },
   { id:'Diagnostic', label:'🔍 ກວດສອບ Diagnostic', color:'#64748B' },
   { id:'AC', label:'❄️ ແອ', color:'#06B6D4' },
   { id:'Other', label:'📌 ອື່ນໆ', color:'#94A3B8' },
@@ -15428,6 +15428,71 @@ async function nextTechId() {
 }
 
 // Seed standard service rates (run once)
+// 🗑 ລົບຄ່າແຮງທັງໝົດຄັ້ງດຽວ — Admin ເທົ່ານັ້ນ
+async function deleteAllServiceRates() {
+  if (typeof cloud!=='undefined' && cloud.profile && !cloud.hasRole('owner','it')) {
+    toast('🔒 ສະເພາະ Owner ຫລື IT Admin', 'bad');
+    return;
+  }
+  const all = await db.service_rates.toArray();
+  if (all.length === 0) {
+    toast('✅ ບໍ່ມີຂໍ້ມູນຄ່າແຮງ ໃນ DB ແລ້ວ', 'ok');
+    return;
+  }
+  // Double confirm
+  const msg1 = `⚠️ ລົບຄ່າແຮງທັງໝົດ ${all.length} ລາຍການ?\n\n📦 ສາມາດກູ້ຄືນໄດ້ໃນ "ຖັງຂີ້ເຫຍື້ອ"\n⚠️ Labor Entries ເກົ່າຍັງສະແດງລະຫັດໄວ້\n\nດຳເນີນຕໍ່?`;
+  if (!confirm(msg1)) return;
+  // ຍຶນຍັນຄັ້ງທີ 2 — ໃຫ້ພິມຄຳ
+  const confirmStr = prompt(`ກະລຸນາພິມ "ລົບທັງໝົດ" ເພື່ອຍຶນຢັນ:`);
+  if (confirmStr !== 'ລົບທັງໝົດ') {
+    toast('❌ ຍົກເລີກ — ບໍ່ໄດ້ພິມຍຶນຢັນຖືກຕ້ອງ', 'warn');
+    return;
+  }
+  // ໃຊ້ softDelete ໃຫ້ໄປຍຶດໃນ Recycle Bin
+  toast(`🔄 ກຳລັງລົບ ${all.length} ລາຍການ...`, 'info');
+  let removed = 0;
+  for (const r of all) {
+    await softDelete('service_rates', r.id, x => `Service Rate: ${x.service_code} — ${x.service_name}`);
+    removed++;
+  }
+  if (typeof auditLog==='function') auditLog('delete-all', 'service_rates', null, `Deleted ${removed} service rates`);
+  toast(`🗑 ລົບ ${removed} ລາຍການສຳເລັດ — ສາມາດກູ້ຄືນໃນ "🗑 ຖັງຂີ້ເຫຍື້ອ"`, 'ok');
+  pages.service_rates();
+}
+
+// 🧹 ລົບລາຍການເຄາະ/ສີ/ເສີມຄວາມງາມ (KALA ບໍ່ມີບໍລິການ)
+async function cleanupBodyPaintRates() {
+  if (typeof cloud!=='undefined' && cloud.profile && !cloud.hasRole('owner','it')) {
+    toast('🔒 ສະເພາະ Owner ຫລື IT Admin', 'bad');
+    return;
+  }
+  const all = await db.service_rates.toArray();
+  // ຄຳສຳຄັນທີ່ບອກວ່າເປັນ Body/Paint/Detailing/ເສີມຄວາມງາມ
+  const keywords = ['ສ້ອມສີ', 'ພົ່ນສີ', 'ເຄາະ', 'PDR', 'Dent', 'Detailing', 'Wax', 'Polish', 'ເຄືອບສີ', 'Body Panel', 'ກວງລົດ', 'ປະຕູ 1 ບານ'];
+  const targets = all.filter(r =>
+    r.category === 'Body' ||
+    keywords.some(k => (r.service_name||'').includes(k))
+  );
+  if (targets.length === 0) {
+    toast('✅ ບໍ່ມີລາຍການເຄາະ/ສີ/ເສີມຄວາມງາມ ໃນ DB ແລ້ວ', 'ok');
+    return;
+  }
+  // ສະແດງລາຍການກ່ອນລົບ
+  let msg = `KALA ບໍ່ມີບໍລິການເຄາະ/ສີ/ເສີມຄວາມງາມ\n\nພົບ ${targets.length} ລາຍການທີ່ຄວນລົບ:\n`;
+  targets.slice(0,15).forEach(r => { msg += `\n• ${r.service_code} — ${r.service_name}`; });
+  if (targets.length > 15) msg += `\n... +${targets.length-15} ອື່ນໆ`;
+  msg += `\n\n📦 ສາມາດກູ້ຄືນໄດ້ໃນ "ຖັງຂີ້ເຫຍື້ອ" — ດຳເນີນຕໍ່?`;
+  if (!confirm(msg)) return;
+  // ໃຊ້ softDelete ໃຫ້ໄປຍຶດໃນ Recycle Bin
+  let removed = 0;
+  for (const r of targets) {
+    await softDelete('service_rates', r.id, x => `Service Rate: ${x.service_code} — ${x.service_name}`);
+    removed++;
+  }
+  toast(`🧹 ລ້າງ ${removed} ລາຍການເຄາະ/ສີ/ເສີມຄວາມງາມ ສຳເລັດ — ສາມາດກູ້ໄດ້ໃນຖັງຂີ້ເຫຍື້ອ`, 'ok');
+  pages.service_rates();
+}
+
 // 🔢 ປ່ຽນລະຫັດເກົ່າທັງໝົດ (SVC-xxx) ໃຫ້ເປັນ RP-0001+
 async function renumberServiceCodes() {
   if (!confirm('ປ່ຽນລະຫັດຄ່າແຮງເກົ່າທັງໝົດເປັນ RP-0001, RP-0002, ... ?\n\n⚠️ ການນີ້ຈະປ່ຽນລະຫັດໃນ Labor Entries ທີ່ກ່ຽວຂ້ອງດ້ວຍ — ບໍ່ສາມາດ Undo ໄດ້')) return;
@@ -15586,14 +15651,14 @@ async function seedServiceRates() {
     { name:'ປ່ຽນ Fan Clutch',                                        cat:'Other', vg:'heavy_truck', hr:2,   charge:280000,  sk:'L2' },
     { name:'ປ່ຽນ Cooling Fan + Motor',                              cat:'Other', vg:'all',         hr:1.5, charge:200000,  sk:'L2' },
 
-    // ==================== 🔥 ເຊື່ອມ + ໂຄງລົດ (Welding + Body) ====================
+    // ==================== 🔥 ເຊື່ອມສ້ອມໂຄງສ້າງ (Structural Welding) ====================
     { name:'ເຊື່ອມສ້ອມໂຄງລົດ — ຈຸດດຽວ',                              cat:'Welding', vg:'all',       hr:2,   charge:200000,  sk:'L2' },
     { name:'ເຊື່ອມສ້ອມໂຄງລົດ — ໃຫຍ່',                                cat:'Welding', vg:'all',       hr:6,   charge:580000,  sk:'L3' },
-    { name:'ສ້ອມສີ — ປະຕູ 1 ບານ',                                    cat:'Body',  vg:'pickup',      hr:6,   charge:680000,  sk:'L2' },
-    { name:'ສ້ອມສີ — ກວງລົດ 1 ບານ',                                  cat:'Body',  vg:'pickup',      hr:5,   charge:580000,  sk:'L2' },
-    { name:'ສ້ອມ Dent — ບໍ່ຕ້ອງສີ (PDR)',                            cat:'Body',  vg:'all',         hr:2,   charge:280000,  sk:'L2' },
-    { name:'ປ່ຽນກະຈົກໜ້າ Windshield',                                cat:'Body',  vg:'all',         hr:2,   charge:250000,  sk:'L2' },
-    { name:'ປ່ຽນແຫວ່ນແນມຫຼັງ',                                       cat:'Body',  vg:'all',         hr:0.5, charge:60000,   sk:'L1' },
+    { name:'ເຊື່ອມສ້ອມຂັນແມ່ນ Chassis',                              cat:'Welding', vg:'all',       hr:4,   charge:380000,  sk:'L3' },
+    // ❌ KALA ບໍ່ມີບໍລິການເຄາະ/ພົ່ນສີ/ເຄືອບສີ/ເສີມຄວາມງາມ
+    // ✅ ປ່ຽນກະຈົກ + ແຫວ່ນແນມຫຼັງ + ແກ ໃຫ້ຄ່າຍຄ່າ Function (ບໍ່ໃຊ່ Body)
+    { name:'ປ່ຽນກະຈົກໜ້າ Windshield (ໃຊ້ງານ ບໍ່ໃຊ່ສ້ອມສີ)',           cat:'Other', vg:'all',         hr:2,   charge:250000,  sk:'L2' },
+    { name:'ປ່ຽນແຫວ່ນແນມຫຼັງ',                                       cat:'Other', vg:'all',         hr:0.5, charge:60000,   sk:'L1' },
     { name:'ປ່ຽນແກ (Horn)',                                          cat:'Electrical', vg:'all',     hr:0.5, charge:50000,   sk:'L1' },
 
     // ==================== 🛠 ຊ່ວງລ່າງ ====================
@@ -15629,8 +15694,7 @@ async function seedServiceRates() {
 
     // ==================== 📌 ອື່ນໆ ====================
     { name:'ຍົກລົດ — Recovery / Towing (ໃນບໍລິສັດ)',                cat:'Other', vg:'all',         hr:2,   charge:300000,  sk:'L1' },
-    { name:'Detailing — ລ້າງ + Clean ໃນ',                            cat:'Other', vg:'all',         hr:2,   charge:150000,  sk:'L1' },
-    { name:'Detailing — Wax + Polish',                                cat:'Other', vg:'all',         hr:3,   charge:280000,  sk:'L1' },
+    { name:'ລ້າງ Engine bay (ກ່ອນສ້ອມ)',                              cat:'Other', vg:'all',         hr:1,   charge:80000,   sk:'L1' },
     { name:'Inspection ກ່ອນສົ່ງມອບ — Pre-delivery',                  cat:'Diagnostic', vg:'all',    hr:1,   charge:80000,   sk:'L1' },
     { name:'ກວດປະຈຳວັນ Daily Inspection',                            cat:'PM',    vg:'all',         hr:0.5, charge:50000,   sk:'L1' },
 
@@ -15808,6 +15872,109 @@ async function seedServiceRates() {
     { name:'[ໂມ່ປູນ] Water Pump + Tank Inspection',                          cat:'Other', vg:'trailer',       hr:1.5, charge:220000, sk:'L1' },
     { name:'[ໂມ່ປູນ] Chute Hydraulic Cylinder Service',                      cat:'Hydraulic', vg:'trailer', hr:3, charge:580000, sk:'L2' },
     { name:'[Trailer] King Pin + 5th Wheel Inspection',                       cat:'PM', vg:'trailer',          hr:2, charge:280000, sk:'L2' },
+
+    // ====================================================
+    // 🔩 ເພີ່ມເຕີມ — ສິ່ງທີ່ຍັງຂາດ (ສ້ອມແປງເທົ່ານັ້ນ — ບໍ່ມີສີ/ເຄາະ)
+    // ====================================================
+
+    // 🔧 ພວງມາ + Power Steering
+    { name:'ປ່ຽນ Power Steering Pump',                                       cat:'Other', vg:'all',          hr:3, charge:580000, sk:'L2' },
+    { name:'ປ່ຽນ Power Steering Fluid + Flush',                              cat:'PM', vg:'all',             hr:1, charge:150000, sk:'L1' },
+    { name:'ສ້ອມ Steering Rack (Rebuild)',                                   cat:'Other', vg:'all',          hr:6, charge:980000, sk:'L3' },
+    { name:'ປ່ຽນ Steering Tie Rod 1 ຄູ່',                                    cat:'Other', vg:'all',          hr:2, charge:280000, sk:'L2' },
+    { name:'ປັບ Steering Free Play',                                          cat:'PM', vg:'heavy_truck',      hr:1, charge:120000, sk:'L2' },
+
+    // 🛢 ນ້ຳມັນ + Fluids ເພີ່ມ
+    { name:'ປ່ຽນນ້ຳມັນເຄື່ອງ ດີຊີນ + Filter (4-6L)',                       cat:'PM', vg:'all',              hr:1, charge:120000, sk:'L1' },
+    { name:'ປ່ຽນນ້ຳມັນເຄື່ອງ HD ບັນທຸກ (10-20L)',                          cat:'PM', vg:'heavy_truck',      hr:1.5, charge:200000, sk:'L1' },
+    { name:'Flush + Refill Coolant System',                                  cat:'PM', vg:'all',              hr:2, charge:280000, sk:'L1' },
+    { name:'Flush + Refill Brake Fluid',                                     cat:'PM', vg:'all',              hr:1.5, charge:180000, sk:'L2' },
+    { name:'ປ່ຽນ Clutch Fluid + Bleed',                                      cat:'PM', vg:'all',              hr:1, charge:120000, sk:'L1' },
+
+    // 🔋 ໄຟຟ້າເພີ່ມ
+    { name:'ປ່ຽນ Headlight Bulb H4/H7',                                      cat:'Electrical', vg:'all',     hr:0.5, charge:50000,  sk:'L1' },
+    { name:'ປ່ຽນ Tail Light / Brake Light Bulb',                             cat:'Electrical', vg:'all',     hr:0.3, charge:30000,  sk:'L1' },
+    { name:'ປ່ຽນ Turn Signal Bulb',                                          cat:'Electrical', vg:'all',     hr:0.3, charge:30000,  sk:'L1' },
+    { name:'ປ່ຽນ Fuse + Relay (1 ຊິ້ນ)',                                    cat:'Electrical', vg:'all',     hr:0.5, charge:40000,  sk:'L1' },
+    { name:'ປ່ຽນ Knock Sensor',                                              cat:'Electrical', vg:'all',     hr:1.5, charge:220000, sk:'L2' },
+    { name:'ປ່ຽນ Crankshaft Position Sensor',                                cat:'Electrical', vg:'all',     hr:1.5, charge:220000, sk:'L2' },
+    { name:'ປ່ຽນ Camshaft Position Sensor',                                  cat:'Electrical', vg:'all',     hr:1.5, charge:220000, sk:'L2' },
+    { name:'ປ່ຽນ Throttle Position Sensor',                                  cat:'Electrical', vg:'all',     hr:1, charge:180000, sk:'L2' },
+    { name:'ປ່ຽນ Oxygen Sensor (O2/Lambda)',                                 cat:'Electrical', vg:'all',     hr:1, charge:180000, sk:'L2' },
+    { name:'ປ່ຽນ MAF Sensor',                                                cat:'Electrical', vg:'all',     hr:0.5, charge:120000, sk:'L1' },
+    { name:'ປ່ຽນ MAP Sensor',                                                cat:'Electrical', vg:'all',     hr:0.5, charge:120000, sk:'L1' },
+    { name:'ປ່ຽນ ABS Sensor + Reset',                                        cat:'Electrical', vg:'all',     hr:1.5, charge:220000, sk:'L2' },
+
+    // 🔄 ສາຍແລະ Belt
+    { name:'ປ່ຽນ V-Belt / Drive Belt',                                       cat:'PM', vg:'all',              hr:1, charge:120000, sk:'L1' },
+    { name:'ປ່ຽນ Serpentine Belt',                                           cat:'PM', vg:'all',              hr:1.5, charge:180000, sk:'L1' },
+    { name:'ປ່ຽນ Belt Tensioner + Idler',                                    cat:'Engine', vg:'all',          hr:2, charge:280000, sk:'L2' },
+
+    // 🛑 ເບຣກເພີ່ມ
+    { name:'ປ່ຽນ Brake Master Cylinder',                                     cat:'Brake', vg:'all',           hr:2.5, charge:380000, sk:'L2' },
+    { name:'ປ່ຽນ Brake Booster',                                             cat:'Brake', vg:'all',           hr:3, charge:480000, sk:'L2' },
+    { name:'ປ່ຽນ Wheel Cylinder',                                            cat:'Brake', vg:'all',           hr:1.5, charge:220000, sk:'L2' },
+    { name:'ປັບ Hand Brake / Parking Brake Cable',                           cat:'Brake', vg:'all',           hr:1, charge:120000, sk:'L1' },
+    { name:'ປ່ຽນ Brake Caliper Rebuild Kit',                                 cat:'Brake', vg:'all',           hr:3, charge:480000, sk:'L2' },
+    { name:'ປ່ຽນ Brake Hose 1 ຊິ້ນ',                                         cat:'Brake', vg:'all',           hr:1, charge:120000, sk:'L1' },
+
+    // 🔧 ສົ່ງກຳລັງເພີ່ມ
+    { name:'ປ່ຽນ Universal Joint (U-Joint)',                                  cat:'Other', vg:'all',           hr:2.5, charge:380000, sk:'L2' },
+    { name:'ປ່ຽນ Drive Shaft Center Support Bearing',                         cat:'Other', vg:'all',           hr:2, charge:280000, sk:'L2' },
+    { name:'ປັບ + Bleed Clutch Hydraulic',                                   cat:'Other', vg:'all',           hr:1, charge:120000, sk:'L1' },
+    { name:'ປ່ຽນ Clutch Master Cylinder',                                    cat:'Other', vg:'all',           hr:2, charge:280000, sk:'L2' },
+    { name:'ປ່ຽນ Clutch Slave Cylinder',                                     cat:'Other', vg:'all',           hr:2, charge:280000, sk:'L2' },
+    { name:'ປ່ຽນ Differential Bearing',                                       cat:'Other', vg:'all',           hr:6, charge:1200000,sk:'L3' },
+
+    // 🚗 ສ່ວນປະກອບອື່ນໆ
+    { name:'ປ່ຽນ Wiper Blade (1 ຄູ່)',                                      cat:'PM', vg:'all',               hr:0.3, charge:30000,  sk:'L1' },
+    { name:'ປ່ຽນ Wiper Motor',                                               cat:'Electrical', vg:'all',      hr:1.5, charge:220000, sk:'L2' },
+    { name:'ປ່ຽນ Wheel Stud / Lug Nut (1 ຊິ້ນ)',                            cat:'Other', vg:'all',            hr:0.5, charge:60000,  sk:'L1' },
+    { name:'ປ່ຽນ Wheel Hub Assembly',                                        cat:'Other', vg:'all',            hr:3, charge:480000, sk:'L2' },
+    { name:'ປ່ຽນ PCV Valve',                                                 cat:'Engine', vg:'all',           hr:0.5, charge:80000,  sk:'L1' },
+    { name:'ປ່ຽນ Cabin Air Filter',                                          cat:'PM', vg:'all',               hr:0.5, charge:50000,  sk:'L1' },
+    { name:'ປ່ຽນ Catalytic Converter',                                       cat:'Engine', vg:'all',           hr:3, charge:780000, sk:'L2' },
+    { name:'ປ່ຽນ VVT Solenoid (Variable Valve Timing)',                      cat:'Engine', vg:'all',           hr:2, charge:380000, sk:'L2' },
+    { name:'ປ່ຽນ EGR Cooler',                                                cat:'Engine', vg:'all',           hr:4, charge:780000, sk:'L3' },
+    { name:'Clean Common Rail Injector (Ultrasonic)',                         cat:'Engine', vg:'all',           hr:3, charge:580000, sk:'L3' },
+    { name:'ປັບ Valve Clearance (Diesel)',                                   cat:'Engine', vg:'all',           hr:4, charge:580000, sk:'L3' },
+    { name:'ປ່ຽນ Engine Mount 1 ຊິ້ນ',                                       cat:'Engine', vg:'all',           hr:1.5, charge:220000, sk:'L2' },
+    { name:'ປ່ຽນ Transmission Mount',                                        cat:'Other', vg:'all',            hr:1.5, charge:220000, sk:'L2' },
+    { name:'ປ່ຽນ Exhaust Pipe / Muffler',                                   cat:'Other', vg:'all',            hr:2, charge:280000, sk:'L2' },
+    { name:'ປ່ຽນ AdBlue Tank / DEF Tank',                                    cat:'Engine', vg:'heavy_truck',   hr:3, charge:580000, sk:'L2' },
+
+    // 🛠 ສະເພາະ ບໍ່ມີໝວດ
+    { name:'ປ່ຽນ Door Lock Actuator',                                        cat:'Electrical', vg:'all',      hr:1.5, charge:220000, sk:'L2' },
+    { name:'ປ່ຽນ Door Handle (Function)',                                    cat:'Other', vg:'all',            hr:1, charge:120000, sk:'L1' },
+    { name:'ປ່ຽນ Seat Belt',                                                 cat:'Other', vg:'all',            hr:1, charge:120000, sk:'L1' },
+    { name:'ປ່ຽນ Floor Mat',                                                 cat:'Other', vg:'all',            hr:0.3, charge:30000,  sk:'L1' },
+    { name:'ປ່ຽນ Rubber Door Seal',                                          cat:'Other', vg:'all',            hr:1, charge:120000, sk:'L1' },
+
+    // 🏗 ໂຟກລິບ ສະເພາະເພີ່ມ
+    { name:'ປ່ຽນ Forklift Drive Tire (Solid)',                              cat:'Tire', vg:'forklift',         hr:2, charge:380000, sk:'L2' },
+    { name:'ປ່ຽນ Forklift Steering Tire',                                   cat:'Tire', vg:'forklift',         hr:1.5, charge:280000, sk:'L2' },
+    { name:'ສ້ອມ Hydraulic Hose Forklift (1 ຊິ້ນ)',                        cat:'Hydraulic', vg:'forklift',  hr:1, charge:180000, sk:'L1' },
+    { name:'ປ່ຽນ Forklift Battery (Electric)',                              cat:'Electrical', vg:'forklift',  hr:2, charge:380000, sk:'L2' },
+
+    // 🚜 ແບັກໂຮ ສະເພາະເພີ່ມ
+    { name:'ປ່ຽນ Excavator Track Idler',                                     cat:'Other', vg:'excavator',      hr:4, charge:850000, sk:'L3' },
+    { name:'ປ່ຽນ Excavator Track Roller (1 ຊິ້ນ)',                         cat:'Other', vg:'excavator',      hr:3, charge:580000, sk:'L2' },
+    { name:'ປ່ຽນ Excavator Counterweight Mount',                            cat:'Welding', vg:'excavator',    hr:3, charge:480000, sk:'L3' },
+    { name:'ປ່ຽນ Excavator Cab Glass',                                      cat:'Other', vg:'excavator',      hr:2, charge:380000, sk:'L2' },
+    { name:'Adjust Track Tension (ປັບຄວາມຕຶງຕີນຕະຂາບ)',                   cat:'PM', vg:'excavator',          hr:1, charge:150000, sk:'L1' },
+
+    // 🚜 ລົດໄຖ ສະເພາະເພີ່ມ
+    { name:'ປ່ຽນ Tractor Front Wheel Bearing',                              cat:'Other', vg:'tractor',        hr:2, charge:280000, sk:'L2' },
+    { name:'ປັບ Tractor Steering Free Play',                                cat:'PM', vg:'tractor',           hr:1, charge:120000, sk:'L1' },
+    { name:'ປ່ຽນ Implement 3-Point Pin',                                    cat:'Other', vg:'tractor',        hr:1, charge:120000, sk:'L1' },
+
+    // 🚛 ບັນທຸກໜັກ ສະເພາະເພີ່ມ
+    { name:'ປ່ຽນ Spring U-Bolt (ບັນທຸກ)',                                   cat:'Other', vg:'heavy_truck',    hr:3, charge:480000, sk:'L2' },
+    { name:'ປ່ຽນ Shackle Pin (Suspension)',                                 cat:'Other', vg:'heavy_truck',    hr:3, charge:480000, sk:'L2' },
+    { name:'ປ່ຽນ Slack Adjuster (Air Brake)',                               cat:'Brake', vg:'heavy_truck',    hr:1.5, charge:280000, sk:'L2' },
+    { name:'ປ່ຽນ Air Tank Drain Valve',                                     cat:'Brake', vg:'heavy_truck',    hr:0.5, charge:80000,  sk:'L1' },
+    { name:'ປ່ຽນ Cab Mount Rubber',                                          cat:'Other', vg:'heavy_truck',    hr:2.5, charge:380000, sk:'L2' },
+    { name:'ປ່ຽນ Exhaust Muffler HD',                                       cat:'Other', vg:'heavy_truck',    hr:2.5, charge:580000, sk:'L2' },
   ];
 
   // ສ້າງລະຫັດ RP-0001+ ໃຫ້ແຕ່ລະລາຍການ
@@ -15884,6 +16051,8 @@ pages.service_rates = async () => {
       <button class="btn" onclick="openServiceRateModal()">+ ເພີ່ມຄ່າແຮງ</button>
       ${all.length > 0 ? `<button class="btn outline" onclick="seedServiceRates()" title="ໂຫຼດເພີ່ມມາດຕະຖານ KALA">📦 ໂຫຼດມາດຕະຖານ</button>` : ''}
       ${all.some(r => !String(r.service_code||'').startsWith('RP-')) && isAdmin() ? `<button class="btn outline" style="background:#7C3AED;color:#fff" onclick="renumberServiceCodes()" title="ປ່ຽນລະຫັດເກົ່າທັງໝົດເປັນ RP-0001+">🔢 ປ່ຽນລະຫັດເປັນ RP-0001</button>` : ''}
+      ${all.some(r => r.category==='Body' || ['ສ້ອມສີ','ພົ່ນສີ','ເຄາະ','PDR','Detailing','Wax','Polish'].some(k => (r.service_name||'').includes(k))) && (typeof cloud==='undefined' || !cloud.profile || cloud.hasRole('owner','it')) ? `<button class="btn outline" style="background:#EF4444;color:#fff" onclick="cleanupBodyPaintRates()" title="KALA ບໍ່ມີບໍລິການເຄາະ/ສີ/ເສີມຄວາມງາມ">🧹 ລ້າງລາຍການເຄາະ/ສີ</button>` : ''}
+      ${all.length > 0 && (typeof cloud==='undefined' || !cloud.profile || cloud.hasRole('owner','it')) ? `<button class="btn" style="background:#7F1D1D;color:#fff" onclick="deleteAllServiceRates()" title="ລົບທັງໝົດ ${all.length} ລາຍການ — Admin only">🗑 ລົບທັງໝົດ (${all.length})</button>` : ''}
     </div>
 
     <div class="card" style="padding:0">
