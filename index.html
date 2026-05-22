@@ -18089,16 +18089,41 @@ async function openVehicleUsageModal(prefillVehicleId, editId, forcedType) {
   const branches = allBranches.filter(b => b.active !== false);
   const branchOptions = branches.map(b => `<option value="${escapeHtml(b.name)}" ${u.branch_from===b.name?'selected':''}>${escapeHtml(b.name)}</option>`).join('');
   const branchOptionsTo = branches.map(b => `<option value="${escapeHtml(b.name)}" ${u.branch_to===b.name?'selected':''}>${escapeHtml(b.name)}</option>`).join('');
-  // 📍 ດຶງ Locations (active) ສຳລັບ dropdown ຈຸດອອກ/ຈຸດໝາຍ
-  const allLocations = (await db.locations.toArray()).filter(l => l.active !== false).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
-  const locOptionsFrom = allLocations.map(l => {
+  // 📍 ດຶງ Locations (active) ສຳລັບ dropdown ຈຸດອອກ/ຈຸດໝາຍ — ຈັດກຸ່ມຕາມແຂວງ → ປະເພດ
+  const allLocations = (await db.locations.toArray()).filter(l => l.active !== false)
+    .sort((a,b)=>(a.province||'').localeCompare(b.province||'') || (a.name||'').localeCompare(b.name||''));
+  // ສ້າງ Datalist ສຳລັບ searchable combobox
+  const buildDatalistOptions = (selectedId) => {
+    return allLocations.map(l => {
+      const lt = LOCATION_TYPES.find(t => t.key === l.type);
+      const icon = lt?.icon || '📍';
+      const short = lt?.short || '';
+      const parts = [l.name, l.village, l.district, l.province].filter(Boolean);
+      return `<option data-id="${l.id}" value="${escapeHtml(l.name)} — ${escapeHtml(short)}${l.province?' • '+escapeHtml(l.province):''}${l.district&&l.district!==l.name?' / '+escapeHtml(l.district):''}">${icon}</option>`;
+    }).join('');
+  };
+  const datalistFrom = buildDatalistOptions(u.start_location_id);
+  const datalistTo = buildDatalistOptions(u.end_location_id);
+  // ສ້າງ Map ສຳລັບ resolve display value → id
+  const locDisplayMap = {};
+  allLocations.forEach(l => {
     const lt = LOCATION_TYPES.find(t => t.key === l.type);
-    return `<option value="${l.id}" ${u.start_location_id==l.id?'selected':''}>${lt?.label.charAt(0)||'📍'} ${escapeHtml(l.name)}${l.village?' — '+escapeHtml(l.village):''}</option>`;
-  }).join('');
-  const locOptionsTo = allLocations.map(l => {
+    const short = lt?.short || '';
+    const displayVal = `${l.name} — ${short}${l.province?' • '+l.province:''}${l.district&&l.district!==l.name?' / '+l.district:''}`;
+    locDisplayMap[displayVal.toLowerCase()] = l.id;
+  });
+  window._locDisplayMap = locDisplayMap;
+  window._locAll = allLocations;
+  // ດຶງ display value ສຳລັບ pre-fill
+  const getDisplayFor = (id) => {
+    const l = allLocations.find(x => x.id == id);
+    if (!l) return '';
     const lt = LOCATION_TYPES.find(t => t.key === l.type);
-    return `<option value="${l.id}" ${u.end_location_id==l.id?'selected':''}>${lt?.label.charAt(0)||'📍'} ${escapeHtml(l.name)}${l.village?' — '+escapeHtml(l.village):''}</option>`;
-  }).join('');
+    const short = lt?.short || '';
+    return `${l.name} — ${short}${l.province?' • '+l.province:''}${l.district&&l.district!==l.name?' / '+l.district:''}`;
+  };
+  const startDisplay = u.start_location_id ? getDisplayFor(u.start_location_id) : '';
+  const endDisplay = u.end_location_id ? getDisplayFor(u.end_location_id) : '';
 
   modal(editId ? `✏️ ແກ້ໄຂບັນທຶກໃຊ້ລົດ` : `🚚 ບັນທຶກໃຊ້ລົດ`, `
     <div class="row">
@@ -18147,22 +18172,21 @@ async function openVehicleUsageModal(prefillVehicleId, editId, forcedType) {
     </div>
 
     <h4 style="color:var(--primary-2);margin:12px 0 6px;font-size:13px">📍 ສະຖານທີ່ + ໄລຍະທາງ
-      ${allLocations.length === 0 ? '<small style="color:var(--warn)">⚠️ ຍັງບໍ່ມີສະຖານທີ່ — <a href="javascript:closeModal();go(\'locations\')" style="color:var(--accent)">ສ້າງກ່ອນ</a></small>' : ''}
+      <small style="font-weight:400;color:var(--muted)">— ${allLocations.length} ສະຖານທີ່</small>
+      ${allLocations.length === 0 ? '<small style="color:var(--warn)">⚠️ ຍັງບໍ່ມີ — <a href="javascript:closeModal();go(\'locations\')" style="color:var(--accent)">ສ້າງກ່ອນ</a></small>' : ''}
     </h4>
     <div class="row">
-      <div class="fld"><label>ຈຸດອອກ <small style="color:var(--muted)">(ເລືອກຈາກ Database)</small></label>
-        <select id="uy_start_loc_id" onchange="autoFillUsageDistance()">
-          <option value="">— ປ້ອນເອງດ້ານລຸ່ມ —</option>
-          ${locOptionsFrom}
-        </select>
-        <input id="uy_start_loc" value="${escapeHtml(u.start_location||'')}" placeholder="ຫຼື ປ້ອນຊື່ສະຖານທີ່ເອງ" style="margin-top:4px"/>
+      <div class="fld"><label>🚩 ຈຸດອອກ <small style="color:var(--muted)">(ພິມເພື່ອຄົ້ນຫາ — Auto-complete)</small></label>
+        <input id="uy_start_loc_search" list="dl_loc_from" value="${escapeHtml(startDisplay)}"
+          placeholder="ພິມຊື່ບ້ານ/ເມືອງ/ແຂວງ..." onchange="resolveLocationInput('start')" oninput="resolveLocationInput('start')"/>
+        <datalist id="dl_loc_from">${datalistFrom}</datalist>
+        <input type="hidden" id="uy_start_loc_id" value="${u.start_location_id||''}"/>
+        <input type="hidden" id="uy_start_loc" value="${escapeHtml(u.start_location||'')}"/>
       </div>
-      <div class="fld"><label>ຈຸດໝາຍ <small style="color:var(--muted)">(ເລືອກຈາກ Database)</small></label>
-        <select id="uy_end_loc_id" onchange="autoFillUsageDistance()">
-          <option value="">— ປ້ອນເອງດ້ານລຸ່ມ —</option>
-          ${locOptionsTo}
-        </select>
-        <input id="uy_end_loc" value="${escapeHtml(u.end_location||'')}" placeholder="ຫຼື ປ້ອນຊື່ສະຖານທີ່ເອງ" style="margin-top:4px"/>
+      <div class="fld"><label>🎯 ຈຸດໝາຍ <small style="color:var(--muted)">(ພິມເພື່ອຄົ້ນຫາ — Auto-complete)</small></label>
+        <input id="uy_end_loc_search" list="dl_loc_to" value="${escapeHtml(endDisplay)}"
+          placeholder="ພິມຊື່ບ້ານ/ເມືອງ/ແຂວງ..." onchange="resolveLocationInput('end')" oninput="resolveLocationInput('end')"/>
+        <datalist id="dl_loc_to">${datalistTo}</datalist>
       </div>
     </div>
     <div id="uy_distance_hint" style="font-size:12px;color:var(--ok);background:#ECFDF5;padding:6px 10px;border-radius:6px;margin:4px 0;display:none"></div>
@@ -18221,6 +18245,37 @@ async function openVehicleUsageModal(prefillVehicleId, editId, forcedType) {
   } catch (e) {
     console.error('openVehicleUsageModal error:', e);
     toast('❌ ເປີດຟອມບໍ່ສຳເລັດ: ' + e.message, 'bad');
+  }
+}
+
+// 🔍 Resolve searchable input → location id (datalist-based combobox)
+function resolveLocationInput(side) {
+  const inp = $(side === 'start' ? '#uy_start_loc_search' : '#uy_end_loc_search');
+  if (!inp) return;
+  const val = (inp.value || '').trim();
+  const map = window._locDisplayMap || {};
+  const id = map[val.toLowerCase()];
+  if (id) {
+    if (side === 'start') {
+      if ($('#uy_start_loc_id')) $('#uy_start_loc_id').value = id;
+      // ດຶງ name ໃສ່ free-text field
+      const loc = (window._locAll||[]).find(x => x.id == id);
+      if (loc && $('#uy_start_loc')) $('#uy_start_loc').value = loc.name;
+    } else {
+      if ($('#uy_end_loc_id')) $('#uy_end_loc_id').value = id;
+      const loc = (window._locAll||[]).find(x => x.id == id);
+      if (loc && $('#uy_end_loc')) $('#uy_end_loc').value = loc.name;
+    }
+    autoFillUsageDistance();
+  } else {
+    // Free-text — ບໍ່ມີ id
+    if (side === 'start') {
+      if ($('#uy_start_loc_id')) $('#uy_start_loc_id').value = '';
+      if ($('#uy_start_loc')) $('#uy_start_loc').value = val;
+    } else {
+      if ($('#uy_end_loc_id')) $('#uy_end_loc_id').value = '';
+      if ($('#uy_end_loc')) $('#uy_end_loc').value = val;
+    }
   }
 }
 
@@ -18746,16 +18801,16 @@ async function renderUsageReport(cfg) {
 // =============================================================================
 
 const LOCATION_TYPES = [
-  { key: 'branch',            label: '🏢 ສາຂາ KALA',           color: '#1F2937' },
-  { key: 'province',          label: '🌏 ແຂວງ',                color: '#7C3AED' },
-  { key: 'district',          label: '🏛 ເມືອງ',                color: '#2563EB' },
-  { key: 'town',              label: '🏙 ຕົວເມືອງ',              color: '#3B82F6' },
-  { key: 'village',           label: '🏘 ບ້ານ',                  color: '#10B981' },
-  { key: 'landmark',          label: '📍 ສະຖານທີ່ສຳຄັນ',         color: '#8B5CF6' },
-  { key: 'customer_site',     label: '👤 ທີ່ຢູ່ລູກຄ້າປະຈຳ',      color: '#F59E0B' },
-  { key: 'construction_site', label: '🏗 ໂຄງການກໍ່ສ້າງ',         color: '#EF4444' },
-  { key: 'market',            label: '🏪 ຕະຫຼາດ',               color: '#06B6D4' },
-  { key: 'poi',               label: '⭐ POI (ສະຖານທີ່ສຳຄັນ)',    color: '#EC4899' },
+  { key: 'branch',            icon: '🏢', label: '🏢 ສາຂາ KALA',           short: 'ສາຂາ',    color: '#1F2937' },
+  { key: 'province',          icon: '🌏', label: '🌏 ແຂວງ',                short: 'ແຂວງ',    color: '#7C3AED' },
+  { key: 'district',          icon: '🏛', label: '🏛 ເມືອງ',                short: 'ເມືອງ',   color: '#2563EB' },
+  { key: 'town',              icon: '🏙', label: '🏙 ຕົວເມືອງ',              short: 'ຕົວເມືອງ', color: '#3B82F6' },
+  { key: 'village',           icon: '🏘', label: '🏘 ບ້ານ',                  short: 'ບ້ານ',    color: '#10B981' },
+  { key: 'landmark',          icon: '📍', label: '📍 ສະຖານທີ່ສຳຄັນ',         short: 'Landmark', color: '#8B5CF6' },
+  { key: 'customer_site',     icon: '👤', label: '👤 ທີ່ຢູ່ລູກຄ້າປະຈຳ',      short: 'ລູກຄ້າ',  color: '#F59E0B' },
+  { key: 'construction_site', icon: '🏗', label: '🏗 ໂຄງການກໍ່ສ້າງ',         short: 'ໂຄງການ', color: '#EF4444' },
+  { key: 'market',            icon: '🏪', label: '🏪 ຕະຫຼາດ',               short: 'ຕະຫຼາດ',  color: '#06B6D4' },
+  { key: 'poi',               icon: '⭐', label: '⭐ POI (ສະຖານທີ່ສຳຄັນ)',    short: 'POI',     color: '#EC4899' },
 ];
 
 // 18 ແຂວງລາວ (ລວມນະຄອນຫຼວງ)
@@ -18839,9 +18894,10 @@ pages.locations = async () => {
         style="padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;min-width:220px"/>
       <button class="btn outline" onclick="window._locFilter={type:'',province:'',q:''};pages.locations()">🔄 ລ້າງ</button>
       <div style="flex:1"></div>
-      <button class="btn outline" onclick="openDistanceMatrix()">🛣 ຈັດການໄລຍະທາງ</button>
-      <button class="btn outline" onclick="openLocationsCSVImport()">📥 ນຳເຂົ້າ CSV</button>
+      <button class="btn outline" onclick="openDistanceMatrix()">🛣 Matrix</button>
+      <button class="btn outline" onclick="openLocationsCSVImport()">📥 CSV</button>
       <button class="btn outline" onclick="seedKalaLocations()">🌏 ໂຫລດ 18 ແຂວງ</button>
+      <button class="btn outline" style="background:#7C3AED;color:#fff" onclick="seedDetailedSouthLogistics()">🎯 Expert Data (ໃຕ້ + ກາງ)</button>
       <button class="btn ok" onclick="openLocationModal()">+ ເພີ່ມສະຖານທີ່</button>
     </div>
 
@@ -19172,6 +19228,186 @@ async function seedKalaLocations() {
     } else skipped++;
   }
   toast(`📥 ໂຫລດ ${added} ສະຖານທີ່ໃໝ່${skipped>0?` • ມີຢູ່ແລ້ວ ${skipped}`:''}`);
+  pages.locations();
+}
+
+// 🏛 ເມືອງລະອຽດ ສຳລັບ 4 ແຂວງໃຕ້ + ສະຫວັນ + ຄຳມ່ວນ + ນະຄອນຫຼວງວຽງຈັນ — Expert Logistic Level
+const LAO_DISTRICTS_DETAILED = [
+  // ===== ຈຳປາສັກ (10 ເມືອງ) =====
+  ['ຈຳປາສັກ', 'ປາກເຊ',                    15.1202, 105.7989, 'capital'],
+  ['ຈຳປາສັກ', 'ຊະນະສົມບູນ',                15.0167, 105.9500],
+  ['ຈຳປາສັກ', 'ບາຈຽງຈະເລີນສຸກ',           15.4500, 106.1667],
+  ['ຈຳປາສັກ', 'ປາກຊ່ອງ',                  15.1969, 106.2333],
+  ['ຈຳປາສັກ', 'ປະທຸມພອນ',                 14.8000, 105.7833],
+  ['ຈຳປາສັກ', 'ໂພນທອງ',                   15.3833, 105.8500],
+  ['ຈຳປາສັກ', 'ໂຂງ (4000 ດອນ)',           14.0833, 105.8333],
+  ['ຈຳປາສັກ', 'ມຸລະປະໂມກ',                14.4833, 105.6500],
+  ['ຈຳປາສັກ', 'ສຸຂຸມາ',                    14.4500, 105.8167],
+  ['ຈຳປາສັກ', 'ຈຳປາສັກ (ເມືອງ)',           14.8833, 105.8500],
+  // ===== ສາລະວັນ (8 ເມືອງ) =====
+  ['ສາລະວັນ', 'ສາລະວັນ',                   15.7140, 106.4220, 'capital'],
+  ['ສາລະວັນ', 'ຕະໂອ້ຍ',                    16.0833, 106.4000],
+  ['ສາລະວັນ', 'ຕ້ອມລານ',                   16.0167, 106.5500],
+  ['ສາລະວັນ', 'ວາປີ',                       15.6333, 106.2667],
+  ['ສາລະວັນ', 'ເລົ່າງາມ',                  15.4500, 106.2167],
+  ['ສາລະວັນ', 'ຄົງເຊໂດນ',                  15.5667, 105.8000],
+  ['ສາລະວັນ', 'ລະຄອນເພັງ',                 15.7333, 105.9667],
+  ['ສາລະວັນ', 'ສະໝ້ວຍ',                    15.9667, 106.6167],
+  // ===== ເຊກອງ (4 ເມືອງ) =====
+  ['ເຊກອງ', 'ລະມາມ',                       15.3458, 106.7308, 'capital'],
+  ['ເຊກອງ', 'ກະລື່ມ',                       15.6333, 106.8000],
+  ['ເຊກອງ', 'ດາກຈຶງ',                       15.4000, 107.3833],
+  ['ເຊກອງ', 'ທ່າແຕງ',                       15.4500, 106.5000],
+  // ===== ອັດຕະປື (5 ເມືອງ) =====
+  ['ອັດຕະປື', 'ສາມັກຄີໄຊ',                 14.8079, 106.8420, 'capital'],
+  ['ອັດຕະປື', 'ໄຊເຊດຖາ',                   14.6500, 106.9167],
+  ['ອັດຕະປື', 'ສະໜາມໄຊ',                   14.8000, 106.5667],
+  ['ອັດຕະປື', 'ພູວົງ',                       14.7500, 107.1500],
+  ['ອັດຕະປື', 'ສະຍຸ້ມສຸກ',                 14.9000, 106.6000],
+  // ===== ສະຫວັນນະເຂດ (15 ເມືອງ) =====
+  ['ສະຫວັນນະເຂດ', 'ໄກສອນພົມວິຫານ',         16.5544, 104.7517, 'capital'],
+  ['ສະຫວັນນະເຂດ', 'ເຊໂນ',                    16.6833, 105.0167],
+  ['ສະຫວັນນະເຂດ', 'ໄຊບູລີ',                  16.5667, 105.5500],
+  ['ສະຫວັນນະເຂດ', 'ອາດສະພອນ',               16.7333, 105.4833],
+  ['ສະຫວັນນະເຂດ', 'ອາດສະພັງທອງ',           16.6500, 105.2667],
+  ['ສະຫວັນນະເຂດ', 'ຈຳພອນ',                  16.4000, 105.2333],
+  ['ສະຫວັນນະເຂດ', 'ນອງ',                     16.4500, 106.6167],
+  ['ສະຫວັນນະເຂດ', 'ອູທຸມພອນ',               16.6167, 105.1500],
+  ['ສະຫວັນນະເຂດ', 'ພິນ',                      16.5667, 106.0167],
+  ['ສະຫວັນນະເຂດ', 'ເຊໂປນ',                   16.7167, 106.2333],
+  ['ສະຫວັນນະເຂດ', 'ສອງຄອນ',                 16.0667, 105.0833],
+  ['ສະຫວັນນະເຂດ', 'ທ່າປາງທອງ',              16.0333, 105.7167],
+  ['ສະຫວັນນະເຂດ', 'ວິລະບູລີ',                16.6667, 106.5333],
+  ['ສະຫວັນນະເຂດ', 'ໄຊພູທອງ',                 16.1167, 105.0667],
+  ['ສະຫວັນນະເຂດ', 'ພະລານໄຊ',                 16.4167, 105.7333],
+  // ===== ຄຳມ່ວນ (10 ເມືອງ) =====
+  ['ຄຳມ່ວນ', 'ທ່າແຂກ',                       17.4116, 105.0944, 'capital'],
+  ['ຄຳມ່ວນ', 'ມະຫາໄຊ',                       17.4500, 105.4500],
+  ['ຄຳມ່ວນ', 'ໜອງບົກ',                       17.4500, 104.7833],
+  ['ຄຳມ່ວນ', 'ຫີນບູນ',                       17.6500, 104.8333],
+  ['ຄຳມ່ວນ', 'ຍົມມະລາດ',                     17.7333, 105.0833],
+  ['ຄຳມ່ວນ', 'ບົວລະພາ',                       17.2167, 105.8667],
+  ['ຄຳມ່ວນ', 'ນາກາຍ',                         17.7500, 105.1167],
+  ['ຄຳມ່ວນ', 'ເຊບັ້ງໄຟ',                    16.9667, 104.8500],
+  ['ຄຳມ່ວນ', 'ຄູນຄຳ',                         18.0333, 105.0833],
+  ['ຄຳມ່ວນ', 'ຊາວເຫຍດ',                       17.5167, 105.6500],
+  // ===== ນະຄອນຫຼວງວຽງຈັນ (9 ເມືອງ) =====
+  ['ນະຄອນຫຼວງວຽງຈັນ', 'ຈັນທະບູລີ',         17.9757, 102.6331, 'capital'],
+  ['ນະຄອນຫຼວງວຽງຈັນ', 'ສີໂຄດຕະບອງ',        17.9700, 102.5500],
+  ['ນະຄອນຫຼວງວຽງຈັນ', 'ສີສັດຕະນາກ',         17.9528, 102.6500],
+  ['ນະຄອນຫຼວງວຽງຈັນ', 'ໄຊເສດຖາ',            17.9886, 102.6678],
+  ['ນະຄອນຫຼວງວຽງຈັນ', 'ນາຊາຍທອງ',            18.0167, 102.4833],
+  ['ນະຄອນຫຼວງວຽງຈັນ', 'ໄຊທານີ',              18.1167, 102.6833],
+  ['ນະຄອນຫຼວງວຽງຈັນ', 'ຫາດຊາຍຟອງ',          17.9000, 102.7333],
+  ['ນະຄອນຫຼວງວຽງຈັນ', 'ສັງທອງ',              18.4167, 102.4167],
+  ['ນະຄອນຫຼວງວຽງຈັນ', 'ໝື່ນວຽງ',             18.0500, 102.9500],
+];
+
+// 🛣 ໄລຍະທາງ Pre-Seed ຕາມເສັ້ນທາງ 13 ໃຕ້ + ເສັ້ນຫຼັກໆ (km ໂດຍປະມານ ຕາມຖະໜົນ)
+// ໃຊ້ String key "ສາລະວັນ:ສາລະວັນ" → ໄລຍະຈາກ ປາກເຊ → ສາລະວັນ = 130 km, etc.
+const LAO_ROUTE_DISTANCES = [
+  // ===== Route 13 South: ປາກເຊ → ສະຫວັນ → ທ່າແຂກ → ວຽງຈັນ =====
+  ['ປາກເຊ', 'ໄກສອນພົມວິຫານ', 230, 'Route 13 South'],
+  ['ປາກເຊ', 'ເຊໂນ', 250, 'Route 13 South'],
+  ['ປາກເຊ', 'ທ່າແຂກ', 350, 'Route 13 South'],
+  ['ປາກເຊ', 'ຈັນທະບູລີ', 700, 'Route 13 South'],
+  ['ໄກສອນພົມວິຫານ', 'ເຊໂນ', 35, 'Route 13'],
+  ['ໄກສອນພົມວິຫານ', 'ທ່າແຂກ', 125, 'Route 13'],
+  ['ໄກສອນພົມວິຫານ', 'ຈັນທະບູລີ', 470, 'Route 13'],
+  ['ທ່າແຂກ', 'ຈັນທະບູລີ', 350, 'Route 13'],
+  ['ເຊໂນ', 'ທ່າແຂກ', 95, 'Route 13'],
+  // ===== ປາກເຊ → ເມືອງໃກ້ຄຽງ =====
+  ['ປາກເຊ', 'ປາກຊ່ອງ', 50, 'Route 16 East'],
+  ['ປາກເຊ', 'ໂຂງ (4000 ດອນ)', 120, 'Route 13 South'],
+  ['ປາກເຊ', 'ສາລະວັນ', 130, 'Route 20'],
+  ['ປາກເຊ', 'ລະມາມ', 175, 'Route 16-23'],
+  ['ປາກເຊ', 'ສາມັກຄີໄຊ', 200, 'Route 18'],
+  ['ປາກເຊ', 'ບາຈຽງຈະເລີນສຸກ', 30, 'Route 16'],
+  ['ປາກເຊ', 'ຈຳປາສັກ (ເມືອງ)', 35, 'West Bank'],
+  ['ປາກເຊ', 'ປະທຸມພອນ', 45, 'South'],
+  ['ປາກເຊ', 'ໂພນທອງ', 25, 'Route 13'],
+  ['ປາກເຊ', 'ສຸຂຸມາ', 75, 'South'],
+  ['ປາກເຊ', 'ມຸລະປະໂມກ', 95, 'South'],
+  ['ປາກເຊ', 'ຊະນະສົມບູນ', 20, 'East'],
+  // ===== ສາລະວັນ → ເມືອງໃກ້ຄຽງ =====
+  ['ສາລະວັນ', 'ຄົງເຊໂດນ', 60, 'Route 20'],
+  ['ສາລະວັນ', 'ລະຄອນເພັງ', 35, 'Route 20'],
+  ['ສາລະວັນ', 'ວາປີ', 30, 'East'],
+  ['ສາລະວັນ', 'ເລົ່າງາມ', 45, 'South'],
+  ['ສາລະວັນ', 'ຕະໂອ້ຍ', 55, 'North'],
+  // ===== ເຊກອງ → ເມືອງໃກ້ຄຽງ =====
+  ['ລະມາມ', 'ທ່າແຕງ', 40, 'West'],
+  ['ລະມາມ', 'ກະລື່ມ', 75, 'East'],
+  ['ລະມາມ', 'ດາກຈຶງ', 110, 'East'],
+  // ===== ອັດຕະປື → ເມືອງໃກ້ຄຽງ =====
+  ['ສາມັກຄີໄຊ', 'ໄຊເຊດຖາ', 25, 'South'],
+  ['ສາມັກຄີໄຊ', 'ສະໜາມໄຊ', 50, 'West'],
+  ['ສາມັກຄີໄຊ', 'ສະຍຸ້ມສຸກ', 35, 'North'],
+  ['ສາມັກຄີໄຊ', 'ພູວົງ', 45, 'East'],
+  // ===== ສະຫວັນນະເຂດ → ເມືອງໃກ້ຄຽງ =====
+  ['ໄກສອນພົມວິຫານ', 'ໄຊບູລີ', 80, 'East'],
+  ['ໄກສອນພົມວິຫານ', 'ອາດສະພອນ', 65, 'NE'],
+  ['ໄກສອນພົມວິຫານ', 'ຈຳພອນ', 50, 'South'],
+  ['ໄກສອນພົມວິຫານ', 'ສອງຄອນ', 65, 'South'],
+  ['ໄກສອນພົມວິຫານ', 'ເຊໂປນ', 195, 'Route 9 East'],
+  ['ໄກສອນພົມວິຫານ', 'ພິນ', 130, 'Route 9'],
+  // ===== ຄຳມ່ວນ → ເມືອງໃກ້ຄຽງ =====
+  ['ທ່າແຂກ', 'ມະຫາໄຊ', 45, 'East'],
+  ['ທ່າແຂກ', 'ໜອງບົກ', 20, 'NW'],
+  ['ທ່າແຂກ', 'ຫີນບູນ', 50, 'NW'],
+  ['ທ່າແຂກ', 'ນາກາຍ', 95, 'East'],
+  // ===== ນະຄອນຫຼວງວຽງຈັນ → ເຂດໃກ້ຄຽງ =====
+  ['ຈັນທະບູລີ', 'ສີໂຄດຕະບອງ', 8, 'City'],
+  ['ຈັນທະບູລີ', 'ສີສັດຕະນາກ', 5, 'City'],
+  ['ຈັນທະບູລີ', 'ໄຊເສດຖາ', 7, 'City'],
+  ['ຈັນທະບູລີ', 'ນາຊາຍທອງ', 18, 'NW'],
+  ['ຈັນທະບູລີ', 'ໄຊທານີ', 25, 'NE'],
+  ['ຈັນທະບູລີ', 'ຫາດຊາຍຟອງ', 15, 'East'],
+  ['ຈັນທະບູລີ', 'ສັງທອງ', 65, 'West'],
+];
+
+// ໂຫລດເມືອງລະອຽດ + Pre-seed ໄລຍະທາງ
+async function seedDetailedSouthLogistics() {
+  if (!confirm(`ໂຫລດ Expert Logistic Data:\n• ${LAO_DISTRICTS_DETAILED.length} ເມືອງລະອຽດ (ຈຳປາສັກ, ສາລະວັນ, ເຊກອງ, ອັດຕະປື, ສະຫວັນ, ຄຳມ່ວນ, ນະຄອນຫຼວງ)\n• ${LAO_ROUTE_DISTANCES.length} ໄລຍະທາງຕາມຖະໜົນຫຼັກ (Route 13, 9, 16, 18, 20)\n\nພ້ອມ GPS ທຸກຈຸດ + ໄລຍະທາງຕາມຖະໜົນຈິງ`)) return;
+  const all = await db.locations.toArray();
+  let added = 0, skipped = 0;
+  // ໂຫລດເມືອງ
+  for (const row of LAO_DISTRICTS_DETAILED) {
+    const [province, name, lat, lng, mark] = row;
+    const existing = all.find(l => l.type === 'district' && l.name === name && l.province === province);
+    if (existing) { skipped++; continue; }
+    await db.locations.add({
+      location_id: await nextLocationId(),
+      name: name, type: 'district',
+      province, district: name, village: '',
+      lat, lng,
+      notes: mark === 'capital' ? 'ສຳນັກງານປົກຄອງແຂວງ' : '',
+      active: true,
+      created_at: new Date().toISOString()
+    });
+    added++;
+  }
+  // ໂຫລດໄລຍະທາງ Route Network
+  const allLocsNow = await db.locations.toArray();
+  const findByName = (n) => allLocsNow.find(l => l.name === n || l.district === n);
+  let distAdded = 0, distSkipped = 0;
+  for (const [n1, n2, km, route] of LAO_ROUTE_DISTANCES) {
+    const l1 = findByName(n1), l2 = findByName(n2);
+    if (!l1 || !l2) { distSkipped++; continue; }
+    const minId = Math.min(l1.id, l2.id);
+    const maxId = Math.max(l1.id, l2.id);
+    const existing = (await db.distance_matrix.where('from_id').equals(minId).toArray()).find(d => d.to_id === maxId);
+    if (existing) { distSkipped++; continue; }
+    await db.distance_matrix.add({
+      from_id: minId, to_id: maxId,
+      distance_km: km,
+      route_notes: route,
+      source: 'route_network',
+      updated_at: new Date().toISOString()
+    });
+    distAdded++;
+  }
+  toast(`📥 ໂຫລດສຳເລັດ:\n• ${added} ເມືອງ (${skipped} ມີຢູ່ແລ້ວ)\n• ${distAdded} ໄລຍະທາງ (${distSkipped} ມີຢູ່ແລ້ວ)`);
   pages.locations();
 }
 
