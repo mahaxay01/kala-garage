@@ -18089,21 +18089,21 @@ async function openVehicleUsageModal(prefillVehicleId, editId, forcedType) {
   const branches = allBranches.filter(b => b.active !== false);
   const branchOptions = branches.map(b => `<option value="${escapeHtml(b.name)}" ${u.branch_from===b.name?'selected':''}>${escapeHtml(b.name)}</option>`).join('');
   const branchOptionsTo = branches.map(b => `<option value="${escapeHtml(b.name)}" ${u.branch_to===b.name?'selected':''}>${escapeHtml(b.name)}</option>`).join('');
-  // 📍 ດຶງ Locations (active) ສຳລັບ dropdown ຈຸດອອກ/ຈຸດໝາຍ — ຈັດກຸ່ມຕາມແຂວງ → ປະເພດ
+  // 📍 ດຶງ Locations (active) ສຳລັບ dropdown ຈຸດອອກ/ຈຸດໝາຍ
   const allLocations = (await db.locations.toArray()).filter(l => l.active !== false)
     .sort((a,b)=>(a.province||'').localeCompare(b.province||'') || (a.name||'').localeCompare(b.name||''));
-  // ສ້າງ Datalist ສຳລັບ searchable combobox
-  const buildDatalistOptions = (selectedId) => {
+  // 🏢 ຈຸດອອກ = ສະເພາະສາຂາ KALA ເທົ່ານັ້ນ (Locked)
+  const kalaBranches = allLocations.filter(l => l.type === 'branch');
+  // ສ້າງ Datalist ສຳລັບ searchable combobox (ຈຸດໝາຍ — ທຸກສະຖານທີ່)
+  const buildDatalistOptions = () => {
     return allLocations.map(l => {
       const lt = LOCATION_TYPES.find(t => t.key === l.type);
       const icon = lt?.icon || '📍';
       const short = lt?.short || '';
-      const parts = [l.name, l.village, l.district, l.province].filter(Boolean);
       return `<option data-id="${l.id}" value="${escapeHtml(l.name)} — ${escapeHtml(short)}${l.province?' • '+escapeHtml(l.province):''}${l.district&&l.district!==l.name?' / '+escapeHtml(l.district):''}">${icon}</option>`;
     }).join('');
   };
-  const datalistFrom = buildDatalistOptions(u.start_location_id);
-  const datalistTo = buildDatalistOptions(u.end_location_id);
+  const datalistTo = buildDatalistOptions();
   // ສ້າງ Map ສຳລັບ resolve display value → id
   const locDisplayMap = {};
   allLocations.forEach(l => {
@@ -18122,7 +18122,12 @@ async function openVehicleUsageModal(prefillVehicleId, editId, forcedType) {
     const short = lt?.short || '';
     return `${l.name} — ${short}${l.province?' • '+l.province:''}${l.district&&l.district!==l.name?' / '+l.district:''}`;
   };
-  const startDisplay = u.start_location_id ? getDisplayFor(u.start_location_id) : '';
+  // ຈຸດອອກ Default = ສຳນັກງານໃຫຍ່ ປາກເຊ (ຖ້າຍັງບໍ່ໄດ້ເລືອກ)
+  let defaultStartId = u.start_location_id;
+  if (!defaultStartId && kalaBranches.length > 0) {
+    const main = kalaBranches.find(b => b.name.includes('ສຳນັກງານໃຫຍ່')) || kalaBranches[0];
+    defaultStartId = main.id;
+  }
   const endDisplay = u.end_location_id ? getDisplayFor(u.end_location_id) : '';
 
   modal(editId ? `✏️ ແກ້ໄຂບັນທຶກໃຊ້ລົດ` : `🚚 ບັນທຶກໃຊ້ລົດ`, `
@@ -18172,22 +18177,53 @@ async function openVehicleUsageModal(prefillVehicleId, editId, forcedType) {
     </div>
 
     <h4 style="color:var(--primary-2);margin:12px 0 6px;font-size:13px">📍 ສະຖານທີ່ + ໄລຍະທາງ
-      <small style="font-weight:400;color:var(--muted)">— ${allLocations.length} ສະຖານທີ່</small>
-      ${allLocations.length === 0 ? '<small style="color:var(--warn)">⚠️ ຍັງບໍ່ມີ — <a href="javascript:closeModal();go(\'locations\')" style="color:var(--accent)">ສ້າງກ່ອນ</a></small>' : ''}
+      <small style="font-weight:400;color:var(--muted)">— ${kalaBranches.length} ສາຂາ • ${allLocations.length} ສະຖານທີ່ທັງໝົດ</small>
+      ${kalaBranches.length === 0 ? '<small style="color:var(--warn)">⚠️ ຍັງບໍ່ມີສາຂາ — <a href="javascript:closeModal();go(\'locations\')" style="color:var(--accent)">ສ້າງກ່ອນ</a></small>' : ''}
     </h4>
-    <div class="row">
-      <div class="fld"><label>🚩 ຈຸດອອກ <small style="color:var(--muted)">(ພິມເພື່ອຄົ້ນຫາ — Auto-complete)</small></label>
-        <input id="uy_start_loc_search" list="dl_loc_from" value="${escapeHtml(startDisplay)}"
-          placeholder="ພິມຊື່ບ້ານ/ເມືອງ/ແຂວງ..." onchange="resolveLocationInput('start')" oninput="resolveLocationInput('start')"/>
-        <datalist id="dl_loc_from">${datalistFrom}</datalist>
-        <input type="hidden" id="uy_start_loc_id" value="${u.start_location_id||''}"/>
-        <input type="hidden" id="uy_start_loc" value="${escapeHtml(u.start_location||'')}"/>
+    <div class="fld" style="margin-bottom:10px"><label>🏢 ຈຸດອອກ <small style="color:var(--ok);font-weight:600">🔒 ສະເພາະສາຂາ KALA</small></label>
+      <select id="uy_start_loc_id" onchange="updateUsageStartFromBranch();autoFillUsageDistance()">
+        <option value="">— ເລືອກສາຂາ —</option>
+        ${kalaBranches.map(b => `<option value="${b.id}" ${defaultStartId==b.id?'selected':''}>${escapeHtml(b.name)}${b.district?' — '+escapeHtml(b.district):''}${b.province?' • '+escapeHtml(b.province):''}</option>`).join('')}
+      </select>
+      <input type="hidden" id="uy_start_loc" value="${escapeHtml(u.start_location||'')}"/>
+    </div>
+    <div class="card" style="background:#FFFBEB;border-left:4px solid #F59E0B;padding:10px;margin:8px 0">
+      <h4 style="margin:0 0 8px;color:#92400E;font-size:13px">🎯 ຈຸດໝາຍ — ເລືອກລະອຽດ 4 ຂັ້ນ</h4>
+      <div class="row">
+        <div class="fld"><label>1️⃣ ແຂວງ <small style="color:var(--bad)">*</small></label>
+          <select id="uy_end_province" onchange="cascadeDest()">
+            <option value="">— ເລືອກແຂວງ —</option>
+            ${PROVINCE_ORDER.filter(p => allLocations.some(l => l.province === p)).map(p =>
+              `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`
+            ).join('')}
+          </select>
+        </div>
+        <div class="fld"><label>2️⃣ ເມືອງ</label>
+          <select id="uy_end_district" onchange="cascadeDest()" disabled>
+            <option value="">— ກະລຸນາເລືອກແຂວງກ່ອນ —</option>
+          </select>
+        </div>
       </div>
-      <div class="fld"><label>🎯 ຈຸດໝາຍ <small style="color:var(--muted)">(ພິມເພື່ອຄົ້ນຫາ — Auto-complete)</small></label>
-        <input id="uy_end_loc_search" list="dl_loc_to" value="${escapeHtml(endDisplay)}"
-          placeholder="ພິມຊື່ບ້ານ/ເມືອງ/ແຂວງ..." onchange="resolveLocationInput('end')" oninput="resolveLocationInput('end')"/>
-        <datalist id="dl_loc_to">${datalistTo}</datalist>
+      <div class="row">
+        <div class="fld"><label>3️⃣ ບ້ານ / ສະຖານທີ່</label>
+          <select id="uy_end_village" onchange="cascadeDest()" disabled>
+            <option value="">— ກະລຸນາເລືອກເມືອງກ່ອນ —</option>
+          </select>
+          <small style="font-size:11px;color:var(--muted)">ຖ້າບໍ່ມີບ້ານໃນລາຍການ → ປ້ອນຊື່ໃນຊ່ອງ "ແຄມທາງ/ຊອຍ"</small>
+        </div>
+        <div class="fld"><label>4️⃣ ແຄມທາງ/ຊອຍ <small style="color:var(--muted)">(ບໍ່ບັງຄັບ)</small></label>
+          <input id="uy_end_extra_addr" placeholder="ຊອຍ 5, ໂຄງການ ABC, ໃກ້ໂຮງຮຽນ..."/>
+        </div>
       </div>
+      <div class="row">
+        <div class="fld"><label>➕ ໄລຍະຕື່ມ ຈາກບ້ານ <small style="color:var(--muted)">(km — ຖ້າຈຸດໝາຍຫ່າງຈາກບ້ານ)</small></label>
+          <input id="uy_end_extra_km" type="number" step="0.1" value="0" oninput="autoFillUsageDistance()"/>
+        </div>
+        <div class="fld"><label>📍 ຈຸດໝາຍລາຍລະອຽດ (Auto)</label>
+          <input id="uy_end_loc" readonly style="background:var(--bg-2);font-weight:600" value="${escapeHtml(u.end_location||'')}"/>
+        </div>
+      </div>
+      <input type="hidden" id="uy_end_loc_id" value="${u.end_location_id||''}"/>
     </div>
     <div id="uy_distance_hint" style="font-size:12px;color:var(--ok);background:#ECFDF5;padding:6px 10px;border-radius:6px;margin:4px 0;display:none"></div>
     <div class="row">
@@ -18240,49 +18276,150 @@ async function openVehicleUsageModal(prefillVehicleId, editId, forcedType) {
   `);
   updateUsageForm();
   calcUsageAmount();
+  // Pre-populate cascade ຖ້າເປັນ Edit
+  if (editId && u.end_location_id) {
+    setTimeout(() => initCascadeDestFromExisting(u), 100);
+  }
   // ຖ້າເປັນ Edit ມີ location_id ແລ້ວ → ສະແດງ hint
-  if (u.start_location_id || u.end_location_id) setTimeout(() => autoFillUsageDistance(), 100);
+  if (u.start_location_id || u.end_location_id) setTimeout(() => autoFillUsageDistance(), 250);
   } catch (e) {
     console.error('openVehicleUsageModal error:', e);
     toast('❌ ເປີດຟອມບໍ່ສຳເລັດ: ' + e.message, 'bad');
   }
 }
 
+// 🎯 Cascading Destination — ແຂວງ → ເມືອງ → ບ້ານ → ຊອຍ + extra km
+function cascadeDest() {
+  const provSel = $('#uy_end_province');
+  const distSel = $('#uy_end_district');
+  const villSel = $('#uy_end_village');
+  const extraAddr = $('#uy_end_extra_addr');
+  const endLoc = $('#uy_end_loc');
+  const endLocId = $('#uy_end_loc_id');
+  if (!provSel) return;
+  const province = provSel.value;
+  const all = window._locAll || [];
+
+  // ====== ຂັ້ນ 2: ສ້າງ Dropdown ເມືອງ ຕາມແຂວງທີ່ເລືອກ ======
+  if (province) {
+    const districts = [...new Set(all.filter(l => l.province === province && l.district)
+      .map(l => l.district))].sort();
+    distSel.innerHTML = `<option value="">— ເລືອກເມືອງ —</option>` +
+      districts.map(d => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join('');
+    distSel.disabled = false;
+  } else {
+    distSel.innerHTML = `<option value="">— ກະລຸນາເລືອກແຂວງກ່ອນ —</option>`;
+    distSel.disabled = true;
+    villSel.innerHTML = `<option value="">— ກະລຸນາເລືອກເມືອງກ່ອນ —</option>`;
+    villSel.disabled = true;
+  }
+
+  // ====== ຂັ້ນ 3: ສ້າງ Dropdown ບ້ານ ຕາມເມືອງທີ່ເລືອກ ======
+  const district = distSel.value;
+  if (province && district) {
+    // ດຶງບ້ານ + POI + Landmark + Construction site ໃນເມືອງນັ້ນ
+    const villages = all.filter(l => l.province === province && l.district === district &&
+      ['village', 'landmark', 'customer_site', 'construction_site', 'market', 'poi', 'town'].includes(l.type))
+      .sort((a,b) => (a.name||'').localeCompare(b.name||''));
+    // ເພີ່ມຕົວເລືອກ "ຕົວເມືອງ (ບໍ່ລະບຸບ້ານ)" ສຳລັບເລືອກລະດັບເມືອງເທົ່ານັ້ນ
+    const districtMaster = all.find(l => l.type === 'district' && l.district === district && l.province === province);
+    let opts = '<option value="">— ເລືອກບ້ານ (ຫຼື "ບໍ່ລະບຸ" ສຳລັບລະດັບເມືອງ) —</option>';
+    if (districtMaster) opts += `<option value="__district__">📍 ບໍ່ລະບຸບ້ານ — ໄປໂດຍກົງເຂົ້າຕົວເມືອງ ${escapeHtml(district)}</option>`;
+    opts += villages.map(v => {
+      const lt = LOCATION_TYPES.find(t => t.key === v.type);
+      return `<option value="${v.id}">${lt?.icon||'📍'} ${escapeHtml(v.name)}</option>`;
+    }).join('');
+    villSel.innerHTML = opts;
+    villSel.disabled = false;
+  } else if (province) {
+    villSel.innerHTML = `<option value="">— ກະລຸນາເລືອກເມືອງກ່ອນ —</option>`;
+    villSel.disabled = true;
+  }
+
+  // ====== ຂັ້ນ 4: ສ້າງ Display + ກຳນົດ End Location ID ======
+  const villVal = villSel.value;
+  let chosenId = null;
+  let chosenName = '';
+  if (villVal === '__district__') {
+    const districtMaster = all.find(l => l.type === 'district' && l.district === district && l.province === province);
+    chosenId = districtMaster ? districtMaster.id : null;
+    chosenName = `ຕົວເມືອງ ${district}`;
+  } else if (villVal) {
+    const loc = all.find(l => l.id == villVal);
+    if (loc) { chosenId = loc.id; chosenName = loc.name; }
+  } else if (district) {
+    // ບໍ່ໄດ້ເລືອກບ້ານ — ໃຊ້ເມືອງເປັນ default
+    const districtMaster = all.find(l => l.type === 'district' && l.district === district && l.province === province);
+    if (districtMaster) { chosenId = districtMaster.id; chosenName = `ຕົວເມືອງ ${district}`; }
+  }
+  // ສ້າງ display text ລະອຽດ
+  const parts = [];
+  if (chosenName) parts.push(chosenName);
+  const addr = extraAddr?.value || '';
+  if (addr) parts.push(addr);
+  if (district && !chosenName.includes(district)) parts.push(`ເມືອງ ${district}`);
+  if (province) parts.push(`ແຂວງ ${province}`);
+  endLoc.value = parts.filter(Boolean).join(' • ');
+  endLocId.value = chosenId || '';
+
+  // Auto-fill distance ໃໝ່
+  autoFillUsageDistance();
+}
+
+// Pre-populate cascade ຕອນເປີດຟອມ (ຖ້າມີ existing data)
+async function initCascadeDestFromExisting(u) {
+  if (!u || !u.end_location_id) return;
+  const all = window._locAll || [];
+  const loc = all.find(l => l.id == u.end_location_id);
+  if (!loc) return;
+  if ($('#uy_end_province')) $('#uy_end_province').value = loc.province || '';
+  cascadeDest();
+  // ສຳລັບ district + village
+  setTimeout(() => {
+    if ($('#uy_end_district')) $('#uy_end_district').value = loc.district || '';
+    cascadeDest();
+    setTimeout(() => {
+      if ($('#uy_end_village')) {
+        if (loc.type === 'district') $('#uy_end_village').value = '__district__';
+        else $('#uy_end_village').value = loc.id;
+        cascadeDest();
+      }
+    }, 50);
+  }, 50);
+}
+
 // 🔍 Resolve searchable input → location id (datalist-based combobox)
+// ໃຊ້ສະເພາະ side='end' ດຽວນີ້ (start ໃຊ້ dropdown ສາຂາແທນ)
 function resolveLocationInput(side) {
-  const inp = $(side === 'start' ? '#uy_start_loc_search' : '#uy_end_loc_search');
+  const inp = $('#uy_end_loc_search');
   if (!inp) return;
   const val = (inp.value || '').trim();
   const map = window._locDisplayMap || {};
   const id = map[val.toLowerCase()];
   if (id) {
-    if (side === 'start') {
-      if ($('#uy_start_loc_id')) $('#uy_start_loc_id').value = id;
-      // ດຶງ name ໃສ່ free-text field
-      const loc = (window._locAll||[]).find(x => x.id == id);
-      if (loc && $('#uy_start_loc')) $('#uy_start_loc').value = loc.name;
-    } else {
-      if ($('#uy_end_loc_id')) $('#uy_end_loc_id').value = id;
-      const loc = (window._locAll||[]).find(x => x.id == id);
-      if (loc && $('#uy_end_loc')) $('#uy_end_loc').value = loc.name;
-    }
+    if ($('#uy_end_loc_id')) $('#uy_end_loc_id').value = id;
+    const loc = (window._locAll||[]).find(x => x.id == id);
+    if (loc && $('#uy_end_loc')) $('#uy_end_loc').value = loc.name;
     autoFillUsageDistance();
   } else {
-    // Free-text — ບໍ່ມີ id
-    if (side === 'start') {
-      if ($('#uy_start_loc_id')) $('#uy_start_loc_id').value = '';
-      if ($('#uy_start_loc')) $('#uy_start_loc').value = val;
-    } else {
-      if ($('#uy_end_loc_id')) $('#uy_end_loc_id').value = '';
-      if ($('#uy_end_loc')) $('#uy_end_loc').value = val;
-    }
+    if ($('#uy_end_loc_id')) $('#uy_end_loc_id').value = '';
+    if ($('#uy_end_loc')) $('#uy_end_loc').value = val;
   }
+}
+
+// ປ້ອນຊື່ສາຂາໃສ່ hidden text field ເມື່ອເລືອກ branch
+function updateUsageStartFromBranch() {
+  const id = $('#uy_start_loc_id')?.value;
+  if (!id) { if ($('#uy_start_loc')) $('#uy_start_loc').value=''; return; }
+  const loc = (window._locAll||[]).find(x => x.id == id);
+  if (loc && $('#uy_start_loc')) $('#uy_start_loc').value = loc.name;
 }
 
 // 🔗 Auto-fill ໄລຍະທາງ ເມື່ອເລືອກ Start + End Location
 async function autoFillUsageDistance() {
   const fromId = parseInt($('#uy_start_loc_id')?.value) || null;
   const toId = parseInt($('#uy_end_loc_id')?.value) || null;
+  const extraKm = parseFloat($('#uy_end_extra_km')?.value) || 0;
   const hint = $('#uy_distance_hint');
   if (!hint) return;
   if (!fromId || !toId) { hint.style.display = 'none'; return; }
@@ -18291,16 +18428,17 @@ async function autoFillUsageDistance() {
   const toLoc = await db.locations.get(toId);
   // ປ້ອນຊື່ໃສ່ text input ໃຫ້ອັດຕະໂນມັດ
   if (fromLoc && $('#uy_start_loc')) $('#uy_start_loc').value = fromLoc.name;
-  if (toLoc && $('#uy_end_loc')) $('#uy_end_loc').value = toLoc.name;
   // ດຶງໄລຍະຈາກ Matrix ຫຼື GPS Haversine
   const result = await getDistance(fromId, toId);
   hint.style.display = 'block';
   if (result) {
     const isAuto = result.source === 'haversine';
+    const totalKm = result.km + extraKm;
     hint.style.background = isAuto ? '#EFF6FF' : '#ECFDF5';
     hint.style.color = isAuto ? '#1E40AF' : '#065F46';
-    const sourceLabel = isAuto ? '🌐 GPS ປະມານ (Haversine × 1.4)' : '✅ ປ້ອນເອງ';
-    hint.innerHTML = `${sourceLabel}: <strong>${result.km} km</strong> (${escapeHtml(fromLoc?.name||'?')} → ${escapeHtml(toLoc?.name||'?')}) <button class="btn sm ok" style="margin-left:8px" onclick="applyDistanceToUsage(${result.km})">ໃຊ້ໄລຍະນີ້</button>`;
+    const sourceLabel = isAuto ? '🌐 GPS ປະມານ' : '✅ ໄລຍະຈິງ';
+    const extraText = extraKm > 0 ? ` + ${extraKm} km (ຊອຍ)` : '';
+    hint.innerHTML = `${sourceLabel}: <strong>${result.km} km</strong>${extraText} = <strong style="font-size:14px">${totalKm.toFixed(1)} km</strong> (${escapeHtml(fromLoc?.name||'?')} → ${escapeHtml(toLoc?.name||'?')}) <button class="btn sm ok" style="margin-left:8px" onclick="applyDistanceToUsage(${totalKm.toFixed(1)})">ໃຊ້ໄລຍະນີ້</button>`;
   } else {
     hint.style.background = '#FEF3C7';
     hint.style.color = '#92400E';
@@ -18368,63 +18506,80 @@ function calcUsageAmount() {
 }
 
 async function saveVehicleUsage(editId) {
-  const billing = $('#uy_billing').value;
-  const sKm = parseFloat($('#uy_start_km').value)||0;
-  const eKm = parseFloat($('#uy_end_km').value)||0;
-  const sT = $('#uy_start_time').value;
-  const eT = $('#uy_end_time').value;
-  const totalKm = Math.max(0, eKm - sKm);
-  let totalHours = 0;
-  if (sT && eT) totalHours = Math.max(0, (new Date(eT) - new Date(sT)) / 3600000);
-  const qty = parseFloat($('#uy_qty').value)||0;
-  const rate = parseFloat($('#uy_rate').value)||0;
-  const extra = parseFloat($('#uy_extra').value)||0;
-  const subtotal = qty * rate;
-  const total = subtotal + extra;
-  const data = {
-    date: $('#uy_date').value,
-    vehicle_id: $('#uy_vehicle').value,
-    usage_type: $('#uy_type').value,
-    billing_type: billing,
-    driver_id: $('#uy_driver').value,
-    operator_name: $('#uy_operator')?.value || '',
-    customer_name: $('#uy_cust_name')?.value || '',
-    customer_phone: $('#uy_cust_phone')?.value || '',
-    branch_from: $('#uy_branch_from')?.value || '',
-    branch_to: $('#uy_branch_to')?.value || '',
-    cargo_desc: $('#uy_cargo_crane')?.value || $('#uy_cargo_del')?.value || $('#uy_cargo_branch')?.value || '',
-    start_location: $('#uy_start_loc').value,
-    end_location: $('#uy_end_loc').value,
-    start_location_id: parseInt($('#uy_start_loc_id')?.value) || null,
-    end_location_id: parseInt($('#uy_end_loc_id')?.value) || null,
-    start_km: sKm, end_km: eKm, total_km: totalKm,
-    start_time: sT, end_time: eT, total_hours: Math.round(totalHours*100)/100,
-    trips: billing==='fixed_trip' ? qty : 1,
-    tonnage: billing==='per_ton' ? qty : 0,
-    rate,
-    subtotal: Math.round(subtotal),
-    extra_cost: extra,
-    total_amount: Math.round(total),
-    payment_status: $('#uy_pay_status').value,
-    payment_method: $('#uy_pay_method').value,
-    status: $('#uy_status').value,
-    notes: $('#uy_notes').value,
-    created_by: (typeof cloud!=='undefined' && cloud.profile?.username) || 'local',
-  };
-  if (!data.vehicle_id) { toast('ກະລຸນາເລືອກລົດ','bad'); return; }
-  let savedId;
-  if (editId) {
-    await db.vehicle_usage.update(editId, data);
-    savedId = editId;
-  } else {
-    data.usage_id = await nextUsageId();
-    data.created_at = new Date().toISOString();
-    savedId = await db.vehicle_usage.add(data);
+  try {
+    const billing = $('#uy_billing')?.value || 'per_km';
+    const sKm = parseFloat($('#uy_start_km')?.value)||0;
+    const eKm = parseFloat($('#uy_end_km')?.value)||0;
+    const sT = $('#uy_start_time')?.value || '';
+    const eT = $('#uy_end_time')?.value || '';
+    const totalKm = Math.max(0, eKm - sKm);
+    let totalHours = 0;
+    if (sT && eT) totalHours = Math.max(0, (new Date(eT) - new Date(sT)) / 3600000);
+    const qty = parseFloat($('#uy_qty')?.value)||0;
+    const rate = parseFloat($('#uy_rate')?.value)||0;
+    const extra = parseFloat($('#uy_extra')?.value)||0;
+    const subtotal = qty * rate;
+    const total = subtotal + extra;
+    const vehicleSel = $('#uy_vehicle');
+    if (!vehicleSel || !vehicleSel.value) { toast('⚠️ ກະລຸນາເລືອກລົດ','bad'); return; }
+    const data = {
+      date: $('#uy_date')?.value || todayISO(),
+      vehicle_id: vehicleSel.value,
+      usage_type: $('#uy_type')?.value || 'personal',
+      billing_type: billing,
+      driver_id: $('#uy_driver')?.value || '',
+      operator_name: $('#uy_operator')?.value || '',
+      customer_name: $('#uy_cust_name')?.value || '',
+      customer_phone: $('#uy_cust_phone')?.value || '',
+      branch_from: $('#uy_branch_from')?.value || '',
+      branch_to: $('#uy_branch_to')?.value || '',
+      cargo_desc: $('#uy_cargo_crane')?.value || $('#uy_cargo_del')?.value || $('#uy_cargo_branch')?.value || '',
+      start_location: $('#uy_start_loc')?.value || '',
+      end_location: $('#uy_end_loc')?.value || '',
+      start_location_id: parseInt($('#uy_start_loc_id')?.value) || null,
+      end_location_id: parseInt($('#uy_end_loc_id')?.value) || null,
+      // 🆕 Cascading destination details
+      end_province: $('#uy_end_province')?.value || '',
+      end_district: $('#uy_end_district')?.value || '',
+      end_village_id: $('#uy_end_village')?.value || '',
+      end_extra_addr: $('#uy_end_extra_addr')?.value || '',
+      end_extra_km: parseFloat($('#uy_end_extra_km')?.value) || 0,
+      start_km: sKm, end_km: eKm, total_km: totalKm,
+      start_time: sT, end_time: eT, total_hours: Math.round(totalHours*100)/100,
+      trips: billing==='fixed_trip' ? qty : 1,
+      tonnage: billing==='per_ton' ? qty : 0,
+      rate,
+      subtotal: Math.round(subtotal),
+      extra_cost: extra,
+      total_amount: Math.round(total),
+      payment_status: $('#uy_pay_status')?.value || 'pending',
+      payment_method: $('#uy_pay_method')?.value || 'cash',
+      status: $('#uy_status')?.value || 'completed',
+      notes: $('#uy_notes')?.value || '',
+      created_by: (typeof cloud!=='undefined' && cloud.profile?.username) || 'local',
+    };
+    let savedId;
+    if (editId) {
+      await db.vehicle_usage.update(editId, data);
+      savedId = editId;
+    } else {
+      data.usage_id = await nextUsageId();
+      data.created_at = new Date().toISOString();
+      savedId = await db.vehicle_usage.add(data);
+    }
+    if (typeof auditLog === 'function') auditLog(editId?'update':'create', 'vehicle_usage', savedId, `${data.usage_id||''} — ${data.vehicle_id} ${USAGE_TYPES.find(t=>t.key===data.usage_type)?.label||''}`);
+    closeModal();
+    toast(`💾 ບັນທຶກໃຊ້ລົດ ${data.usage_id||''} ສຳເລັດ`);
+    // Refresh ໜ້າປະຈຸບັນ
+    if (currentPage === 'vehicle_detail') renderVehicleDetail();
+    else if (currentPage === 'vehicle_usage') pages.vehicle_usage();
+    else if (currentPage === 'deliveries') pages.deliveries();
+    else if (currentPage === 'inter_branch') pages.inter_branch();
+    else if (currentPage === 'rentals') pages.rentals();
+  } catch (e) {
+    console.error('saveVehicleUsage error:', e);
+    toast('❌ ບັນທຶກບໍ່ສຳເລັດ: ' + e.message, 'bad');
   }
-  if (typeof auditLog === 'function') auditLog(editId?'update':'create', 'vehicle_usage', savedId, `${data.usage_id||''} — ${data.vehicle_id} ${USAGE_TYPES.find(t=>t.key===data.usage_type)?.label||''}`);
-  closeModal(); toast(`💾 ບັນທຶກໃຊ້ລົດ ${data.usage_id||''} ສຳເລັດ`);
-  if (currentPage === 'vehicle_detail') renderVehicleDetail();
-  else if (currentPage === 'vehicle_usage') pages.vehicle_usage();
 }
 
 async function renderVehicleUsageSummary(v) {
@@ -18935,12 +19090,12 @@ pages.locations = async () => {
     </div>
   `;
 
-  // ສ້າງເນື້ອຫາ — Grouped ຫຼື Flat
+  // ສ້າງເນື້ອຫາ — Grouped 3-level (ແຂວງ → ເມືອງ → ບ້ານ) ຫຼື Flat
   let tableContent;
   if (filtered.length === 0) {
     tableContent = '<div class="empty" style="padding:30px"><div class="icon">📍</div><p>ຍັງບໍ່ມີສະຖານທີ່ — ກົດ "+ ເພີ່ມສະຖານທີ່" ຫຼື "🎯 Expert Data"</p></div>';
   } else if (f.groupBy) {
-    // 🆕 Grouped by Province — ມີຫົວແຂວງ + collapse
+    // 🆕 Grouped 3-level: ແຂວງ → ເມືອງ → ບ້ານ/POI
     tableContent = `<table style="font-size:12.5px;width:100%">
       <thead><tr><th>ID</th><th>ປະເພດ</th><th>ຊື່ສະຖານທີ່</th><th>ບ້ານ</th><th>ເມືອງ</th><th>ແຂວງ</th><th style="text-align:center">GPS</th><th style="text-align:right">ໄລຍະ</th><th></th></tr></thead>
       <tbody>
@@ -18948,17 +19103,46 @@ pages.locations = async () => {
         const items = grouped[prov].sort(sortInProvince);
         const isCollapsed = window._locCollapsed[prov] === true;
         const withGPS = items.filter(l => l.lat && l.lng).length;
-        // ດຶງສີຂອງແຂວງ
         const provColor = PROVINCE_ORDER.indexOf(prov) < 4 ? '#7C3AED' : PROVINCE_ORDER.indexOf(prov) < 8 ? '#3B82F6' : '#6B7280';
+        // 🆕 ແບ່ງເປັນ 2 ກຸ່ມພາຍໃນແຂວງ:
+        //   1. ລະດັບແຂວງ/ສາຂາ (ບໍ່ມີ district ຊັດເຈນ)
+        //   2. ກຸ່ມຕາມເມືອງ (ມີ district)
+        const provLevel = items.filter(l => !l.district || l.type === 'province' || l.type === 'branch');
+        const byDistrict = {};
+        items.filter(l => l.district && l.type !== 'province' && l.type !== 'branch').forEach(l => {
+          (byDistrict[l.district] = byDistrict[l.district] || []).push(l);
+        });
+        const districtNames = Object.keys(byDistrict).sort();
+
         return `
-          <tr style="background:linear-gradient(90deg,${provColor}22,transparent);cursor:pointer" onclick="toggleProvinceGroup('${escapeHtml(prov)}')">
-            <td colspan="9" style="padding:10px 12px;font-weight:700;color:${provColor};font-size:13px">
+          <tr style="background:linear-gradient(90deg,${provColor}33,${provColor}11);cursor:pointer;border-top:2px solid ${provColor}" onclick="toggleProvinceGroup('${escapeHtml(prov)}')">
+            <td colspan="9" style="padding:12px 14px;font-weight:700;color:${provColor};font-size:14px">
               <span style="display:inline-block;width:20px">${isCollapsed?'▶':'▼'}</span>
               🌏 ${escapeHtml(prov)}
-              <small style="font-weight:500;color:var(--muted);margin-left:8px">— ${items.length} ສະຖານທີ່ • 🌐 ${withGPS} GPS</small>
+              <small style="font-weight:500;color:var(--muted);margin-left:8px">— ${items.length} ສະຖານທີ່ • ${districtNames.length} ເມືອງ • 🌐 ${withGPS} GPS</small>
             </td>
           </tr>
-          ${isCollapsed ? '' : items.map(renderLocationRow).join('')}
+          ${isCollapsed ? '' : `
+            ${provLevel.length > 0 ? provLevel.map(renderLocationRow).join('') : ''}
+            ${districtNames.map(distName => {
+              const distItems = byDistrict[distName];
+              const distKey = prov + '||' + distName;
+              const distCollapsed = window._locCollapsed[distKey] === true;
+              const distWithGPS = distItems.filter(l => l.lat && l.lng).length;
+              // ດຶງສະຖານທີ່ "ເມືອງ" ນຳ (ມີ type=district)
+              const districtMaster = distItems.find(l => l.type === 'district');
+              return `
+                <tr style="background:${provColor}0A;cursor:pointer" onclick="toggleProvinceGroup('${escapeHtml(distKey)}')">
+                  <td colspan="9" style="padding:8px 14px 8px 36px;font-weight:600;color:#374151;font-size:12.5px">
+                    <span style="display:inline-block;width:18px">${distCollapsed?'▶':'▼'}</span>
+                    🏛 ເມືອງ ${escapeHtml(distName)}
+                    <small style="font-weight:500;color:var(--muted);margin-left:6px">— ${distItems.length} ຈຸດ • 🌐 ${distWithGPS} GPS</small>
+                  </td>
+                </tr>
+                ${distCollapsed ? '' : distItems.map(renderLocationRow).join('')}
+              `;
+            }).join('')}
+          `}
         `;
       }).join('')}
       </tbody>
@@ -19464,12 +19648,88 @@ const LAO_ROUTE_DISTANCES = [
   ['ຈັນທະບູລີ', 'ສັງທອງ', 65, 'West'],
 ];
 
-// ໂຫລດເມືອງລະອຽດ + Pre-seed ໄລຍະທາງ
+// 🏘 ບ້ານສຳຄັນໃນແຕ່ລະເມືອງ 4 ແຂວງໃຕ້ (ສະຖານທີ່ສຳຄັນ — ບໍ່ໃຊ່ບ້ານໝົດ ແຕ່ສະຖານທີ່ທີ່ມັກສົ່ງສິນຄ້າ)
+// Format: [province, district, village_name, lat, lng]
+const LAO_VILLAGES_SOUTH = [
+  // ===== ຈຳປາສັກ =====
+  // ປາກເຊ (10 ບ້ານສຳຄັນ)
+  ['ຈຳປາສັກ', 'ປາກເຊ', 'ບ້ານທ່າຫຼວງ',         15.1175, 105.7867],
+  ['ຈຳປາສັກ', 'ປາກເຊ', 'ບ້ານ ກມ.5',           15.1325, 105.8217],
+  ['ຈຳປາສັກ', 'ປາກເຊ', 'ບ້ານໂພນທັນ',           15.1300, 105.8400],
+  ['ຈຳປາສັກ', 'ປາກເຊ', 'ບ້ານໂພນສະຫວ່າງ',      15.1050, 105.8050],
+  ['ຈຳປາສັກ', 'ປາກເຊ', 'ບ້ານສະຫວ່າງ',          15.1100, 105.7950],
+  ['ຈຳປາສັກ', 'ປາກເຊ', 'ບ້ານໂພນທອງ',           15.1400, 105.7900],
+  ['ຈຳປາສັກ', 'ປາກເຊ', 'ບ້ານສະພາງທອງ',         15.1250, 105.8100],
+  ['ຈຳປາສັກ', 'ປາກເຊ', 'ບ້ານໜອງບົກ',           15.0950, 105.8200],
+  // ປາກຊ່ອງ
+  ['ຈຳປາສັກ', 'ປາກຊ່ອງ', 'ບ້ານປາກຊ່ອງ',         15.1969, 106.2333],
+  ['ຈຳປາສັກ', 'ປາກຊ່ອງ', 'ບ້ານຫົວເຊ',           15.1800, 106.2150],
+  ['ຈຳປາສັກ', 'ປາກຊ່ອງ', 'ບ້ານກາໂຕ',            15.2050, 106.2500],
+  ['ຈຳປາສັກ', 'ປາກຊ່ອງ', 'ບ້ານໂພນສະອາດ',        15.2200, 106.2667],
+  ['ຈຳປາສັກ', 'ປາກຊ່ອງ', 'ບ້ານໜອງເສືອ',         15.1700, 106.2000],
+  // ໂຂງ
+  ['ຈຳປາສັກ', 'ໂຂງ', 'ບ້ານໝູ່ດອນເດດ',           13.9667, 105.8500],
+  ['ຈຳປາສັກ', 'ໂຂງ', 'ບ້ານໝູ່ດອນຄອນ',           13.9333, 105.9500],
+  ['ຈຳປາສັກ', 'ໂຂງ', 'ບ້ານໝູ່ດອນສະຫົງ',         13.9833, 105.8333],
+  ['ຈຳປາສັກ', 'ໂຂງ', 'ບ້ານ ນາກະຊາງ',            14.1167, 105.8167],
+  // ບາຈຽງ
+  ['ຈຳປາສັກ', 'ບາຈຽງຈະເລີນສຸກ', 'ບ້ານທົ່ງປະຕູ',  15.4500, 106.1700],
+  ['ຈຳປາສັກ', 'ບາຈຽງຈະເລີນສຸກ', 'ບ້ານໜອງເຄືອ',  15.4333, 106.1500],
+  // ໂພນທອງ
+  ['ຈຳປາສັກ', 'ໂພນທອງ', 'ບ້ານໂພນທອງ',           15.3833, 105.8500],
+  ['ຈຳປາສັກ', 'ໂພນທອງ', 'ບ້ານໜອງປຸງ',           15.3667, 105.8333],
+  // ປະທຸມພອນ
+  ['ຈຳປາສັກ', 'ປະທຸມພອນ', 'ບ້ານໜອງປະທຸມ',       14.8000, 105.7833],
+  ['ຈຳປາສັກ', 'ປະທຸມພອນ', 'ບ້ານໂນນສະຫວ່າງ',     14.8167, 105.8000],
+
+  // ===== ສາລະວັນ =====
+  // ສາລະວັນ (ຕົວເມືອງ)
+  ['ສາລະວັນ', 'ສາລະວັນ', 'ບ້ານສາລະວັນ',         15.7140, 106.4220],
+  ['ສາລະວັນ', 'ສາລະວັນ', 'ບ້ານທ່າແບ່ງ',          15.7000, 106.4000],
+  ['ສາລະວັນ', 'ສາລະວັນ', 'ບ້ານໂພນສະອາດ',        15.7250, 106.4400],
+  ['ສາລະວັນ', 'ສາລະວັນ', 'ບ້ານໂນນສະຫວ່າງ',      15.7300, 106.4100],
+  // ຄົງເຊໂດນ
+  ['ສາລະວັນ', 'ຄົງເຊໂດນ', 'ບ້ານຄົງເຊໂດນ',       15.5667, 105.8000],
+  ['ສາລະວັນ', 'ຄົງເຊໂດນ', 'ບ້ານທ່າແບ່ງ',         15.5500, 105.7833],
+  // ວາປີ
+  ['ສາລະວັນ', 'ວາປີ', 'ບ້ານວາປີ',                15.6333, 106.2667],
+  // ເລົ່າງາມ
+  ['ສາລະວັນ', 'ເລົ່າງາມ', 'ບ້ານເລົ່າງາມ',         15.4500, 106.2167],
+  // ຕະໂອ້ຍ
+  ['ສາລະວັນ', 'ຕະໂອ້ຍ', 'ບ້ານຕະໂອ້ຍ',           16.0833, 106.4000],
+
+  // ===== ເຊກອງ =====
+  // ລະມາມ
+  ['ເຊກອງ', 'ລະມາມ', 'ບ້ານລະມາມ',                15.3458, 106.7308],
+  ['ເຊກອງ', 'ລະມາມ', 'ບ້ານໂພນສະຫວ່າງ',          15.3500, 106.7200],
+  ['ເຊກອງ', 'ລະມາມ', 'ບ້ານໝູ່ ກມ.10',            15.3600, 106.7400],
+  // ທ່າແຕງ
+  ['ເຊກອງ', 'ທ່າແຕງ', 'ບ້ານທ່າແຕງ',              15.4500, 106.5000],
+  ['ເຊກອງ', 'ທ່າແຕງ', 'ບ້ານໝູ່ໂພນສະຫວ່າງ',      15.4400, 106.4900],
+  // ກະລື່ມ
+  ['ເຊກອງ', 'ກະລື່ມ', 'ບ້ານກະລື່ມ',              15.6333, 106.8000],
+  // ດາກຈຶງ
+  ['ເຊກອງ', 'ດາກຈຶງ', 'ບ້ານດາກຈຶງ',              15.4000, 107.3833],
+
+  // ===== ອັດຕະປື =====
+  // ສາມັກຄີໄຊ (ຕົວເມືອງ)
+  ['ອັດຕະປື', 'ສາມັກຄີໄຊ', 'ບ້ານຕົວເມືອງ',       14.8079, 106.8420],
+  ['ອັດຕະປື', 'ສາມັກຄີໄຊ', 'ບ້ານພູຄຳ',           14.8200, 106.8500],
+  ['ອັດຕະປື', 'ສາມັກຄີໄຊ', 'ບ້ານໂພນສະຫວ່າງ',    14.7900, 106.8300],
+  // ໄຊເຊດຖາ
+  ['ອັດຕະປື', 'ໄຊເຊດຖາ', 'ບ້ານໄຊເຊດຖາ',          14.6500, 106.9167],
+  // ສະໜາມໄຊ
+  ['ອັດຕະປື', 'ສະໜາມໄຊ', 'ບ້ານສະໜາມໄຊ',          14.8000, 106.5667],
+  // ພູວົງ
+  ['ອັດຕະປື', 'ພູວົງ', 'ບ້ານພູວົງ',               14.7500, 107.1500],
+];
+
+// ໂຫລດເມືອງລະອຽດ + ບ້ານສຳຄັນ + Pre-seed ໄລຍະທາງ
 async function seedDetailedSouthLogistics() {
-  if (!confirm(`ໂຫລດ Expert Logistic Data:\n• ${LAO_DISTRICTS_DETAILED.length} ເມືອງລະອຽດ (ຈຳປາສັກ, ສາລະວັນ, ເຊກອງ, ອັດຕະປື, ສະຫວັນ, ຄຳມ່ວນ, ນະຄອນຫຼວງ)\n• ${LAO_ROUTE_DISTANCES.length} ໄລຍະທາງຕາມຖະໜົນຫຼັກ (Route 13, 9, 16, 18, 20)\n\nພ້ອມ GPS ທຸກຈຸດ + ໄລຍະທາງຕາມຖະໜົນຈິງ`)) return;
+  if (!confirm(`ໂຫລດ Expert Logistic Data:\n• ${LAO_DISTRICTS_DETAILED.length} ເມືອງລະອຽດ (ຈຳປາສັກ, ສາລະວັນ, ເຊກອງ, ອັດຕະປື, ສະຫວັນ, ຄຳມ່ວນ, ນະຄອນຫຼວງ)\n• ${LAO_VILLAGES_SOUTH.length} ບ້ານສຳຄັນ ໃນ 4 ແຂວງໃຕ້\n• ${LAO_ROUTE_DISTANCES.length} ໄລຍະທາງຕາມຖະໜົນຫຼັກ (Route 13, 9, 16, 18, 20)\n\nພ້ອມ GPS ທຸກຈຸດ + ໄລຍະທາງຕາມຖະໜົນຈິງ`)) return;
   const all = await db.locations.toArray();
   let added = 0, skipped = 0;
-  // ໂຫລດເມືອງ
+  // 1. ໂຫລດເມືອງ
   for (const row of LAO_DISTRICTS_DETAILED) {
     const [province, name, lat, lng, mark] = row;
     const existing = all.find(l => l.type === 'district' && l.name === name && l.province === province);
@@ -19485,7 +19745,24 @@ async function seedDetailedSouthLogistics() {
     });
     added++;
   }
-  // ໂຫລດໄລຍະທາງ Route Network
+  // 2. 🏘 ໂຫລດບ້ານສຳຄັນ ໃນ 4 ແຂວງໃຕ້
+  let villagesAdded = 0, villagesSkipped = 0;
+  for (const [province, district, vname, lat, lng] of LAO_VILLAGES_SOUTH) {
+    const existing = (await db.locations.toArray()).find(l =>
+      l.type === 'village' && l.name === vname && l.province === province && l.district === district
+    );
+    if (existing) { villagesSkipped++; continue; }
+    await db.locations.add({
+      location_id: await nextLocationId(),
+      name: vname, type: 'village',
+      province, district, village: vname,
+      lat, lng,
+      active: true,
+      created_at: new Date().toISOString()
+    });
+    villagesAdded++;
+  }
+  // 3. ໂຫລດໄລຍະທາງ Route Network
   const allLocsNow = await db.locations.toArray();
   const findByName = (n) => allLocsNow.find(l => l.name === n || l.district === n);
   let distAdded = 0, distSkipped = 0;
@@ -19505,7 +19782,7 @@ async function seedDetailedSouthLogistics() {
     });
     distAdded++;
   }
-  toast(`📥 ໂຫລດສຳເລັດ:\n• ${added} ເມືອງ (${skipped} ມີຢູ່ແລ້ວ)\n• ${distAdded} ໄລຍະທາງ (${distSkipped} ມີຢູ່ແລ້ວ)`);
+  toast(`📥 ໂຫລດສຳເລັດ:\n• ${added} ເມືອງ (${skipped} ມີຢູ່ແລ້ວ)\n• ${villagesAdded} ບ້ານ (${villagesSkipped} ມີຢູ່ແລ້ວ)\n• ${distAdded} ໄລຍະທາງ (${distSkipped} ມີຢູ່ແລ້ວ)`);
   pages.locations();
 }
 
