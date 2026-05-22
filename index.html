@@ -18850,7 +18850,17 @@ async function nextLocationId() {
 }
 
 // 📍 ໜ້າຫຼັກ Locations
-window._locFilter = window._locFilter || { type:'', province:'', q:'' };
+window._locFilter = window._locFilter || { type:'', province:'', q:'', groupBy: true };
+window._locCollapsed = window._locCollapsed || {};
+
+// ລຳດັບແຂວງສຳລັບການສະແດງ — ໃຕ້ກ່ອນ (ບ່ອນ KALA ມີສາຂາຫຼາຍ)
+const PROVINCE_ORDER = [
+  'ຈຳປາສັກ', 'ສາລະວັນ', 'ເຊກອງ', 'ອັດຕະປື',
+  'ສະຫວັນນະເຂດ', 'ຄຳມ່ວນ', 'ບໍລິຄຳໄຊ', 'ໄຊສົມບູນ',
+  'ນະຄອນຫຼວງວຽງຈັນ', 'ວຽງຈັນ',
+  'ຊຽງຂວາງ', 'ຫົວພັນ', 'ຫຼວງພະບາງ', 'ໄຊຍະບູລີ',
+  'ອຸດົມໄຊ', 'ຫຼວງນ້ຳທາ', 'ບໍ່ແກ້ວ', 'ຜົ້ງສາລີ'
+];
 
 pages.locations = async () => {
   const all = (await db.locations.toArray()).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
@@ -18868,6 +18878,99 @@ pages.locations = async () => {
   const typeCounts = {};
   LOCATION_TYPES.forEach(t => { typeCounts[t.key] = all.filter(l => l.type === t.key).length; });
 
+  // ໃຫ້ນ້ຳໜັກລຳດັບເມືອງພາຍໃນແຂວງ: ແຂວງ → ສຳນັກງານປົກຄອງ (capital) → ສາຂາ KALA → ເມືອງອື່ນ → ບ້ານ → ອື່ນໆ
+  const TYPE_RANK = { province: 0, branch: 1, district: 2, town: 3, village: 4, market: 5, construction_site: 6, customer_site: 7, landmark: 8, poi: 9 };
+  const sortInProvince = (a, b) => {
+    const ra = TYPE_RANK[a.type] ?? 99;
+    const rb = TYPE_RANK[b.type] ?? 99;
+    if (ra !== rb) return ra - rb;
+    return (a.name||'').localeCompare(b.name||'');
+  };
+
+  // ສ້າງຕາຕະລາງ groups by province
+  const grouped = {};
+  filtered.forEach(l => {
+    const p = l.province || '— ບໍ່ລະບຸແຂວງ —';
+    (grouped[p] = grouped[p] || []).push(l);
+  });
+  // ຈັດລຽງລຳດັບແຂວງ
+  const sortedProvinces = Object.keys(grouped).sort((a, b) => {
+    const ia = PROVINCE_ORDER.indexOf(a);
+    const ib = PROVINCE_ORDER.indexOf(b);
+    if (ia !== -1 && ib !== -1) return ia - ib;
+    if (ia !== -1) return -1;
+    if (ib !== -1) return 1;
+    return a.localeCompare(b);
+  });
+
+  const renderLocationRow = (l) => {
+    const lt = LOCATION_TYPES.find(t => t.key === l.type);
+    const distancesCount = matrix.filter(d => d.from_id === l.id || d.to_id === l.id).length;
+    const hasGPS = l.lat != null && l.lng != null;
+    return `<tr>
+      <td><strong style="font-family:monospace;font-size:11px">${l.location_id||l.id}</strong></td>
+      <td><span class="pill" style="background:${lt?.color||'#888'};color:#fff;font-size:10px">${lt?.label||l.type}</span></td>
+      <td><strong>${escapeHtml(l.name||'-')}</strong>${l.notes==='ສຳນັກງານປົກຄອງແຂວງ'?' <span class="pill warn" style="font-size:9px">⭐ ປົກຄອງ</span>':''}</td>
+      <td>${escapeHtml(l.village||'-')}</td>
+      <td>${escapeHtml(l.district||'-')}</td>
+      <td>${escapeHtml(l.province||'-')}</td>
+      <td style="text-align:center">${hasGPS?`<span title="${l.lat.toFixed(4)},${l.lng.toFixed(4)}" style="color:var(--ok);font-size:14px">🌐</span>`:'<span style="color:var(--muted);font-size:14px" title="ບໍ່ມີ GPS">—</span>'}</td>
+      <td style="text-align:right"><span class="pill ${distancesCount>0?'ok':'gray'}">${distancesCount}</span></td>
+      <td class="actions">
+        <button class="btn sm outline" onclick="openLocationDistances(${l.id})" title="ຈັດການໄລຍະ">🛣</button>
+        <button class="btn sm outline" onclick="openLocationModal(${l.id})">${t('edit')}</button>
+        ${isAdmin()?`<button class="btn sm danger" onclick="delLocation(${l.id})">${t('delete')}</button>`:''}
+      </td>
+    </tr>`;
+  };
+
+  // ສ້າງ tab ແຂວງດ້ານເທິງ (Quick filter)
+  const provinceTabs = `
+    <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px">
+      <button class="btn sm ${!f.province?'':'outline'}" onclick="window._locFilter.province='';pages.locations()">🌏 ທຸກແຂວງ (${all.length})</button>
+      ${PROVINCE_ORDER.filter(p => all.some(l => l.province === p)).map(p => {
+        const cnt = all.filter(l => l.province === p).length;
+        return `<button class="btn sm ${f.province===p?'':'outline'}" onclick="window._locFilter.province='${p}';pages.locations()">${escapeHtml(p)} (${cnt})</button>`;
+      }).join('')}
+    </div>
+  `;
+
+  // ສ້າງເນື້ອຫາ — Grouped ຫຼື Flat
+  let tableContent;
+  if (filtered.length === 0) {
+    tableContent = '<div class="empty" style="padding:30px"><div class="icon">📍</div><p>ຍັງບໍ່ມີສະຖານທີ່ — ກົດ "+ ເພີ່ມສະຖານທີ່" ຫຼື "🎯 Expert Data"</p></div>';
+  } else if (f.groupBy) {
+    // 🆕 Grouped by Province — ມີຫົວແຂວງ + collapse
+    tableContent = `<table style="font-size:12.5px;width:100%">
+      <thead><tr><th>ID</th><th>ປະເພດ</th><th>ຊື່ສະຖານທີ່</th><th>ບ້ານ</th><th>ເມືອງ</th><th>ແຂວງ</th><th style="text-align:center">GPS</th><th style="text-align:right">ໄລຍະ</th><th></th></tr></thead>
+      <tbody>
+      ${sortedProvinces.map(prov => {
+        const items = grouped[prov].sort(sortInProvince);
+        const isCollapsed = window._locCollapsed[prov] === true;
+        const withGPS = items.filter(l => l.lat && l.lng).length;
+        // ດຶງສີຂອງແຂວງ
+        const provColor = PROVINCE_ORDER.indexOf(prov) < 4 ? '#7C3AED' : PROVINCE_ORDER.indexOf(prov) < 8 ? '#3B82F6' : '#6B7280';
+        return `
+          <tr style="background:linear-gradient(90deg,${provColor}22,transparent);cursor:pointer" onclick="toggleProvinceGroup('${escapeHtml(prov)}')">
+            <td colspan="9" style="padding:10px 12px;font-weight:700;color:${provColor};font-size:13px">
+              <span style="display:inline-block;width:20px">${isCollapsed?'▶':'▼'}</span>
+              🌏 ${escapeHtml(prov)}
+              <small style="font-weight:500;color:var(--muted);margin-left:8px">— ${items.length} ສະຖານທີ່ • 🌐 ${withGPS} GPS</small>
+            </td>
+          </tr>
+          ${isCollapsed ? '' : items.map(renderLocationRow).join('')}
+        `;
+      }).join('')}
+      </tbody>
+    </table>`;
+  } else {
+    // Flat view
+    tableContent = `<table style="font-size:12.5px">
+      <tr><th>ID</th><th>ປະເພດ</th><th>ຊື່ສະຖານທີ່</th><th>ບ້ານ</th><th>ເມືອງ</th><th>ແຂວງ</th><th style="text-align:center">GPS</th><th style="text-align:right">ໄລຍະ</th><th></th></tr>
+      ${filtered.map(renderLocationRow).join('')}
+    </table>`;
+  }
+
   $('#main').innerHTML = `
     <div class="crumbs">ການປະຕິບັດງານ › ສະຖານທີ່ + ໄລຍະທາງ</div>
     <div class="page-title">📍 Locations Master + Distance Matrix <small style="font-weight:400;color:var(--muted);font-size:13px">— ${filtered.length}/${all.length} ສະຖານທີ່ • ${matrix.length} ໄລຍະທາງ</small></div>
@@ -18880,55 +18983,50 @@ pages.locations = async () => {
       <div class="kpi"><div class="label">🗺 ແຂວງ</div><div class="val">${new Set(all.map(l => l.province).filter(Boolean)).size}</div><div class="muted">/18</div></div>
     </div>
 
+    ${provinceTabs}
+
     <div class="toolbar" style="flex-wrap:wrap;gap:8px">
       <select onchange="window._locFilter.type=this.value;pages.locations()" style="padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px">
         <option value="">📂 ທຸກປະເພດ (${all.length})</option>
         ${LOCATION_TYPES.map(t => `<option value="${t.key}" ${f.type===t.key?'selected':''}>${t.label} (${typeCounts[t.key]||0})</option>`).join('')}
       </select>
-      <select onchange="window._locFilter.province=this.value;pages.locations()" style="padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px">
-        <option value="">🗺 ທຸກແຂວງ</option>
-        ${SOUTHERN_PROVINCES.map(p => `<option value="${p}" ${f.province===p?'selected':''}>${p}</option>`).join('')}
-      </select>
       <input type="search" placeholder="🔍 ຄົ້ນຫາ ຊື່/ບ້ານ/ເມືອງ..." value="${escapeHtml(f.q)}"
         oninput="window._locFilter.q=this.value;clearTimeout(window._lft);window._lft=setTimeout(()=>pages.locations(),300)"
         style="padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;min-width:220px"/>
-      <button class="btn outline" onclick="window._locFilter={type:'',province:'',q:''};pages.locations()">🔄 ລ້າງ</button>
+      <button class="btn sm ${f.groupBy?'':'outline'}" onclick="window._locFilter.groupBy=!window._locFilter.groupBy;pages.locations()" title="ສະຫຼັບ Group by Province">📂 ກຸ່ມຕາມແຂວງ</button>
+      <button class="btn sm outline" onclick="expandAllProvinces()">⏬ ເປີດທຸກກຸ່ມ</button>
+      <button class="btn sm outline" onclick="collapseAllProvinces()">⏫ ປິດທຸກກຸ່ມ</button>
+      <button class="btn outline" onclick="window._locFilter={type:'',province:'',q:'',groupBy:true};pages.locations()">🔄 ລ້າງ</button>
       <div style="flex:1"></div>
       <button class="btn outline" onclick="openDistanceMatrix()">🛣 Matrix</button>
       <button class="btn outline" onclick="openLocationsCSVImport()">📥 CSV</button>
       <button class="btn outline" onclick="seedKalaLocations()">🌏 ໂຫລດ 18 ແຂວງ</button>
-      <button class="btn outline" style="background:#7C3AED;color:#fff" onclick="seedDetailedSouthLogistics()">🎯 Expert Data (ໃຕ້ + ກາງ)</button>
+      <button class="btn outline" style="background:#7C3AED;color:#fff" onclick="seedDetailedSouthLogistics()">🎯 Expert Data</button>
       <button class="btn ok" onclick="openLocationModal()">+ ເພີ່ມສະຖານທີ່</button>
     </div>
 
     <div class="card" style="padding:0;overflow-x:auto">
-      ${filtered.length === 0 ? '<div class="empty" style="padding:30px"><div class="icon">📍</div><p>ຍັງບໍ່ມີສະຖານທີ່ — ກົດ "+ ເພີ່ມສະຖານທີ່" ຫຼື "ໂຫລດຂໍ້ມູນເລີ່ມຕົ້ນ"</p></div>' : `
-      <table style="font-size:12.5px">
-        <tr><th>ID</th><th>ປະເພດ</th><th>ຊື່ສະຖານທີ່</th><th>ບ້ານ</th><th>ເມືອງ</th><th>ແຂວງ</th><th style="text-align:center">GPS</th><th style="text-align:right">ໄລຍະ</th><th></th></tr>
-        ${filtered.map(l => {
-          const lt = LOCATION_TYPES.find(t => t.key === l.type);
-          const distancesCount = matrix.filter(d => d.from_id === l.id || d.to_id === l.id).length;
-          const hasGPS = l.lat != null && l.lng != null;
-          return `<tr>
-            <td><strong style="font-family:monospace;font-size:11px">${l.location_id||l.id}</strong></td>
-            <td><span class="pill" style="background:${lt?.color||'#888'};color:#fff;font-size:10px">${lt?.label||l.type}</span></td>
-            <td><strong>${escapeHtml(l.name||'-')}</strong></td>
-            <td>${escapeHtml(l.village||'-')}</td>
-            <td>${escapeHtml(l.district||'-')}</td>
-            <td>${escapeHtml(l.province||'-')}</td>
-            <td style="text-align:center">${hasGPS?`<span title="${l.lat.toFixed(4)},${l.lng.toFixed(4)}" style="color:var(--ok);font-size:14px">🌐</span>`:'<span style="color:var(--muted);font-size:14px" title="ບໍ່ມີ GPS">—</span>'}</td>
-            <td style="text-align:right"><span class="pill ${distancesCount>0?'ok':'gray'}">${distancesCount}</span></td>
-            <td class="actions">
-              <button class="btn sm outline" onclick="openLocationDistances(${l.id})" title="ຈັດການໄລຍະ">🛣</button>
-              <button class="btn sm outline" onclick="openLocationModal(${l.id})">${t('edit')}</button>
-              ${isAdmin()?`<button class="btn sm danger" onclick="delLocation(${l.id})">${t('delete')}</button>`:''}
-            </td>
-          </tr>`;
-        }).join('')}
-      </table>`}
+      ${tableContent}
     </div>
   `;
 };
+
+function toggleProvinceGroup(prov) {
+  window._locCollapsed[prov] = !window._locCollapsed[prov];
+  pages.locations();
+}
+
+async function expandAllProvinces() {
+  window._locCollapsed = {};
+  pages.locations();
+}
+
+async function collapseAllProvinces() {
+  const all = await db.locations.toArray();
+  const provs = [...new Set(all.map(l => l.province || '— ບໍ່ລະບຸແຂວງ —'))];
+  provs.forEach(p => { window._locCollapsed[p] = true; });
+  pages.locations();
+}
 
 async function openLocationModal(id) {
   let loc = { name:'', type:'village', province:'ຈຳປາສັກ', district:'', village:'', address:'', notes:'', active:true, lat:null, lng:null };
