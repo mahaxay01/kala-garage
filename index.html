@@ -19794,6 +19794,12 @@ async function openVehicleUsageModal(prefillVehicleId, editId, forcedType) {
     const existing = await db.vehicle_usage.get(editId);
     if (existing) u = Object.assign(u, existing);
   }
+  // 🆕 Pre-fill data from Cost Calculator
+  if (window._usagePrefill && !editId) {
+    u = Object.assign(u, window._usagePrefill);
+    window._usagePrefill = null; // consume once
+    toast('🗺 ໂຫລດຂໍ້ມູນຈາກແຜນທີ່ — ກວດສອບ ແລະ ບັນທຶກ', 'info', 4000);
+  }
   // ດຶງ branches ທີ່ active=true (ໂດຍບໍ່ຜ່ານ index — ກັນປະຫຍັດ Dexie type-mismatch)
   const allBranches = await db.branches.toArray();
   const branches = allBranches.filter(b => b.active !== false);
@@ -20595,6 +20601,7 @@ async function renderUsageModulePage(cfg) {
         <button onclick="window._modView='${cfg.module}_table';pages.${cfg.module}()" style="padding:7px 14px;border-radius:6px;border:none;background:${window._modView!==cfg.module+'_map'?'#0F3D7A':'transparent'};color:${window._modView!==cfg.module+'_map'?'#fff':'var(--text)'};cursor:pointer;font-size:13px;font-weight:600;font-family:inherit">☰ ຕາຕະລາງ</button>
         <button onclick="window._modView='${cfg.module}_map';pages.${cfg.module}()" style="padding:7px 14px;border-radius:6px;border:none;background:${window._modView===cfg.module+'_map'?'#F97316':'transparent'};color:${window._modView===cfg.module+'_map'?'#fff':'var(--text)'};cursor:pointer;font-size:13px;font-weight:600;font-family:inherit">🗺 ແຜນທີ່</button>
         <button onclick="openRoutePlanner('${cfg.module}')" style="padding:7px 14px;border-radius:6px;border:none;background:#7C3AED;color:#fff;cursor:pointer;font-size:13px;font-weight:600;font-family:inherit;margin-left:6px" title="ວາງເສັ້ນທາງສົ່ງສິນຄ້າຫຼາຍຈຸດ + TSP Optimize">🎯 ວາງເສັ້ນທາງ</button>
+        <button onclick="openCostCalculator('${cfg.defaultType}')" style="padding:7px 14px;border-radius:6px;border:none;background:#F97316;color:#fff;cursor:pointer;font-size:13px;font-weight:600;font-family:inherit;margin-left:6px" title="ກົດໝຸດໃນແຜນທີ່ ໄລ່ຄ່າຂົນສົ່ງ + ບັນທຶກເປັນໃບສົ່ງ">💰 ໄລ່ຄ່າຂົນສົ່ງ</button>
       </div>
       <button class="btn ok" onclick="openVehicleUsageModal(null,null,'${cfg.defaultType}')">${cfg.addLabel}</button>
     </div>
@@ -20876,6 +20883,368 @@ function rpClear() {
   rpUpdate();
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// 💰 COST CALCULATOR ON MAP — Click to pin origin/destination, get cost
+// ═══════════════════════════════════════════════════════════════════════════
+window._costCalc = window._costCalc || {
+  origin: null, destination: null, waypoints: [],
+  mode: 'road',
+  routeData: null,
+  vehicle_id: null, rate_per_km: 0,
+};
+
+async function openCostCalculator(forcedType) {
+  const vehicles = (await db.vehicles.toArray()).filter(v => v.status !== 'sold');
+  const rates = await db.vehicle_usage_rates.toArray();
+  const branches = (await db.locations.toArray()).filter(l => l.type === 'branch' && l.lat);
+
+  window._costCalc = {
+    origin: branches[0] ? { lat: branches[0].lat, lng: branches[0].lng, name: branches[0].name, type: 'branch', id: branches[0].id } : null,
+    destination: null, waypoints: [],
+    mode: KALA_MAP.getApiKey('openrouteservice') ? 'road' : 'straight',
+    routeData: null,
+    vehicle_id: vehicles[0]?.vehicle_id || '',
+    forced_type: forcedType || 'customer_delivery',
+  };
+
+  const defaultRate = vehicles[0] ? (rates.find(r => r.vehicle_id === vehicles[0].vehicle_id)?.rate_per_km || 0) : 0;
+  window._costCalc.rate_per_km = defaultRate;
+
+  modal('💰 ໄລ່ຄ່າຂົນສົ່ງ ໃນແຜນທີ່ — Cost Calculator', `
+    <div style="display:grid;grid-template-columns:340px 1fr;gap:14px;height:680px">
+
+      <aside style="background:var(--bg);padding:14px;border-radius:8px;overflow-y:auto;font-size:13px">
+        <h4 style="margin:0 0 8px;font-size:13px;color:var(--primary)">📍 ຈຸດເລີ່ມ - ປາຍ</h4>
+
+        <div style="background:#fff;padding:10px;border-radius:8px;margin-bottom:8px;border-left:4px solid #10B981">
+          <div style="font-size:11px;font-weight:700;color:#065F46;margin-bottom:4px">🅰 ຕົ້ນທາງ</div>
+          <select id="cc_origin_select" onchange="ccSelectOrigin(this.value)" style="width:100%;padding:6px;border:1px solid var(--line);border-radius:4px;font-size:12px">
+            <option value="">— ກົດໃນແຜນທີ່ —</option>
+            <optgroup label="🏢 ສາຂາ KALA">
+              ${branches.map(b => `<option value="branch:${b.id}">${escapeHtml(b.name)}</option>`).join('')}
+            </optgroup>
+          </select>
+          <div id="cc_origin_info" style="font-size:11px;color:var(--muted);margin-top:4px">${window._costCalc.origin ? '📍 ' + escapeHtml(window._costCalc.origin.name) : '⚪ ຍັງບໍ່ໄດ້ເລືອກ'}</div>
+        </div>
+
+        <div style="background:#fff;padding:10px;border-radius:8px;margin-bottom:8px;border-left:4px solid #EF4444">
+          <div style="font-size:11px;font-weight:700;color:#991B1B;margin-bottom:4px">🅱 ປາຍທາງ</div>
+          <div id="cc_dest_info" style="font-size:11px;color:var(--muted)">⚪ ກົດໃນແຜນທີ່ ເພື່ອປັກໝຸດປາຍທາງ</div>
+          <input id="cc_dest_name" type="text" placeholder="ຊື່ປາຍທາງ" style="width:100%;margin-top:6px;padding:6px;border:1px solid var(--line);border-radius:4px;font-size:12px;display:none"/>
+        </div>
+
+        <button onclick="ccAddWaypoint()" class="btn outline" style="width:100%;font-size:12px;margin-bottom:8px">➕ ເພີ່ມຈຸດແວ່ (Waypoint)</button>
+
+        <hr style="border:none;border-top:1px solid var(--line);margin:12px 0">
+
+        <h4 style="margin:0 0 6px;font-size:13px;color:var(--primary)">🛣 ປະເພດເສັ້ນທາງ</h4>
+        <div style="display:flex;gap:0;background:#fff;border:1px solid var(--line);border-radius:6px;padding:3px;margin-bottom:10px">
+          <button onclick="ccSetMode('road')" id="cc_mode_road" style="flex:1;padding:6px;border-radius:4px;border:none;background:${window._costCalc.mode==='road'?'#F97316':'transparent'};color:${window._costCalc.mode==='road'?'#fff':'var(--text)'};cursor:pointer;font-size:11px;font-weight:600;font-family:inherit">🛣 ຖະໜົນຈິງ</button>
+          <button onclick="ccSetMode('straight')" id="cc_mode_straight" style="flex:1;padding:6px;border-radius:4px;border:none;background:${window._costCalc.mode==='straight'?'#0F3D7A':'transparent'};color:${window._costCalc.mode==='straight'?'#fff':'var(--text)'};cursor:pointer;font-size:11px;font-weight:600;font-family:inherit">📏 ຕົ້ນ→ປາຍ</button>
+        </div>
+        ${!KALA_MAP.getApiKey('openrouteservice') ? '<div style="font-size:10px;color:#B45309;background:#FEF3C7;padding:6px;border-radius:4px;margin-bottom:8px">⚠️ ບໍ່ມີ OpenRouteService key — ໂໝດ "ຖະໜົນຈິງ" ຈະໃຊ້ໄລຍະຄາດຄະເນ (×1.4). <a href="#" onclick="closeModal();openMapApiKeysModal(null,()=>{});return false" style="color:#F97316;font-weight:700">ຕັ້ງຄ່າ →</a></div>' : ''}
+
+        <hr style="border:none;border-top:1px solid var(--line);margin:12px 0">
+
+        <h4 style="margin:0 0 6px;font-size:13px;color:var(--primary)">🚚 ລົດ + ຄ່າແຮງ</h4>
+        <select id="cc_vehicle" onchange="ccChangeVehicle(this.value)" style="width:100%;padding:6px;border:1px solid var(--line);border-radius:4px;font-size:12px;margin-bottom:6px">
+          ${vehicles.map(v => `<option value="${v.vehicle_id}">${escapeHtml(v.plate||v.vehicle_id)} (${escapeHtml(v.type||'-')})</option>`).join('')}
+        </select>
+        <label style="font-size:11px;color:var(--muted)">ອັດຕາ ກີບ/km</label>
+        <input id="cc_rate" type="number" value="${defaultRate}" onchange="ccCalculate()" style="width:100%;padding:6px;border:1px solid var(--line);border-radius:4px;font-size:12px;font-family:monospace"/>
+
+        <hr style="border:none;border-top:2px solid var(--primary);margin:12px 0">
+
+        <div id="cc_result" style="background:#fff;padding:14px;border-radius:8px;border:2px solid var(--line)">
+          <div style="text-align:center;color:var(--muted);font-size:12px">ກົດປຸ່ມ "🧮 ໄລ່" ຫຼັງເລືອກ ຕົ້ນ-ປາຍ</div>
+        </div>
+
+        <button onclick="ccCalculate(true)" class="btn ok" style="width:100%;margin-top:10px;font-size:13px;padding:10px">🧮 ໄລ່ຄ່າຂົນສົ່ງ</button>
+        <button onclick="ccClear()" class="btn outline" style="width:100%;margin-top:6px;font-size:12px">🔄 ລ້າງ</button>
+      </aside>
+
+      <div style="position:relative">
+        <div id="cc_map" style="width:100%;height:680px;border-radius:8px;background:#E5E7EB"></div>
+        <div style="position:absolute;top:12px;left:12px;background:rgba(255,255,255,.95);padding:8px 12px;border-radius:8px;font-size:11px;box-shadow:0 2px 8px rgba(0,0,0,.15);z-index:1000;max-width:280px">
+          💡 <strong>ວິທີໃຊ້:</strong><br>
+          1️⃣ ເລືອກສາຂາຕົ້ນທາງ (ຊ້າຍ) ຫຼື ກົດໃນແຜນທີ່<br>
+          2️⃣ ກົດ <strong>ຄັ້ງທີ່ສອງ</strong> ໃນແຜນທີ່ ເພື່ອປັກໝຸດປາຍທາງ<br>
+          3️⃣ ກົດປຸ່ມ <strong>🧮 ໄລ່</strong><br>
+          4️⃣ ກົດ <strong>💾 ບັນທຶກເປັນໃບສົ່ງ</strong>
+        </div>
+      </div>
+    </div>
+  `, `
+    <button class="btn outline" onclick="closeModal()">${t('cancel')}</button>
+    <button id="cc_save_btn" class="btn ok" onclick="ccSaveAsDelivery()" disabled>💾 ບັນທຶກເປັນໃບສົ່ງ</button>
+  `, 'xl');
+
+  setTimeout(() => initCostCalcMap(branches), 100);
+}
+
+let _ccMap = null;
+let _ccMarkers = { origin: null, destination: null, waypoints: [], route: null };
+
+async function initCostCalcMap(branches) {
+  if (_ccMap) { _ccMap.remove(); _ccMap = null; }
+  _ccMap = KALA_MAP.init('cc_map');
+  _ccMarkers = { origin: null, destination: null, waypoints: [], route: null };
+
+  _ccMap.on('click', async (e) => {
+    const cc = window._costCalc;
+    if (!cc.origin) {
+      cc.origin = { lat: e.latlng.lat, lng: e.latlng.lng, name: 'ຈຸດທີ່ກົດ A', custom: true };
+      ccUpdateMarkers();
+      const infoEl = document.getElementById('cc_origin_info');
+      if (infoEl) infoEl.innerHTML = `📍 ${cc.origin.lat.toFixed(5)}, ${cc.origin.lng.toFixed(5)} <span style="color:var(--ok)">(ກົດໃນແຜນທີ່)</span>`;
+    } else if (!cc.destination) {
+      cc.destination = { lat: e.latlng.lat, lng: e.latlng.lng, name: 'ປາຍທາງ', custom: true };
+      ccUpdateMarkers();
+      const infoEl = document.getElementById('cc_dest_info');
+      if (infoEl) infoEl.innerHTML = `📍 ${cc.destination.lat.toFixed(5)}, ${cc.destination.lng.toFixed(5)} <span style="color:var(--bad)">(ກົດໃນແຜນທີ່)</span>`;
+      const nameInput = document.getElementById('cc_dest_name');
+      if (nameInput) {
+        nameInput.style.display = 'block';
+        nameInput.focus();
+        nameInput.addEventListener('input', (ev) => { cc.destination.name = ev.target.value || 'ປາຍທາງ'; });
+      }
+      ccCalculate();
+    } else {
+      cc.waypoints.push({ lat: e.latlng.lat, lng: e.latlng.lng, name: 'ຈຸດແວ່ ' + (cc.waypoints.length+1) });
+      ccUpdateMarkers();
+      ccCalculate();
+    }
+  });
+
+  branches.forEach(b => {
+    L.marker([b.lat, b.lng], { icon: KALA_MAP.createPin(b, { size: 24 }), opacity: 0.6 })
+      .bindPopup('<strong>🏢 ' + escapeHtml(b.name) + '</strong>')
+      .on('click', (e) => {
+        L.DomEvent.stopPropagation(e);
+        const cc = window._costCalc;
+        if (!cc.origin) {
+          cc.origin = { lat: b.lat, lng: b.lng, name: b.name, id: b.id, type: 'branch' };
+        } else if (!cc.destination) {
+          cc.destination = { lat: b.lat, lng: b.lng, name: b.name, id: b.id };
+        }
+        ccUpdateMarkers();
+        ccCalculate();
+      })
+      .addTo(_ccMap);
+  });
+
+  ccUpdateMarkers();
+}
+
+function ccUpdateMarkers() {
+  const cc = window._costCalc;
+  if (_ccMarkers.origin) { _ccMap.removeLayer(_ccMarkers.origin); _ccMarkers.origin = null; }
+  if (_ccMarkers.destination) { _ccMap.removeLayer(_ccMarkers.destination); _ccMarkers.destination = null; }
+  _ccMarkers.waypoints.forEach(m => _ccMap.removeLayer(m));
+  _ccMarkers.waypoints = [];
+  if (_ccMarkers.route) { _ccMap.removeLayer(_ccMarkers.route); _ccMarkers.route = null; }
+
+  if (cc.origin) {
+    _ccMarkers.origin = L.marker([cc.origin.lat, cc.origin.lng], {
+      draggable: true,
+      icon: L.divIcon({ html: '<div style="background:#10B981;color:#fff;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.4)">A</div>', iconSize:[36,36], iconAnchor:[18,18] }),
+    }).bindPopup('<strong>🅰 ຕົ້ນທາງ:</strong><br>' + escapeHtml(cc.origin.name)).addTo(_ccMap);
+    _ccMarkers.origin.on('dragend', (e) => {
+      const p = e.target.getLatLng();
+      cc.origin.lat = p.lat; cc.origin.lng = p.lng;
+      const infoEl = document.getElementById('cc_origin_info');
+      if (infoEl) infoEl.innerHTML = `📍 ${p.lat.toFixed(5)}, ${p.lng.toFixed(5)} <span style="color:var(--ok)">(ລາກປ່ຽນ)</span>`;
+      ccCalculate();
+    });
+  }
+  if (cc.destination) {
+    _ccMarkers.destination = L.marker([cc.destination.lat, cc.destination.lng], {
+      draggable: true,
+      icon: L.divIcon({ html: '<div style="background:#EF4444;color:#fff;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.4)">B</div>', iconSize:[36,36], iconAnchor:[18,18] }),
+    }).bindPopup('<strong>🅱 ປາຍທາງ:</strong><br>' + escapeHtml(cc.destination.name)).addTo(_ccMap);
+    _ccMarkers.destination.on('dragend', (e) => {
+      const p = e.target.getLatLng();
+      cc.destination.lat = p.lat; cc.destination.lng = p.lng;
+      const infoEl = document.getElementById('cc_dest_info');
+      if (infoEl) infoEl.innerHTML = `📍 ${p.lat.toFixed(5)}, ${p.lng.toFixed(5)} <span style="color:var(--bad)">(ລາກປ່ຽນ)</span>`;
+      ccCalculate();
+    });
+  }
+  cc.waypoints.forEach((w, i) => {
+    const m = L.marker([w.lat, w.lng], {
+      draggable: true,
+      icon: L.divIcon({ html: '<div style="background:#3B82F6;color:#fff;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.4)">' + (i+1) + '</div>', iconSize:[30,30], iconAnchor:[15,15] }),
+    }).bindPopup('<strong>ຈຸດແວ່ ' + (i+1) + '</strong><br><button onclick="ccRemoveWaypoint(' + i + ')" style="background:#EF4444;color:#fff;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;font-family:inherit">🗑 ລົບ</button>').addTo(_ccMap);
+    m.on('dragend', (e) => {
+      const p = e.target.getLatLng();
+      w.lat = p.lat; w.lng = p.lng;
+      ccCalculate();
+    });
+    _ccMarkers.waypoints.push(m);
+  });
+
+  const all = [cc.origin, ...cc.waypoints, cc.destination].filter(Boolean);
+  if (all.length > 0) {
+    if (all.length === 1) _ccMap.setView([all[0].lat, all[0].lng], 13);
+    else _ccMap.fitBounds(L.latLngBounds(all.map(p => [p.lat, p.lng])), { padding:[60,60] });
+  }
+}
+
+async function ccSelectOrigin(val) {
+  if (!val) return;
+  if (val.startsWith('branch:')) {
+    const id = parseInt(val.split(':')[1]);
+    const loc = await db.locations.get(id);
+    if (!loc || !loc.lat) return;
+    window._costCalc.origin = { lat: loc.lat, lng: loc.lng, name: loc.name, id: loc.id, type: 'branch' };
+    const infoEl = document.getElementById('cc_origin_info');
+    if (infoEl) infoEl.innerHTML = '📍 ' + escapeHtml(loc.name);
+    ccUpdateMarkers();
+    ccCalculate();
+  }
+}
+
+function ccSetMode(mode) {
+  window._costCalc.mode = mode;
+  ['road','straight'].forEach(m => {
+    const btn = document.getElementById('cc_mode_'+m);
+    if (btn) {
+      btn.style.background = m === mode ? (m === 'road' ? '#F97316' : '#0F3D7A') : 'transparent';
+      btn.style.color = m === mode ? '#fff' : 'var(--text)';
+    }
+  });
+  ccCalculate();
+}
+
+async function ccChangeVehicle(vid) {
+  window._costCalc.vehicle_id = vid;
+  const rates = await db.vehicle_usage_rates.toArray();
+  const r = rates.find(x => x.vehicle_id === vid);
+  const defaultRate = r?.rate_per_km || 0;
+  window._costCalc.rate_per_km = defaultRate;
+  const rateEl = document.getElementById('cc_rate');
+  if (rateEl) rateEl.value = defaultRate;
+  ccCalculate();
+}
+
+function ccAddWaypoint() {
+  toast('💡 ກົດໃນແຜນທີ່ເພື່ອປັກໝຸດຈຸດແວ່ (ຈະເຂົ້າຄິວຫລັງປາຍທາງ)', 'info', 3000);
+}
+
+function ccRemoveWaypoint(i) {
+  window._costCalc.waypoints.splice(i, 1);
+  ccUpdateMarkers();
+  ccCalculate();
+}
+
+async function ccCalculate(showLoading) {
+  const cc = window._costCalc;
+  const resEl = document.getElementById('cc_result');
+  const saveBtn = document.getElementById('cc_save_btn');
+  if (!cc.origin || !cc.destination) {
+    if (resEl) resEl.innerHTML = '<div style="text-align:center;color:var(--muted);font-size:12px">ກະລຸນາເລືອກ ຕົ້ນທາງ + ປາຍທາງ</div>';
+    if (saveBtn) saveBtn.disabled = true;
+    return;
+  }
+
+  if (showLoading && resEl) resEl.innerHTML = '<div style="text-align:center;color:var(--muted);font-size:12px">⏳ ກຳລັງໄລ່...</div>';
+
+  const rateInput = document.getElementById('cc_rate');
+  const ratePerKm = rateInput ? (parseFloat(rateInput.value) || cc.rate_per_km) : cc.rate_per_km;
+
+  let route;
+  if (cc.mode === 'road') {
+    route = await fetchRoadRoute(cc.origin, cc.destination, cc.waypoints);
+  } else {
+    const all = [cc.origin, ...cc.waypoints, cc.destination];
+    let dist = 0;
+    for (let i = 0; i < all.length - 1; i++) dist += KALA_MAP.haversineKm(all[i], all[i+1]);
+    route = {
+      ok: true,
+      method: 'straight-direct',
+      distance_km: dist,
+      duration_min: dist / 50 * 60,
+      coordinates: all.map(p => [p.lng, p.lat]),
+    };
+  }
+
+  cc.routeData = route;
+
+  if (_ccMarkers.route) { _ccMap.removeLayer(_ccMarkers.route); _ccMarkers.route = null; }
+  if (route.coordinates) {
+    _ccMarkers.route = L.polyline(route.coordinates.map(c => [c[1], c[0]]), {
+      color: cc.mode === 'road' ? '#F97316' : '#0F3D7A',
+      weight: 5,
+      opacity: 0.85,
+      dashArray: cc.mode === 'straight' ? '10, 8' : null,
+    }).addTo(_ccMap);
+  }
+
+  const cost = route.distance_km * ratePerKm;
+  const hours = Math.floor(route.duration_min / 60);
+  const minutes = Math.round(route.duration_min % 60);
+
+  if (resEl) resEl.innerHTML = `
+    <div style="text-align:center">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:6px">${route.method === 'road' ? '🛣 ໄລຍະຖະໜົນຈິງ (OpenRouteService)' : route.method === 'straight' ? '📏 ໄລຍະຄາດຄະເນ (Haversine ×1.4)' : '📏 ໄລຍະຕົ້ນ→ປາຍ'}</div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:2px">ໄລຍະທາງ</div>
+      <div style="font-size:28px;font-weight:700;color:var(--primary)">${route.distance_km.toFixed(1)} <span style="font-size:14px;color:var(--muted)">km</span></div>
+      <hr style="border:none;border-top:1px solid var(--line);margin:10px 0">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:2px">⏱ ເວລາເດີນທາງ</div>
+      <div style="font-size:18px;font-weight:600;color:#1E40AF">${hours > 0 ? hours+' ຊມ. ' : ''}${minutes} ນາທີ</div>
+      <hr style="border:none;border-top:1px solid var(--line);margin:10px 0">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:2px">💰 ຄ່າຂົນສົ່ງ</div>
+      <div style="font-size:32px;font-weight:700;color:var(--ok)">${fmt(Math.round(cost))} <span style="font-size:14px;color:var(--muted)">ກີບ</span></div>
+      <div style="font-size:10px;color:var(--muted);margin-top:4px">@ ${fmt(ratePerKm)} ກີບ/km</div>
+    </div>
+  `;
+  if (saveBtn) saveBtn.disabled = false;
+}
+
+function ccClear() {
+  window._costCalc.origin = null;
+  window._costCalc.destination = null;
+  window._costCalc.waypoints = [];
+  window._costCalc.routeData = null;
+  document.getElementById('cc_origin_info').textContent = '⚪ ຍັງບໍ່ໄດ້ເລືອກ';
+  document.getElementById('cc_dest_info').textContent = '⚪ ກົດໃນແຜນທີ່ ເພື່ອປັກໝຸດປາຍທາງ';
+  const nameInput = document.getElementById('cc_dest_name');
+  if (nameInput) { nameInput.style.display = 'none'; nameInput.value = ''; }
+  ccUpdateMarkers();
+  document.getElementById('cc_result').innerHTML = '<div style="text-align:center;color:var(--muted);font-size:12px">ກົດປຸ່ມ "🧮 ໄລ່" ຫຼັງເລືອກ ຕົ້ນ-ປາຍ</div>';
+  document.getElementById('cc_save_btn').disabled = true;
+}
+
+async function ccSaveAsDelivery() {
+  const cc = window._costCalc;
+  if (!cc.origin || !cc.destination || !cc.routeData) {
+    toast('⚠️ ກະລຸນາໄລ່ຄ່າຂົນສົ່ງກ່ອນ', 'warn');
+    return;
+  }
+  const rate = parseFloat(document.getElementById('cc_rate')?.value) || cc.rate_per_km;
+  const cost = cc.routeData.distance_km * rate;
+
+  window._usagePrefill = {
+    usage_type: cc.forced_type || 'customer_delivery',
+    vehicle_id: cc.vehicle_id,
+    branch_from: cc.origin.type === 'branch' ? cc.origin.name : '',
+    start_location: cc.origin.name,
+    start_location_id: cc.origin.id || null,
+    end_location: cc.destination.name,
+    end_location_id: cc.destination.id || null,
+    customer_name: cc.destination.name,
+    total_km: parseFloat(cc.routeData.distance_km.toFixed(2)),
+    total_hours: parseFloat((cc.routeData.duration_min/60).toFixed(2)),
+    rate: rate,
+    billing_type: 'per_km',
+    subtotal: Math.round(cost),
+    total_amount: Math.round(cost),
+    notes: `📍 GPS: ${cc.origin.lat.toFixed(5)},${cc.origin.lng.toFixed(5)} → ${cc.destination.lat.toFixed(5)},${cc.destination.lng.toFixed(5)}\n🛣 ${cc.routeData.method === 'road' ? 'ໄລຍະຖະໜົນຈິງ' : 'ໄລຍະຄາດຄະເນ'}: ${cc.routeData.distance_km.toFixed(1)} km`,
+  };
+  closeModal();
+  setTimeout(() => openVehicleUsageModal(cc.vehicle_id, null, cc.forced_type || 'customer_delivery'), 200);
+}
+
 async function rpSaveAsDelivery(moduleName) {
   const p = window._routePlanner;
   if (!p.origin || !p.optimized || p.optimized.length < 3) {
@@ -21038,47 +21407,210 @@ window.KALA_MAP = (function() {
   const DEFAULT_CENTER = [15.1156, 105.7857];
   const DEFAULT_ZOOM = 8;
 
-  // Map Tile Providers
+  // 🔑 API Keys (stored in localStorage — user can set in Settings)
+  function getApiKey(provider) {
+    return localStorage.getItem('kala_apikey_' + provider) || '';
+  }
+  function setApiKey(provider, key) {
+    if (key) localStorage.setItem('kala_apikey_' + provider, key);
+    else localStorage.removeItem('kala_apikey_' + provider);
+  }
+
+  // 🗺 Map Tile Providers — Many options, some need API keys
   const PROVIDERS = {
     osm: {
-      name: '🗺 OpenStreetMap',
+      name: '🗺 OpenStreetMap (ຟຣີ)',
       url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-      attribution: '&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a>',
+      attribution: '&copy; OpenStreetMap',
       maxZoom: 19,
+      free: true,
     },
     cartoLight: {
-      name: '⚪ Carto Light',
+      name: '⚪ Carto Light (ຟຣີ)',
       url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-      attribution: '&copy; <a href="https://carto.com/">CARTO</a> &copy; OpenStreetMap',
+      attribution: '&copy; CARTO &copy; OSM',
       maxZoom: 20,
+      free: true,
     },
     cartoDark: {
-      name: '⚫ Carto Dark',
+      name: '⚫ Carto Dark (ຟຣີ)',
       url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-      attribution: '&copy; <a href="https://carto.com/">CARTO</a> &copy; OpenStreetMap',
+      attribution: '&copy; CARTO &copy; OSM',
       maxZoom: 20,
+      free: true,
+    },
+    cartoVoyager: {
+      name: '🎨 Carto Voyager (ສວຍ ຟຣີ)',
+      url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+      attribution: '&copy; CARTO &copy; OSM',
+      maxZoom: 20,
+      free: true,
     },
     esriSat: {
-      name: '🛰 Satellite (ESRI)',
+      name: '🛰 Satellite ESRI (ຟຣີ)',
       url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
       attribution: 'Tiles &copy; Esri',
       maxZoom: 19,
+      free: true,
     },
     esriHybrid: {
-      name: '🌐 Hybrid (ESRI Sat + Labels)',
+      name: '🌐 Hybrid Sat+Labels (ຟຣີ)',
       hybrid: true,
       url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
       labelUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
       attribution: 'Tiles &copy; Esri',
       maxZoom: 19,
+      free: true,
+    },
+    esriTopo: {
+      name: '⛰ ESRI Topographic (ຟຣີ)',
+      url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',
+      attribution: 'Tiles &copy; Esri',
+      maxZoom: 19,
+      free: true,
     },
     opentopo: {
-      name: '⛰ OpenTopoMap',
+      name: '🏔 OpenTopoMap (ຟຣີ)',
       url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
-      attribution: '&copy; OpenStreetMap, SRTM | OpenTopoMap',
+      attribution: '&copy; OSM, SRTM | OpenTopoMap',
       maxZoom: 17,
+      free: true,
+    },
+    osmHot: {
+      name: '🚜 OSM Humanitarian (ຟຣີ)',
+      url: 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
+      attribution: '&copy; OSM, HOT',
+      maxZoom: 19,
+      free: true,
+    },
+    // ===== Providers requiring free API key =====
+    maptilerStreets: {
+      name: '✨ MapTiler Streets (ສວຍສຸດ)',
+      keyName: 'maptiler',
+      url: 'https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key={apikey}',
+      attribution: '&copy; <a href="https://www.maptiler.com/">MapTiler</a> &copy; OSM',
+      maxZoom: 22,
+      signupUrl: 'https://maptiler.com',
+    },
+    maptilerBasic: {
+      name: '✨ MapTiler Basic',
+      keyName: 'maptiler',
+      url: 'https://api.maptiler.com/maps/basic-v2/{z}/{x}/{y}.png?key={apikey}',
+      attribution: '&copy; MapTiler &copy; OSM',
+      maxZoom: 22,
+      signupUrl: 'https://maptiler.com',
+    },
+    maptilerOutdoor: {
+      name: '🏕 MapTiler Outdoor',
+      keyName: 'maptiler',
+      url: 'https://api.maptiler.com/maps/outdoor-v2/{z}/{x}/{y}.png?key={apikey}',
+      attribution: '&copy; MapTiler &copy; OSM',
+      maxZoom: 22,
+      signupUrl: 'https://maptiler.com',
+    },
+    maptilerSat: {
+      name: '🛰 MapTiler Satellite HD',
+      keyName: 'maptiler',
+      url: 'https://api.maptiler.com/maps/satellite/{z}/{x}/{y}.jpg?key={apikey}',
+      attribution: '&copy; MapTiler',
+      maxZoom: 22,
+      signupUrl: 'https://maptiler.com',
+    },
+    maptilerHybrid: {
+      name: '🌐 MapTiler Hybrid HD',
+      keyName: 'maptiler',
+      url: 'https://api.maptiler.com/maps/hybrid/{z}/{x}/{y}.jpg?key={apikey}',
+      attribution: '&copy; MapTiler &copy; OSM',
+      maxZoom: 22,
+      signupUrl: 'https://maptiler.com',
+    },
+    stadiaSmooth: {
+      name: '🎨 Stadia Alidade Smooth (ສວຍ)',
+      keyName: 'stadia',
+      url: 'https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}{r}.png?api_key={apikey}',
+      attribution: '&copy; Stadia Maps &copy; OSM',
+      maxZoom: 20,
+      signupUrl: 'https://stadiamaps.com',
+    },
+    stadiaSmoothDark: {
+      name: '🌙 Stadia Smooth Dark',
+      keyName: 'stadia',
+      url: 'https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png?api_key={apikey}',
+      attribution: '&copy; Stadia Maps &copy; OSM',
+      maxZoom: 20,
+      signupUrl: 'https://stadiamaps.com',
+    },
+    stadiaOutdoors: {
+      name: '🏞 Stadia Outdoors',
+      keyName: 'stadia',
+      url: 'https://tiles.stadiamaps.com/tiles/outdoors/{z}/{x}/{y}{r}.png?api_key={apikey}',
+      attribution: '&copy; Stadia Maps &copy; OSM',
+      maxZoom: 20,
+      signupUrl: 'https://stadiamaps.com',
+    },
+    mapboxStreets: {
+      name: '💎 Mapbox Streets',
+      keyName: 'mapbox',
+      url: 'https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/{z}/{x}/{y}?access_token={apikey}',
+      attribution: '&copy; Mapbox &copy; OSM',
+      maxZoom: 22,
+      tileSize: 512,
+      zoomOffset: -1,
+      signupUrl: 'https://mapbox.com',
+    },
+    mapboxSat: {
+      name: '🛰 Mapbox Satellite Streets',
+      keyName: 'mapbox',
+      url: 'https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/tiles/{z}/{x}/{y}?access_token={apikey}',
+      attribution: '&copy; Mapbox',
+      maxZoom: 22,
+      tileSize: 512,
+      zoomOffset: -1,
+      signupUrl: 'https://mapbox.com',
+    },
+    mapboxOutdoors: {
+      name: '🏔 Mapbox Outdoors',
+      keyName: 'mapbox',
+      url: 'https://api.mapbox.com/styles/v1/mapbox/outdoors-v12/tiles/{z}/{x}/{y}?access_token={apikey}',
+      attribution: '&copy; Mapbox &copy; OSM',
+      maxZoom: 22,
+      tileSize: 512,
+      zoomOffset: -1,
+      signupUrl: 'https://mapbox.com',
+    },
+    thunderforestTransport: {
+      name: '🚚 Thunderforest Transport',
+      keyName: 'thunderforest',
+      url: 'https://{s}.tile.thunderforest.com/transport/{z}/{x}/{y}.png?apikey={apikey}',
+      attribution: '&copy; Thunderforest &copy; OSM',
+      maxZoom: 22,
+      signupUrl: 'https://thunderforest.com',
+    },
+    thunderforestLandscape: {
+      name: '🌳 Thunderforest Landscape',
+      keyName: 'thunderforest',
+      url: 'https://{s}.tile.thunderforest.com/landscape/{z}/{x}/{y}.png?apikey={apikey}',
+      attribution: '&copy; Thunderforest &copy; OSM',
+      maxZoom: 22,
+      signupUrl: 'https://thunderforest.com',
+    },
+    thunderforestOutdoors: {
+      name: '🏞 Thunderforest Outdoors',
+      keyName: 'thunderforest',
+      url: 'https://{s}.tile.thunderforest.com/outdoors/{z}/{x}/{y}.png?apikey={apikey}',
+      attribution: '&copy; Thunderforest &copy; OSM',
+      maxZoom: 22,
+      signupUrl: 'https://thunderforest.com',
     },
   };
+
+  // Check if provider is usable (has API key if needed)
+  function isProviderUsable(key) {
+    const p = PROVIDERS[key];
+    if (!p) return false;
+    if (p.free) return true;
+    return !!getApiKey(p.keyName);
+  }
 
   // Save provider preference
   function getActiveProvider() {
@@ -21090,14 +21622,23 @@ window.KALA_MAP = (function() {
 
   // Create the tile layer based on provider key
   function createTileLayer(providerKey) {
-    const p = PROVIDERS[providerKey] || PROVIDERS.osm;
+    let p = PROVIDERS[providerKey];
+    if (!p) p = PROVIDERS.osm;
+    // Fallback if API key required but missing
+    if (!p.free && !getApiKey(p.keyName)) {
+      console.warn(`Provider ${providerKey} requires API key, falling back to OSM`);
+      p = PROVIDERS.osm;
+    }
+    const apikey = p.keyName ? getApiKey(p.keyName) : '';
+    const opts = { maxZoom: p.maxZoom, attribution: p.attribution };
+    if (p.tileSize) opts.tileSize = p.tileSize;
+    if (p.zoomOffset != null) opts.zoomOffset = p.zoomOffset;
     if (p.hybrid) {
-      // Hybrid: 2 layers stacked
-      const sat = L.tileLayer(p.url, { maxZoom: p.maxZoom, attribution: p.attribution });
-      const labels = L.tileLayer(p.labelUrl, { maxZoom: p.maxZoom });
+      const sat = L.tileLayer(p.url.replace('{apikey}', apikey), opts);
+      const labels = L.tileLayer(p.labelUrl.replace('{apikey}', apikey), { maxZoom: p.maxZoom });
       return L.layerGroup([sat, labels]);
     }
-    return L.tileLayer(p.url, { maxZoom: p.maxZoom, attribution: p.attribution });
+    return L.tileLayer(p.url.replace('{apikey}', apikey), opts);
   }
 
   // Initialize a map in the given container
@@ -21115,7 +21656,7 @@ window.KALA_MAP = (function() {
     let tileLayer = createTileLayer(activeKey);
     tileLayer.addTo(map);
 
-    // 🗂 Custom provider switcher control
+    // 🗂 Custom provider switcher control — grouped by free/premium
     const ProviderControl = L.Control.extend({
       options: { position: 'topright' },
       onAdd: function() {
@@ -21123,10 +21664,21 @@ window.KALA_MAP = (function() {
         div.style.background = '#fff';
         div.style.padding = '6px 8px';
         div.style.fontSize = '12px';
-        div.innerHTML = `<select style="border:none;font-size:12px;font-family:inherit;padding:2px;cursor:pointer">
-          ${Object.keys(PROVIDERS).map(k => `<option value="${k}" ${k===activeKey?'selected':''}>${PROVIDERS[k].name}</option>`).join('')}
-        </select>`;
+        div.style.display = 'flex';
+        div.style.gap = '4px';
+        div.style.alignItems = 'center';
+        const freeOpts = Object.entries(PROVIDERS).filter(([k,v]) => v.free).map(([k,v]) => `<option value="${k}" ${k===activeKey?'selected':''}>${v.name}</option>`).join('');
+        const premiumOpts = Object.entries(PROVIDERS).filter(([k,v]) => !v.free).map(([k,v]) => {
+          const ok = !!getApiKey(v.keyName);
+          return `<option value="${k}" ${k===activeKey?'selected':''} ${!ok?'disabled':''}>${v.name}${!ok?' 🔒':''}</option>`;
+        }).join('');
+        div.innerHTML = `<select style="border:none;font-size:12px;font-family:inherit;padding:2px;cursor:pointer;max-width:220px">
+          <optgroup label="🆓 ຟຣີ ບໍ່ຕ້ອງສະໝັກ">${freeOpts}</optgroup>
+          <optgroup label="💎 ຄຸນນະພາບສູງ (ຕ້ອງ API Key)">${premiumOpts}</optgroup>
+        </select>
+        <button title="🔑 ຕັ້ງຄ່າ API Keys" style="background:#F97316;color:#fff;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;font-family:inherit;font-size:12px">🔑</button>`;
         const sel = div.querySelector('select');
+        const keyBtn = div.querySelector('button');
         L.DomEvent.disableClickPropagation(div);
         sel.addEventListener('change', (e) => {
           activeKey = e.target.value;
@@ -21135,6 +21687,14 @@ window.KALA_MAP = (function() {
           tileLayer = createTileLayer(activeKey);
           tileLayer.addTo(map);
         });
+        keyBtn.addEventListener('click', () => openMapApiKeysModal(map, () => {
+          // Re-render the control to reflect new key states
+          map.removeControl(this);
+          map.removeLayer(tileLayer);
+          tileLayer = createTileLayer(activeKey);
+          tileLayer.addTo(map);
+          map.addControl(new ProviderControl());
+        }));
         return div;
       }
     });
@@ -21386,8 +21946,133 @@ window.KALA_MAP = (function() {
     init, createPin, createTruckMarker, pinLocations, drawRoute, drawMultiRoute,
     optimizeTSP, routeDistance, haversineKm, fitBounds, addHeatmap, addGeofence,
     getActiveProvider, setActiveProvider,
+    getApiKey, setApiKey, isProviderUsable,
   };
 })();
+
+// 🔑 Map API Keys Modal
+function openMapApiKeysModal(callbackMap, onChange) {
+  const keys = {
+    maptiler: KALA_MAP.getApiKey('maptiler'),
+    stadia: KALA_MAP.getApiKey('stadia'),
+    mapbox: KALA_MAP.getApiKey('mapbox'),
+    thunderforest: KALA_MAP.getApiKey('thunderforest'),
+    openrouteservice: KALA_MAP.getApiKey('openrouteservice'),
+  };
+  modal('🔑 ຕັ້ງຄ່າ API Keys — Map Providers', `
+    <div class="alert info" style="font-size:12px;line-height:1.7">
+      💡 API Keys ໂດຍປົກກະຕິແມ່ນ <strong>ຟຣີ</strong> — ສະໝັກໃຊ້ເວລາ 1-2 ນາທີເທົ່ານັ້ນ.
+      ກົດປຸ່ມ "📋 ສະໝັກ" ດ້ານຂ້າງ → ສ້າງບັນຊີ → Copy API Key ມາໃສ່ນີ້.
+      Keys ຈະຖືກບັນທຶກໃນ browser ນີ້ເທົ່ານັ້ນ.
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:12px;margin-top:14px">
+
+      <div style="background:var(--bg);padding:12px;border-radius:8px;border-left:4px solid #3B82F6">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <strong style="color:#1E40AF">✨ MapTiler</strong>
+          <button class="btn sm outline" onclick="window.open('https://www.maptiler.com/cloud/','_blank')">📋 ສະໝັກ</button>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:6px">ຟຣີ 100,000 loads/ເດືອນ — Streets, Satellite, Outdoor, Hybrid HD</div>
+        <input type="text" id="apikey_maptiler" value="${escapeHtml(keys.maptiler)}" placeholder="ປ້ອນ API Key ທີ່ນີ້..." style="width:100%;padding:8px;border:1px solid var(--line);border-radius:6px;font-family:monospace;font-size:12px"/>
+      </div>
+
+      <div style="background:var(--bg);padding:12px;border-radius:8px;border-left:4px solid #8B5CF6">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <strong style="color:#6D28D9">🎨 Stadia Maps</strong>
+          <button class="btn sm outline" onclick="window.open('https://client.stadiamaps.com/signup/','_blank')">📋 ສະໝັກ</button>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:6px">ຟຣີ 200K req/ເດືອນ (ບໍ່ຄ້າພານິດ) — Alidade Smooth, Dark, Outdoors</div>
+        <input type="text" id="apikey_stadia" value="${escapeHtml(keys.stadia)}" placeholder="ປ້ອນ API Key ທີ່ນີ້..." style="width:100%;padding:8px;border:1px solid var(--line);border-radius:6px;font-family:monospace;font-size:12px"/>
+      </div>
+
+      <div style="background:var(--bg);padding:12px;border-radius:8px;border-left:4px solid #10B981">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <strong style="color:#065F46">💎 Mapbox</strong>
+          <button class="btn sm outline" onclick="window.open('https://account.mapbox.com/auth/signup/','_blank')">📋 ສະໝັກ</button>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:6px">ຟຣີ 50K loads/ເດືອນ — ຄຸນນະພາບສູງສຸດ Streets, Satellite Streets, Outdoors</div>
+        <input type="text" id="apikey_mapbox" value="${escapeHtml(keys.mapbox)}" placeholder="ປ້ອນ Public Access Token (ເລີ່ມຕົ້ນດ້ວຍ pk.)..." style="width:100%;padding:8px;border:1px solid var(--line);border-radius:6px;font-family:monospace;font-size:12px"/>
+      </div>
+
+      <div style="background:var(--bg);padding:12px;border-radius:8px;border-left:4px solid #F59E0B">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <strong style="color:#92400E">🚚 Thunderforest</strong>
+          <button class="btn sm outline" onclick="window.open('https://www.thunderforest.com/pricing/','_blank')">📋 ສະໝັກ</button>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:6px">ຟຣີ 150K req/ເດືອນ — Transport (ດີສຳລັບເສັ້ນທາງ), Landscape, Outdoors</div>
+        <input type="text" id="apikey_thunderforest" value="${escapeHtml(keys.thunderforest)}" placeholder="ປ້ອນ API Key ທີ່ນີ້..." style="width:100%;padding:8px;border:1px solid var(--line);border-radius:6px;font-family:monospace;font-size:12px"/>
+      </div>
+
+      <div style="background:#FEF3C7;padding:12px;border-radius:8px;border-left:4px solid #F97316">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <strong style="color:#92400E">🛣 OpenRouteService — ສຳລັບ Road Routing</strong>
+          <button class="btn sm outline" onclick="window.open('https://openrouteservice.org/dev/#/signup','_blank')">📋 ສະໝັກ</button>
+        </div>
+        <div style="font-size:11px;color:#78350F;margin-bottom:6px">ຟຣີ 2,000 req/ມື້ — ໄລ່ໄລຍະທາງຈິງ ໂດຍຖະໜົນ + ເວລາເດີນທາງ</div>
+        <input type="text" id="apikey_openrouteservice" value="${escapeHtml(keys.openrouteservice)}" placeholder="ປ້ອນ API Key..." style="width:100%;padding:8px;border:1px solid #FDBA74;border-radius:6px;font-family:monospace;font-size:12px"/>
+      </div>
+
+    </div>
+  `, `
+    <button class="btn outline" onclick="closeModal()">${t('cancel')}</button>
+    <button class="btn ok" onclick="saveMapApiKeys()">💾 ${t('save')}</button>
+  `, 'large');
+  window._mapApiKeysCallback = onChange;
+}
+
+function saveMapApiKeys() {
+  ['maptiler','stadia','mapbox','thunderforest','openrouteservice'].forEach(k => {
+    const v = document.getElementById('apikey_'+k)?.value?.trim() || '';
+    KALA_MAP.setApiKey(k, v);
+  });
+  closeModal();
+  toast('💾 ບັນທຶກ API Keys ສຳເລັດ', 'ok');
+  if (typeof window._mapApiKeysCallback === 'function') window._mapApiKeysCallback();
+}
+
+// 🛣 OpenRouteService Road Routing
+async function fetchRoadRoute(origin, destination, waypoints = []) {
+  const apiKey = KALA_MAP.getApiKey('openrouteservice');
+  if (!apiKey) {
+    // Fallback: Haversine × 1.4 road factor
+    const all = [origin, ...waypoints, destination];
+    let dist = 0;
+    for (let i = 0; i < all.length - 1; i++) dist += KALA_MAP.haversineKm(all[i], all[i+1]);
+    const roadDist = dist * 1.4;
+    return {
+      ok: true,
+      method: 'straight',
+      distance_km: roadDist,
+      duration_min: roadDist / 50 * 60, // assume 50 km/h average
+      coordinates: all.map(p => [p.lng, p.lat]),
+    };
+  }
+  try {
+    const coords = [[origin.lng, origin.lat], ...waypoints.map(w => [w.lng, w.lat]), [destination.lng, destination.lat]];
+    const res = await fetch('https://api.openrouteservice.org/v2/directions/driving-car/geojson', {
+      method: 'POST',
+      headers: {
+        'Authorization': apiKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ coordinates: coords }),
+    });
+    if (!res.ok) throw new Error('Routing failed: ' + res.status);
+    const data = await res.json();
+    const feature = data.features[0];
+    return {
+      ok: true,
+      method: 'road',
+      distance_km: feature.properties.summary.distance / 1000,
+      duration_min: feature.properties.summary.duration / 60,
+      coordinates: feature.geometry.coordinates,
+    };
+  } catch (e) {
+    console.warn('Road routing failed, using straight-line:', e);
+    return fetchRoadRoute(origin, destination, waypoints); // recurse without key → straight-line
+  }
+}
 
 window._locView = window._locView || 'table'; // 'table' | 'map'
 
