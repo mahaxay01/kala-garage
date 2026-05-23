@@ -7,6 +7,13 @@
 <script src="https://cdn.jsdelivr.net/npm/dexie@3.2.7/dist/dexie.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/gitbrent/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
+<!-- 🗺 Leaflet.js — Logistics Command Center Map -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
 <!-- Supabase Cloud Sync (loaded but only used if Cloud Mode enabled) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.43.4/dist/umd/supabase.min.js"></script>
 <!-- Web fonts: load Lao + Thai fonts as fallback so characters never become boxes -->
@@ -1318,7 +1325,6 @@ const I18N = {
     predict_due_in: "ຈະຄົບ PM ໃນ", predict_days: "ມື້", predict_based_on: "ຄຳນວນຈາກ Trend ເລກໄມ",
     days_to_stockout: "ມື້ກ່ອນ Stock ໝົດ", avg_daily_usage: "ສະເລ່ຍໃຊ້/ມື້",
     suggested_reorder: "ປະລິມານທີ່ແນະນຳໃຫ້ສັ່ງ",
-    gps_status: "ສະຖານະການເຊື່ອມຕໍ່",
     install_pwa: "📱 ຕິດຕັ້ງເປັນ App ໃນມືຖື",
     tool_active: "ໃຊ້ງານ", tool_calibrating: "ກຳລັງ Calibrate", tool_expired: "Sticker ໝົດອາຍຸ",
     best_price: "ລາຄາດີສຸດ",
@@ -1505,6 +1511,61 @@ db.version(2).stores({
   outsource: '++id, jo_id, vendor_id, status',
   settings: 'key',
 });
+// ===== v24: Logistics Command Center — GPS Tracking + Geofences + Route History =====
+db.version(24).stores({
+  vehicles: '++id, vehicle_id, plate, type, branch, status, category_id',
+  inspections: '++id, vehicle_id, date, status, frequency, driver',
+  joborders: '++id, jo_id, vehicle_id, priority, status, created',
+  parts: '++id, code, class, grade, category_id, warehouse, status',
+  partmovements: '++id, part_id, type, date',
+  drivers: '++id, driver_id, name, license_expiry, assigned_vehicle',
+  tires: '++id, tire_id, current_vehicle, position, status, install_km, install_date',
+  tire_history: '++id, tire_id, date, event_type, vehicle_id, position, km',
+  vendors: '++id, vendor_id, name, category_id, province',
+  vendorprices: '++id, vendor_id, part_code, currency, date',
+  tools: '++id, tool_id, name, calib_due, status',
+  outsource: '++id, jo_id, vendor_id, status',
+  fluids: '++id, vehicle_id, type, date, next_due_date',
+  mileage_log: '++id, vehicle_id, date, mileage',
+  categories: '++id, name, type, parent_id',
+  exchange_rates: '++id, currency, rate, valid_from',
+  pm_templates: '++id, vehicle_type, interval_type, interval_value',
+  pm_history: '++id, vehicle_id, template_id, date, mileage',
+  fuel_log: '++id, vehicle_id, date, driver, station',
+  documents: '++id, entity_type, entity_id, doc_type, expiry_date',
+  incidents: '++id, date, vehicle_id, driver_id, severity, status',
+  audit_log: '++id, timestamp, user, action, entity',
+  purchase_requests: '++id, pr_id, vendor_id, status, created, total_lak',
+  purchase_orders: '++id, po_id, vendor_id, status, created, urgency, total_lak',
+  vehicle_pm: '++id, vehicle_id, interval_type, interval_value, active',
+  gps_devices: '++id, vehicle_id, imei, model, platform, status, installed_date',
+  driver_reviews: '++id, driver_id, review_date, reviewer, period, total_score',
+  receipt_inspections: '++id, jo_id, vehicle_id, date, inspector',
+  predelivery_inspections: '++id, jo_id, vehicle_id, date, inspector, approved',
+  users: '++id, username, role, name, active, created',
+  depreciation: '++id, vehicle_id, year, month, value, accumulated',
+  parts_replacements: '++id, vehicle_id, part_type, date, km, cost, jo_id',
+  ai_chat_history: '++id, timestamp, role, content',
+  deleted_items: '++id, deleted_at, deleted_by, store, original_id, summary, restored',
+  price_change_audit: '++id, timestamp, user, entity_type, entity_id, field, old_value, new_value, summary',
+  service_rates: '++id, service_code, service_name, category, vehicle_group, base_charge, skill_required, active',
+  tech_profiles: '++id, tech_id, name, skill_level, commission_pct, walkin_commission_pct, active, branch',
+  labor_entries: '++id, entry_id, date, jo_id, vehicle_id, tech_id, service_code, charge_amount, commission_amount, status, approved_by, customer_type, intake_id',
+  customer_receipts: '++id, receipt_id, date, labor_entry_id, customer_name, customer_phone, vehicle_plate, total_amount, signed_at, signed_by_customer',
+  vehicle_intakes: '++id, intake_id, date, customer_phone, vehicle_plate, pickup_code, status, received_by_tech_id, linked_entry_id, delivered_at',
+  camera_counts: '++id, date, vehicles_in, vehicles_out, recorded_by',
+  customer_audits: '++id, audit_id, labor_entry_id, customer_phone, audit_date, called_at, response, satisfaction, received_receipt, called_by, notes',
+  branches: '++id, branch_id, name, province, address, manager, active',
+  vehicle_specs: '++id, vehicle_id, updated_at',
+  vehicle_usage: '++id, usage_id, date, vehicle_id, usage_type, billing_type, customer_phone, status, total_amount, created_by',
+  vehicle_usage_rates: '++id, vehicle_id, vehicle_type, rate_per_km, rate_per_hour, rate_per_ton, fixed_trip_rate, active',
+  locations: '++id, location_id, name, type, province, district, village, parent_id, lat, lng, active',
+  distance_matrix: '++id, from_id, to_id, distance_km, travel_time_min, route_notes, source, updated_at',
+  helpdesk_problems: '++id, problem_id, category, difficulty, symptom, vehicle_class, vehicle_brand, views, helpful_count, active, created_at',
+  helpdesk_usage: '++id, problem_id, jo_id, technician_id, was_helpful, date',
+  settings: 'key',
+});
+
 // ===== v23: Helpdesk ສະບັບເຕັມ — Brand + Vehicle Class =====
 db.version(23).stores({
   vehicles: '++id, vehicle_id, plate, type, branch, status, category_id',
@@ -2589,8 +2650,8 @@ const NAV_GROUPS = [
     id:'fleet', icon:'🚗', label:'ລົດ ແລະ ການກວດປະຈຳວັນ',
     items: [
       { page:'vehicles',      icon:'🚗', label:'ທະບຽນລົດ' },
-      { page:'drivers',       icon:'👤', label:'ຄົນຂັບ' },
-      { page:'driver_perf',   icon:'🏆', label:'ຄະແນນຄົນຂັບ' },
+      
+      
       { page:'daily',         icon:'✅', label:'ກວດປະຈຳວັນ' },
       { page:'fuel',          icon:'⛽', label:'ບິນນ້ຳມັນ' },
       { page:'mileage',       icon:'📏', label:'ບັນທຶກເລກໄມ' },
@@ -2621,15 +2682,7 @@ const NAV_GROUPS = [
     ]
   },
   // 🚚 [ໂມດູນ 2] ການຂົນສົ່ງ — Logistics
-  {
-    id:'logistics', icon:'🚚', label:'🚚 ໂມດູນ ການຂົນສົ່ງ (Logistics)',
-    items: [
-      { page:'deliveries',      icon:'📦', label:'ສົ່ງສິນຄ້າໃຫ້ລູກຄ້າ' },
-      { page:'inter_branch',    icon:'🔄', label:'ໂອນສາຂາພາຍໃນ' },
-      { page:'logistics_report',icon:'📊', label:'ລາຍງານຂົນສົ່ງ' },
-      { page:'locations',       icon:'📍', label:'ສະຖານທີ່ + ໄລຍະທາງ' },
-    ]
-  },
+  
   // 🏗 [ໂມດູນ 3] ການເຊົ່າ — Rental
   {
     id:'rental', icon:'🏗', label:'🏗 ໂມດູນ ການເຊົ່າ (Rental)',
@@ -2642,7 +2695,7 @@ const NAV_GROUPS = [
   {
     id:'antifraud', icon:'🛡️', label:'ການກວດສອບ Anti-Fraud',
     items: [
-      { page:'camera_reconciliation', icon:'📷', label:'Camera Reconciliation' },
+      
       { page:'customer_audit',        icon:'📞', label:'Customer Audit (ສຸ່ມໂທ)' },
       { page:'intakes',               icon:'🛡️', label:'ໃບຮັບລົດເຂົ້າ (ງານໃຫຍ່)' },
     ]
@@ -2668,7 +2721,7 @@ const NAV_GROUPS = [
       { page:'forms_hub',    icon:'📋', label:'ຟອມ ແລະ ໃບລາຍງານ' },
       { page:'depreciation', icon:'📉', label:'ຄ່າເສື່ອມຊັບສິນ' },
       { page:'price_audit',  icon:'💱', label:'ການປ່ຽນລາຄາ' },
-      { page:'gps',          icon:'🗺', label:'GPS / Telematics' },
+      
       { page:'ai_tools',     icon:'🛠', label:'AI Tools (20 ຄວາມສາມາດ)' },
     ]
   },
@@ -3154,12 +3207,98 @@ async function renderDriverDashboard() {
         <p style="margin:0;font-size:12px;color:#92400E">ກົດປຸ່ມ "📦 ສ້າງໃບສົ່ງສິນຄ້າ" ດ້ານເທິງເພື່ອເລີ່ມຕົ້ນ</p>
       </div>
     `}
+
   `;
+
 }
 
 
+// ═══════════════════════════════════════════════════════════════════════════
+// 🔥 LOGISTICS ANALYTICS — Heatmaps + Customer Concentration + Cost/km
+// ═══════════════════════════════════════════════════════════════════════════
+window._lanView = window._lanView || { mode: 'density' };
 
-// ===================== DASHBOARD =====================
+pages.logistics_analytics = async () => {
+  const el = document.getElementById('content') || document.querySelector('main') || document.body;
+  if (el) el.innerHTML = '<div style="padding:40px;text-align:center;color:#64748b">'
+    + '<h2 style="margin-bottom:8px">ຄຸນສົມບັດນີ້ຖືກປິດໄວ້ຊົ່ວຄາວ</h2>'
+    + '<p>ໂມດູນຂົນສົ່ງ / ຕິດຕາມ (logistics &amp; tracking) ຖືກປິດໃນສະບັບນີ້.</p>'
+    + '</div>';
+};
+
+let _lanMap = null;
+let _lanLayers = [];
+async function renderAnalyticsMap(destStats) {
+  const view = window._lanView;
+  const locations = await db.locations.toArray();
+  const branches = locations.filter(l => l.type === 'branch' && l.lat);
+
+  if (!_lanMap) {
+    _lanMap = KALA_MAP.init('lan_map');
+  }
+  _lanLayers.forEach(l => _lanMap.removeLayer(l));
+  _lanLayers = [];
+
+  // Always show branches
+  branches.forEach(b => {
+    const m = L.marker([b.lat, b.lng], { icon: KALA_MAP.createPin(b, { size: 40 }) })
+      .bindPopup(`<strong>🏢 ${escapeHtml(b.name)}</strong><br>${escapeHtml(b.province||'')}`);
+    m.addTo(_lanMap);
+    _lanLayers.push(m);
+  });
+
+  if (view.mode === 'density') {
+    // Heatmap by count
+    const pts = destStats.map(d => ({ lat: d.loc.lat, lng: d.loc.lng, weight: d.count }));
+    if (pts.length > 0) {
+      const heat = KALA_MAP.addHeatmap(_lanMap, pts, { radius: 40, blur: 25 });
+      _lanLayers.push(heat);
+    }
+  } else if (view.mode === 'revenue') {
+    // Heatmap weighted by revenue
+    const maxRev = Math.max(...destStats.map(d => d.revenue), 1);
+    const pts = destStats.map(d => ({ lat: d.loc.lat, lng: d.loc.lng, weight: d.revenue/maxRev*10 }));
+    if (pts.length > 0) {
+      const heat = KALA_MAP.addHeatmap(_lanMap, pts, { radius: 45, blur: 28, gradient:{0.2:'#86EFAC',0.5:'#22C55E',0.8:'#15803D',1:'#14532D'} });
+      _lanLayers.push(heat);
+    }
+  } else if (view.mode === 'frequency') {
+    // Circles sized by frequency
+    destStats.forEach(d => {
+      const circle = L.circleMarker([d.loc.lat, d.loc.lng], {
+        radius: Math.min(8 + d.count, 30),
+        color: '#3B82F6',
+        fillColor: '#60A5FA',
+        fillOpacity: 0.55,
+        weight: 2,
+      }).bindPopup(`<strong>${escapeHtml(d.loc.name||'-')}</strong><br>📦 ${d.count} ການສົ່ງ<br>💰 ${fmt(d.revenue)} ກີບ`);
+      circle.addTo(_lanMap);
+      _lanLayers.push(circle);
+    });
+  } else if (view.mode === 'suggest') {
+    // Show top under-served zones
+    destStats.forEach(d => {
+      if (d.count < 5) return;
+      let minDist = Infinity;
+      branches.forEach(b => {
+        const dist = KALA_MAP.haversineKm(d.loc, b);
+        if (dist < minDist) minDist = dist;
+      });
+      const isCandidate = minDist > 50;
+      const color = isCandidate ? '#8B5CF6' : '#94A3B8';
+      const circle = L.circleMarker([d.loc.lat, d.loc.lng], {
+        radius: isCandidate ? 12 : 6,
+        color, fillColor: color, fillOpacity: isCandidate ? 0.7 : 0.4, weight: 2,
+      }).bindPopup(`<strong>${escapeHtml(d.loc.name||'-')}</strong><br>📦 ${d.count} ການສົ່ງ<br>🛣 ${minDist.toFixed(0)} km ຈາກສາຂາ ${isCandidate?'<br><strong style="color:#8B5CF6">🎯 ແນະນຳເປີດສາຂາ</strong>':''}`);
+      circle.addTo(_lanMap);
+      _lanLayers.push(circle);
+    });
+  }
+
+  const allLatLng = [...branches, ...destStats.map(d=>d.loc)];
+  if (allLatLng.length > 0) KALA_MAP.fitBounds(_lanMap, allLatLng);
+}
+
 pages.dashboard = async () => {
   // 🆕 ກວດບົດບາດ — ສະແດງ Worker Dashboard ສຳລັບຊ່າງ/ຄົນຂັບ
   if (typeof cloud!=='undefined' && cloud.profile) {
@@ -3268,37 +3407,11 @@ pages.dashboard = async () => {
 
 // ===================== DRIVERS =====================
 pages.drivers = async () => {
-  const drivers = await db.drivers.toArray();
-  const vehicles = await db.vehicles.toArray();
-  const today = todayISO();
-  const totalD = drivers.length;
-  const pageRes = paginate(drivers, 'drivers');
-  $('#main').innerHTML = `
-    <div class="crumbs">${t('nav_operations')} › ${t('nav_drivers')}</div>
-    <div class="page-title">👤 ${t('nav_drivers')} <small style="font-weight:400;color:var(--muted);font-size:13px">— ${totalD}</small></div>
-    <div class="toolbar"><button class="btn" onclick="openDriverModal()">${t('add_driver_new')}</button></div>
-    <div class="card" style="padding:0">
-      ${drivers.length === 0 ? `<div class="empty" style="padding:30px"><div class="icon">👤</div><p>${t('no_data')}</p></div>` : `
-      <table class="resizable">
-        <tr><th>${t('fld_id')}</th><th>${t('fld_name')}</th><th>${t('fld_license_no')}</th>
-          <th>${t('fld_license_class')}</th><th>${t('fld_license_expiry')}</th><th>${t('fld_default_vehicle')}</th><th>${t('fld_phone')}</th><th></th></tr>
-        ${pageRes.items.map(d => {
-          const daysLeft = d.license_expiry ? daysBetween(today, d.license_expiry) : null;
-          const expStatus = daysLeft === null ? '' : daysLeft < 0 ? 'bad' : daysLeft < 30 ? 'warn' : 'ok';
-          return `<tr>
-          <td><strong>${d.driver_id}</strong></td><td>${escapeHtml(d.name)}</td>
-          <td>${d.license_no||'-'}</td><td>${d.license_class||'-'}</td>
-          <td>${d.license_expiry ? `<span class="pill ${expStatus}">${d.license_expiry}</span>` : '-'}</td>
-          <td>${d.default_vehicle||'-'}</td><td>${d.phone||'-'}</td>
-          <td class="actions">
-            <button class="btn sm" onclick="openDriverReviewModal(${d.id})" title="ບັນທຶກຄະແນນຈາກຫົວໜ້າ">⭐ ໃຫ້ຄະແນນ</button>
-            <button class="btn sm outline" onclick="openDriverModal(${d.id})">${t('edit')}</button>
-            <button class="btn sm danger" onclick="delDriver(${d.id})">${t('delete')}</button></td>
-        </tr>`;}).join('')}
-      </table>
-      ${pagerUI('drivers', totalD, 'pages.drivers')}`}
-    </div>
-  `;
+  const el = document.getElementById('content') || document.querySelector('main') || document.body;
+  if (el) el.innerHTML = '<div style="padding:40px;text-align:center;color:#64748b">'
+    + '<h2 style="margin-bottom:8px">ຄຸນສົມບັດນີ້ຖືກປິດໄວ້ຊົ່ວຄາວ</h2>'
+    + '<p>ໂມດູນຂົນສົ່ງ / ຕິດຕາມ (logistics &amp; tracking) ຖືກປິດໃນສະບັບນີ້.</p>'
+    + '</div>';
 };
 async function openDriverModal(id) {
   const vehicles = await db.vehicles.toArray();
@@ -5975,140 +6088,11 @@ function getScoreSettings() {
   return Object.assign(def, JSON.parse(localStorage.getItem('kala_score_settings') || '{}'));
 }
 pages.driver_perf = async () => {
-  const ss = getScoreSettings();
-  const drivers = await db.drivers.toArray();
-  const fuelLogs = await db.fuel_log.toArray();
-  const inspections = await db.inspections.toArray();
-  const incidents = await db.incidents.toArray();
-  const vehicles = await db.vehicles.toArray();
-  const reviews = await db.driver_reviews.toArray();
-  const today = todayISO();
-  // Calculate score per driver
-  const scores = drivers.map(d => {
-    // Get vehicles this driver uses (from default_vehicle and fuel logs)
-    const driverVehicleIds = new Set();
-    if (d.default_vehicle) driverVehicleIds.add(d.default_vehicle);
-    fuelLogs.filter(f => f.driver === d.name).forEach(f => driverVehicleIds.add(f.vehicle_id));
-    const driverVehicles = vehicles.filter(v => driverVehicleIds.has(v.vehicle_id));
-
-    const myFuelLogs = fuelLogs.filter(f => f.driver === d.name);
-    let avgKmL = 0, kmLCount = 0;
-    const perVehKmL = {};
-    for (let i = 0; i < myFuelLogs.length; i++) {
-      const cur = myFuelLogs[i];
-      const prev = myFuelLogs.slice(i+1).find(p => p.vehicle_id === cur.vehicle_id);
-      if (prev && cur.km_at_fill && prev.km_at_fill && cur.liters) {
-        const km = cur.km_at_fill - prev.km_at_fill;
-        if (km > 0) {
-          const kmL = km / cur.liters;
-          avgKmL += kmL; kmLCount++;
-          (perVehKmL[cur.vehicle_id] = perVehKmL[cur.vehicle_id] || []).push(kmL);
-        }
-      }
-    }
-    avgKmL = kmLCount ? avgKmL / kmLCount : 0;
-    // Score per vehicle using its own Km/L target if set, then average
-    let fuelScoreSum = 0, scoredVehicles = 0;
-    Object.entries(perVehKmL).forEach(([vid, arr]) => {
-      const veh = vehicles.find(v => v.vehicle_id === vid);
-      const mean = arr.reduce((a,b)=>a+b,0) / arr.length;
-      const fmax = (veh && veh.fuel_max) || ss.fuel_max;
-      const fmin = (veh && veh.fuel_min) || ss.fuel_min;
-      const range = fmax - fmin;
-      const s = range > 0 ? Math.max(0, Math.min(100, ((mean - fmin) / range) * 100)) : 0;
-      fuelScoreSum += s; scoredVehicles++;
-    });
-    const fuelScore = scoredVehicles > 0 ? (fuelScoreSum / scoredVehicles) : 0;
-
-    const myInspections = inspections.filter(i => i.driver === d.name);
-    const lastN = new Date(); lastN.setDate(lastN.getDate() - ss.compliance_days);
-    const recentInspections = myInspections.filter(i => new Date(i.date) >= lastN);
-    const complianceScore = Math.min(100, (recentInspections.length / ss.compliance_days) * 100);
-
-    const myIncidents = incidents.filter(i => i.driver_id === d.id);
-    const safetyScore = Math.max(0, 100 - myIncidents.length * ss.incident_penalty);
-
-    // Supervisor reviews (last 6 months)
-    const sixMonAgo = new Date(); sixMonAgo.setMonth(sixMonAgo.getMonth() - 6);
-    const myReviews = reviews.filter(r => r.driver_id === d.id && new Date(r.review_date) >= sixMonAgo);
-    const supScore = myReviews.length > 0
-      ? Math.round(myReviews.reduce((a,r) => a + (r.total_score||0), 0) / myReviews.length)
-      : null;
-
-    // Vehicle-derived: PM compliance from assigned vehicles
-    let vehPMOk = 0, vehPMBad = 0;
-    driverVehicles.forEach(v => {
-      if (!v.nextPM) return;
-      const days = daysBetween(today, v.nextPM);
-      if (days < 0) vehPMBad++; else vehPMOk++;
-    });
-    const vehicleCareScore = (vehPMOk + vehPMBad) > 0
-      ? Math.round((vehPMOk / (vehPMOk + vehPMBad)) * 100)
-      : 100;
-
-    // Weighted average — include supervisor review (weight 25%) if available
-    const w_sup = ss.weight_supervisor || 25;
-    const w_veh = ss.weight_vehicle_care || 0;
-    const baseTotalW = ss.weight_fuel + ss.weight_compliance + ss.weight_safety;
-    let overall;
-    if (supScore !== null || w_veh > 0) {
-      // Rescale base weights so total adds up properly
-      const remaining = 100 - (supScore !== null ? w_sup : 0) - w_veh;
-      const scale = remaining / baseTotalW;
-      const components = [
-        fuelScore * (ss.weight_fuel * scale),
-        complianceScore * (ss.weight_compliance * scale),
-        safetyScore * (ss.weight_safety * scale),
-      ];
-      if (supScore !== null) components.push(supScore * w_sup);
-      if (w_veh > 0) components.push(vehicleCareScore * w_veh);
-      overall = Math.round(components.reduce((a,c) => a+c, 0) / 100);
-    } else {
-      overall = baseTotalW > 0
-        ? Math.round((fuelScore * ss.weight_fuel + complianceScore * ss.weight_compliance + safetyScore * ss.weight_safety) / baseTotalW)
-        : 0;
-    }
-
-    return { driver: d, vehicleCount: driverVehicles.length, vehicleCareScore, fuelScore: Math.round(fuelScore), complianceScore: Math.round(complianceScore), safetyScore: Math.round(safetyScore), supScore, supReviewCount: myReviews.length, overall, avgKmL: avgKmL.toFixed(1), incidents: myIncidents.length, inspectionDays: recentInspections.length };
-  });
-  scores.sort((a,b) => b.overall - a.overall);
-
-  $('#main').innerHTML = `
-    <div class="crumbs">${t('nav_operations')} › ${t('nav_driver_perf')}</div>
-    <div class="page-title">🏆 ${t('nav_driver_perf')}
-      ${adminOnly(`<button class="btn sm" onclick="openDriverReviewModal()">⭐ ບັນທຶກຄະແນນຈາກຫົວໜ້າ</button>`)}
-      ${adminOnly(`<button class="btn sm outline" onclick="openScoreSettingsModal()">⚙️ ${t('score_settings')}</button>`)}
-    </div>
-    <div class="alert info">💡 ຄະແນນຄຳນວນຈາກ <strong>5 ດ້ານ</strong>: ປະສິດທິພາບນ້ຳມັນ • Daily Check • ຄວາມປອດໄພ • <strong>ຄະແນນຈາກຫົວໜ້າ (Manual)</strong> • ສະພາບລົດທີ່ດູແລ (PM)</div>
-    <div class="card" style="padding:0;overflow-x:auto">
-      ${scores.length === 0 ? `<div class="empty" style="padding:30px"><div class="icon">🏆</div><p>${t('no_data')}</p></div>` : `
-      <table style="font-size:12.5px;min-width:1200px">
-        <tr><th style="width:50px">ອັນດັບ</th><th>ຄົນຂັບ</th><th>${t('driver_score')}</th>
-          <th>⛽ ນ້ຳມັນ</th><th>✅ Compliance</th><th>🛡 ປອດໄພ</th>
-          <th>⭐ ຫົວໜ້າ</th><th>🚗 ດູແລລົດ</th>
-          <th>km/L</th><th>Daily/30</th><th>Incidents</th><th></th></tr>
-        ${scores.map((s, idx) => {
-          const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx+1}`;
-          const ovColor = s.overall >= 80 ? 'var(--ok)' : s.overall >= 60 ? 'var(--warn)' : 'var(--bad)';
-          return `<tr>
-            <td style="text-align:center;font-size:18px;font-weight:700">${medal}</td>
-            <td><strong>${escapeHtml(s.driver.name)}</strong>
-              <div class="muted" style="font-size:11px">${s.driver.driver_id} • ດູແລລົດ ${s.vehicleCount} ຄັນ</div></td>
-            <td style="min-width:140px"><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;background:var(--bg-2);height:18px;border-radius:9px;overflow:hidden"><div style="background:${ovColor};height:100%;width:${s.overall}%"></div></div><strong style="color:${ovColor};min-width:38px">${s.overall}/100</strong></div></td>
-            <td><strong>${s.fuelScore}</strong></td>
-            <td><strong>${s.complianceScore}</strong></td>
-            <td><strong>${s.safetyScore}</strong></td>
-            <td>${s.supScore !== null ? `<strong>${s.supScore}</strong><div class="muted" style="font-size:10px">${s.supReviewCount} ຄັ້ງ</div>` : `<span class="muted" style="font-size:11px">— ຍັງບໍ່ມີ —</span>`}</td>
-            <td><strong style="color:${s.vehicleCareScore>=80?'var(--ok)':s.vehicleCareScore>=50?'var(--warn)':'var(--bad)'}">${s.vehicleCareScore}</strong></td>
-            <td>${s.avgKmL}</td>
-            <td>${s.inspectionDays}</td>
-            <td style="color:${s.incidents>0?'var(--bad)':'var(--ok)'};font-weight:700">${s.incidents}</td>
-            <td><button class="btn sm outline" onclick="showDriverReviewHistory(${s.driver.id})">📜 ປະຫວັດ</button></td>
-          </tr>`;
-        }).join('')}
-      </table>`}
-    </div>
-  `;
+  const el = document.getElementById('content') || document.querySelector('main') || document.body;
+  if (el) el.innerHTML = '<div style="padding:40px;text-align:center;color:#64748b">'
+    + '<h2 style="margin-bottom:8px">ຄຸນສົມບັດນີ້ຖືກປິດໄວ້ຊົ່ວຄາວ</h2>'
+    + '<p>ໂມດູນຂົນສົ່ງ / ຕິດຕາມ (logistics &amp; tracking) ຖືກປິດໃນສະບັບນີ້.</p>'
+    + '</div>';
 };
 
 // ===================== DRIVER SUPERVISOR REVIEW =====================
@@ -6485,343 +6469,11 @@ pages.forecast = async () => {
 let gpsTab = 'overview';
 
 pages.gps = async () => {
-  const vehs = await db.vehicles.toArray();
-  const devices = await db.gps_devices.toArray();
-  const installedCount = devices.filter(d => d.status === 'active').length;
-  const totalVehicles = vehs.length;
-
-  // GPS Hardware options database
-  const HARDWARE = [
-    {
-      tier:'low', name:'Concox GT06N', price:'15–25 USD', mfg:'Concox (ຈີນ)',
-      pros:['ລາຄາຖືກ ເໝາະຕິດທົ່ວທັງ Fleet','ສະໜັບສະໜຸນ Traccar (Open-source)','ມີ Backup Battery','Cut-off ນ້ຳມັນ ໄດ້'],
-      cons:['ໄວ້ໃຈໄດ້ປານກາງ','ບໍ່ມີ CANBus','ບໍ່ມີ Driver Behavior ລະອຽດ'],
-      best_for:'ລົດກະບະ, ລົດເກ໋ງ, ລົດຕູ້ — ການຕິດຕາມພື້ນຖານ',
-    },
-    {
-      tier:'low', name:'Sinotrack ST-901', price:'10–20 USD', mfg:'Sinotrack (ຈີນ)',
-      pros:['ລາຄາຖືກສຸດ','ຕິດຕັ້ງງ່າຍ 2 ສາຍ (12V + GND)','Traccar ສະໜັບສະໜຸນ'],
-      cons:['ບໍ່ມີ Battery ສຳຮອງ','ບໍ່ມີ Sensor Input','Signal ປານກາງ'],
-      best_for:'ລົດຈັກ, ລົດທີ່ບໍ່ສຳຄັນ, ການທົດລອງ',
-    },
-    {
-      tier:'mid', name:'Teltonika FMB920 / FMB003', price:'60–120 USD', mfg:'Teltonika (Lithuania)',
-      pros:['ມາດຕະຖານ EU ໄວ້ໃຈໄດ້ສູງ','CANBus + iButton + 1-Wire','Driver Behavior (Harsh Brake/Acc/Turn)','API ດີ Document ຄົບ','ໃຊ້ກັບ Wialon, Traccar ໄດ້'],
-      cons:['ລາຄາສູງກວ່າ','ຕັ້ງຄ່າຍຸ່ງສຳລັບ Beginner'],
-      best_for:'ລົດບັນທຸກ 6/10 ລໍ້, ລົດໂມປູນ, ລົດທີ່ມີຄ່າ — ການຕິດຕາມລະອຽດ',
-    },
-    {
-      tier:'mid', name:'Queclink GV75', price:'70–110 USD', mfg:'Queclink',
-      pros:['ມາດຕະຖານອຸດສະຫະກຳ IP67','ສຳນັ້ນຫຼາຍປະເທດໃຊ້','API ດີ'],
-      cons:['ຫາຍາກໃນລາວ','ຕ້ອງສັ່ງຈາກ Singapore/HK'],
-      best_for:'ລົດເຄນ, ລົດແບັກໂຮ — Outdoor ໜັກ',
-    },
-    {
-      tier:'high', name:'Teltonika FMC650 / Ruptela Pro5', price:'150–300 USD', mfg:'Teltonika/Ruptela',
-      pros:['CANBus ເຕັມ ອ່ານຂໍ້ມູນຈາກລົດໄດ້ ມຸມພວງມາໄລ, RPM, ນ້ຳມັນ','4G LTE','Camera Add-on ໄດ້','Driver ID Card','Tachograph Download'],
-      cons:['ລາຄາສູງ','ຕ້ອງມີຄົນຊ່ຽວຊານຕິດຕັ້ງ'],
-      best_for:'ລົດເຄນ, ລົດແບັກໂຮ Tier-1 — ການຕິດຕາມຄຸນນະພາບລະດັບ Enterprise',
-    },
-  ];
-
-  // Platform options
-  const PLATFORMS = [
-    {
-      name:'Traccar', cost:'ຟຣີ (Self-host) ຫຼື $25/ເດືອນ Cloud', type:'Open-source',
-      pros:['ຟຣີ ບໍ່ມີຄ່າ Per-vehicle','ຮອງຮັບ 200+ GPS Brand','Self-host ໃນ KALA Server ໄດ້','API ດີ ເຊື່ອມກັບລະບົບໄດ້','ມີ Mobile App ຟຣີ'],
-      cons:['ຕ້ອງມີ IT Server (Ubuntu/Docker)','UI ບໍ່ສວຍເທົ່າ Commercial','ບໍ່ມີ Support 24/7 ຟຣີ'],
-      recommend:'⭐ ແນະນຳສຳລັບ KALA — ປະຫຍັດເງິນ, ປັບແຕ່ງເອງໄດ້',
-    },
-    {
-      name:'Wialon Hosting', cost:'$1.5–3 / ລົດ / ເດືອນ', type:'Commercial Cloud',
-      pros:['UI/UX ດີ ໄວ້ໃຈໄດ້ສູງ','Mobile App ສະຫຼອງ','ມີ Support ໃນ Thailand','ມີ Reports ສຳເລັດຮູບເຍອະ','Driver Behavior ດີຫຼາຍ'],
-      cons:['ມີຄ່າ Per-vehicle ທຸກເດືອນ','100 ລົດ × 2 USD × 12 = $2,400/ປີ'],
-      recommend:'ດີສຳລັບອົງກອນທີ່ບໍ່ຢາກວ່າຈ້າງ IT',
-    },
-    {
-      name:'Cartrack / Mix Telematics', cost:'$5–15 / ລົດ / ເດືອນ', type:'Enterprise SaaS',
-      pros:['Service ຄົບເຕັມ ມີ Hardware + ບໍລິການ','Driver Score Card ມາດຕະຖານ','Insurance Partnership','24/7 Support'],
-      cons:['ລາຄາແພງ','Vendor Lock-in','100 ລົດ × $8 × 12 = $9,600/ປີ'],
-      recommend:'ດີສຳລັບ Fleet ໃຫຍ່ 200+ ລົດ ທີ່ມີງົບປະມານ',
-    },
-  ];
-
-  // Tab content
-  let tabContent = '';
-  if (gpsTab === 'overview') {
-    tabContent = `
-      <div class="kpi-grid">
-        <div class="kpi"><div class="label">ລົດທັງໝົດ</div><div class="val">${totalVehicles}</div></div>
-        <div class="kpi"><div class="label">ຕິດ GPS ແລ້ວ</div><div class="val" style="color:var(--ok)">${installedCount}</div></div>
-        <div class="kpi"><div class="label">ຍັງບໍ່ໄດ້ຕິດ</div><div class="val" style="color:var(--warn)">${totalVehicles - installedCount}</div></div>
-        <div class="kpi"><div class="label">% Coverage</div><div class="val">${totalVehicles>0?Math.round(installedCount/totalVehicles*100):0}%</div></div>
-      </div>
-
-      <div class="card">
-        <h3>🎯 ສິ່ງທີ່ KALA ຈະໄດ້ຈາກ GPS Tracking</h3>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-top:10px">
-          <div style="background:#EFF6FF;border-left:4px solid var(--accent);padding:12px;border-radius:8px">
-            <strong>📍 ການຕິດຕາມຕຳແໜ່ງ Real-time</strong>
-            <p style="font-size:12px;color:var(--muted);margin-top:4px">ຮູ້ວ່າລົດແຕ່ລະຄັນຢູ່ໃສ ກຳລັງເຮັດຫຍັງ — ປ້ອງກັນ "ລົດຫາຍ" ຫຼື ໃຊ້ໂດຍບໍ່ໄດ້ຮັບອະນຸຍາດ</p>
-          </div>
-          <div style="background:#F0FDF4;border-left:4px solid var(--ok);padding:12px;border-radius:8px">
-            <strong>⛽ ປະຢັດນ້ຳມັນ 15–25%</strong>
-            <p style="font-size:12px;color:var(--muted);margin-top:4px">Idling, Route ບໍ່ດີ, ຄວາມໄວເກີນ — ຈັບໄດ້ໝົດ. ໂດຍລວມໄດ້ປະຢັດ 15-25% ຂອງຕົ້ນທຶນນ້ຳມັນ</p>
-          </div>
-          <div style="background:#FFFBEB;border-left:4px solid var(--warn);padding:12px;border-radius:8px">
-            <strong>🛡 ຫຼຸດອຸບັດເຫດ 30–40%</strong>
-            <p style="font-size:12px;color:var(--muted);margin-top:4px">Driver Behavior Monitoring: Harsh Brake/Acc/Turn → ຄະແນນຄົນຂັບ → ການເຮັດທີ່ປອດໄພຂຶ້ນ</p>
-          </div>
-          <div style="background:#FEF2F2;border-left:4px solid var(--bad);padding:12px;border-radius:8px">
-            <strong>🚧 Geofence Alerts</strong>
-            <p style="font-size:12px;color:var(--muted);margin-top:4px">ກຳນົດເຂດໃຫ້ລົດ ຖ້າອອກນອກເຂດ → ແຈ້ງເຕືອນ. ໂດຍສະເພາະລົດເຄນ/ແບັກໂຮ</p>
-          </div>
-          <div style="background:#F5F3FF;border-left:4px solid #8B5CF6;padding:12px;border-radius:8px">
-            <strong>📏 Auto-update ເລກໄມ</strong>
-            <p style="font-size:12px;color:var(--muted);margin-top:4px">ບໍ່ຕ້ອງໃຫ້ຄົນຂັບກອກ km ເອງ — GPS ສົ່ງມາໃຫ້ ໂດຍຕົງ. PM ຈະຕ້ອງເວລາ.</p>
-          </div>
-          <div style="background:#ECFEFF;border-left:4px solid #06B6D4;padding:12px;border-radius:8px">
-            <strong>📊 ROI ປະມານ 6–10 ເດືອນ</strong>
-            <p style="font-size:12px;color:var(--muted);margin-top:4px">ການລົງທຶນຕິດ GPS 100 ລົດ (Concox + Traccar) ໃຊ້ປະມານ $2,500-3,500. ປະຢັດໃນປີ 1 ໄດ້ $8,000-15,000</p>
-          </div>
-        </div>
-      </div>
-
-      <div class="card">
-        <h3>📋 ການວາງແຜນຕິດຕັ້ງເປັນ 3 ໄລຍະ — ແນະນຳສຳລັບ KALA</h3>
-        <table>
-          <tr><th>ໄລຍະ</th><th>ໄລຍະເວລາ</th><th>ຂອບເຂດ</th><th>Hardware</th><th>Platform</th><th>ງົບປະມານ</th></tr>
-          <tr>
-            <td><strong>Phase 1: Pilot</strong></td>
-            <td>1–2 ເດືອນ</td>
-            <td>10 ລົດ (ຫຼາກຫຼາຍປະເພດ)</td>
-            <td>Concox GT06N</td>
-            <td>Traccar (Self-host)</td>
-            <td>$300–500</td>
-          </tr>
-          <tr>
-            <td><strong>Phase 2: ຂະຫຍາຍ</strong></td>
-            <td>3–6 ເດືອນ</td>
-            <td>ລົດທີ່ສຳຄັນ 50–100 ຄັນ</td>
-            <td>Concox + Teltonika ສຳລັບລົດໃຫຍ່</td>
-            <td>Traccar + ປັບແຕ່ງ Dashboard</td>
-            <td>$2,000–4,000</td>
-          </tr>
-          <tr>
-            <td><strong>Phase 3: ສົມບູນ</strong></td>
-            <td>6–12 ເດືອນ</td>
-            <td>ທຸກລົດໃນ Fleet</td>
-            <td>Tier ຕາມຄວາມສຳຄັນ</td>
-            <td>Integrate ກັບ KALA Garage App</td>
-            <td>$5,000–10,000</td>
-          </tr>
-        </table>
-        <div class="alert info" style="margin-top:12px;font-size:12px">
-          💡 <strong>ຄຳແນະນຳ:</strong> ເລີ່ມຈາກ Phase 1 ກ່ອນ — ໃຊ້ 10 ລົດ ທົດສອບ 1-2 ເດືອນ.
-          ຖ້າດີຕາມຕ້ອງການແລ້ວຈິ່ງຂະຫຍາຍ. ບໍ່ຄວນຕິດທັນ 100 ລົດ ໃນຄັ້ງດຽວ ເພາະຍັງບໍ່ຮູ້ ROI ຈິງ.
-        </div>
-      </div>
-    `;
-  } else if (gpsTab === 'hardware') {
-    tabContent = `
-      <div class="alert info">📡 <strong>GPS Tracker</strong> ແມ່ນອຸປະກອນທີ່ຕິດຢູ່ໃນລົດ ສົ່ງຕຳແໜ່ງຜ່ານ SIM Card ໄປຫາ Server. ປະກອບໄປດ້ວຍ GPS Module + GSM/4G Module + Battery + Sensor inputs.</div>
-      ${HARDWARE.map(h => `
-        <div class="card">
-          <h3>${h.tier==='low'?'💰':h.tier==='mid'?'🥈':'🏆'} ${h.name} <small style="color:var(--muted);font-weight:400">— ${h.price}</small></h3>
-          <div class="muted" style="font-size:12px;margin-bottom:8px">ຜູ້ຜະລິດ: ${h.mfg}</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:6px">
-            <div>
-              <strong style="color:var(--ok);font-size:13px">✅ ຂໍ້ດີ</strong>
-              <ul style="margin-left:18px;font-size:12px;color:#374151;line-height:1.7">${h.pros.map(p=>`<li>${p}</li>`).join('')}</ul>
-            </div>
-            <div>
-              <strong style="color:var(--bad);font-size:13px">⚠️ ຂໍ້ຄວນລະວັງ</strong>
-              <ul style="margin-left:18px;font-size:12px;color:#374151;line-height:1.7">${h.cons.map(p=>`<li>${p}</li>`).join('')}</ul>
-            </div>
-          </div>
-          <div style="background:#EFF6FF;padding:8px 12px;border-radius:6px;margin-top:10px;font-size:12px;border-left:3px solid var(--accent)">
-            <strong>🎯 ເໝາະສຳລັບ:</strong> ${h.best_for}
-          </div>
-        </div>
-      `).join('')}
-      <div class="card">
-        <h3>📦 ສິ່ງທີ່ຕ້ອງຊື້ເພີ່ມ (ນອກຈາກ Tracker)</h3>
-        <table>
-          <tr><th>ລາຍການ</th><th>ລາຄາ (USD)</th><th>ໝາຍເຫດ</th></tr>
-          <tr><td>SIM Card (Data Plan)</td><td>$2–5/ເດືອນ</td><td>Unitel, LaoTel — ເລືອກ Plan 500MB/ເດືອນ ພຽງພໍ</td></tr>
-          <tr><td>ສາຍໄຟ + Connector</td><td>$3–5</td><td>ມັກລວມໃນ Tracker ແລ້ວ</td></tr>
-          <tr><td>Anti-tamper Seal</td><td>$1–2</td><td>ປ້ອງກັນຄົນຂັບ ຖອດອອກ</td></tr>
-          <tr><td>Fuel Sensor (ຖ້າຕ້ອງການ)</td><td>$50–80</td><td>ສະເພາະລົດທີ່ສຳຄັນ ເຊັ່ນ ລົດໂມປູນ, ລົດໃຫຍ່</td></tr>
-          <tr><td>RFID Driver ID Reader</td><td>$25–40</td><td>ສຳລັບລະບຸວ່າໃຜຂັບລົດໃນເວລາໃດ</td></tr>
-          <tr><td>ຄ່າຕິດຕັ້ງ (ຊ່າງ)</td><td>$10–30 / ຄັນ</td><td>ຕິດເອງໂດຍຊ່າງ KALA ໄດ້</td></tr>
-        </table>
-      </div>
-    `;
-  } else if (gpsTab === 'platform') {
-    tabContent = `
-      <div class="alert info">🖥 <strong>Platform</strong> ແມ່ນເຄື່ອງມືທີ່ Tracker ສົ່ງຂໍ້ມູນໄປຫາ ແລະ ໃຫ້ KALA ເບິ່ງເຫັນຕຳແໜ່ງ, ປະຫວັດ, Report ຕ່າງໆ.</div>
-      ${PLATFORMS.map(p => `
-        <div class="card">
-          <h3>${p.name} <small style="color:var(--muted);font-weight:400">— ${p.cost} (${p.type})</small></h3>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-            <div>
-              <strong style="color:var(--ok);font-size:13px">✅ ຂໍ້ດີ</strong>
-              <ul style="margin-left:18px;font-size:12px;color:#374151;line-height:1.7">${p.pros.map(x=>`<li>${x}</li>`).join('')}</ul>
-            </div>
-            <div>
-              <strong style="color:var(--bad);font-size:13px">⚠️ ຂໍ້ຈຳກັດ</strong>
-              <ul style="margin-left:18px;font-size:12px;color:#374151;line-height:1.7">${p.cons.map(x=>`<li>${x}</li>`).join('')}</ul>
-            </div>
-          </div>
-          ${p.recommend?`<div style="background:#FEF3C7;padding:10px 12px;border-radius:6px;margin-top:10px;font-size:12px;border-left:3px solid var(--warn)"><strong>${p.recommend}</strong></div>`:''}
-        </div>
-      `).join('')}
-
-      <div class="card">
-        <h3>🔧 Setup Traccar Server (ແນະນຳສຳລັບ KALA)</h3>
-        <ol style="margin-left:20px;line-height:1.9;font-size:13px">
-          <li><strong>Server ທີ່ຕ້ອງມີ:</strong> Ubuntu 22.04, 2 CPU, 4GB RAM, 50GB SSD — VPS Hetzner/DigitalOcean ປະມານ $5–10/ເດືອນ</li>
-          <li><strong>ຕິດຕັ້ງ Docker:</strong> <code style="background:#F1F5F9;padding:2px 6px;border-radius:4px;font-size:11px">curl -fsSL get.docker.com | sh</code></li>
-          <li><strong>Run Traccar:</strong> <code style="background:#F1F5F9;padding:2px 6px;border-radius:4px;font-size:11px">docker run -d --name traccar -p 8082:8082 -p 5023:5023 -v traccar-data:/opt/traccar/data traccar/traccar:latest</code></li>
-          <li><strong>ເຂົ້າ Web UI:</strong> http://your-server-ip:8082 (Default: admin/admin)</li>
-          <li><strong>ເພີ່ມ GPS Device:</strong> Settings → Devices → Add — ໃສ່ IMEI ຂອງ Tracker</li>
-          <li><strong>ຕັ້ງຄ່າ Tracker:</strong> ສົ່ງ SMS ໄປຫາ Tracker ບອກໃຫ້ສົ່ງຂໍ້ມູນໄປ Server IP ຂອງເຮົາ
-            <br><small style="color:var(--muted)">ຕົວຢ່າງ Concox: <code>SERVER,1,your-server-ip,5023,0#</code></small>
-          </li>
-          <li><strong>Integrate ກັບ KALA Garage App:</strong> ໃຊ້ Traccar REST API <code style="background:#F1F5F9;padding:2px 6px;border-radius:4px;font-size:11px">GET /api/positions</code> → ສ້າງ Mileage Auto-update</li>
-        </ol>
-        <div class="alert info" style="margin-top:12px;font-size:12px">📖 ເອກະສານເຕັມ: https://www.traccar.org/documentation/</div>
-      </div>
-    `;
-  } else if (gpsTab === 'integration') {
-    tabContent = `
-      <div class="alert info">🔗 <strong>Integration</strong> = ການເຊື່ອມ GPS Platform ກັບ KALA Garage App ໂດຍຜ່ານ API. ເພື່ອໃຫ້ຂໍ້ມູນ GPS ມີຜົນຕໍ່ການວາງແຜນ PM, Mileage, Driver Score.</div>
-
-      <div class="card">
-        <h3>🎯 ສິ່ງທີ່ Integration ຈະເຮັດໃຫ້ໂດຍອັດຕະໂນມັດ</h3>
-        <table>
-          <tr><th>Function</th><th>ປະຈຸບັນ (Manual)</th><th>ຫຼັງ Integration</th></tr>
-          <tr><td>Auto-Mileage</td><td>ຄົນຂັບກອກເອງ → ມັກລືມ ຫຼື ປອມ</td><td>GPS ສົ່ງມາ → ບັນທຶກອັດຕະໂນມັດ ທຸກມື້</td></tr>
-          <tr><td>PM Reminder</td><td>ອີງຕາມວັນທີ ບໍ່ຮູ້ km ຈິງ</td><td>ອີງຕາມ km ຈິງ → ແມ່ນຍຳ</td></tr>
-          <tr><td>Driver Score</td><td>ຄິດຄະແນນ ຈາກ Fuel + Incidents</td><td>+ Harsh Brake, Speed, Idling ຈາກ GPS</td></tr>
-          <tr><td>Geofence Alert</td><td>ບໍ່ມີ</td><td>ລົດອອກນອກເຂດ → ແຈ້ງເຕືອນທັນທີ</td></tr>
-          <tr><td>Fuel Theft Detection</td><td>ຫາຍາກ</td><td>Fuel Sensor + GPS → ຈັບໄດ້ ນ້ຳມັນຫາຍ ໂດຍບໍ່ມີເຫດຜົນ</td></tr>
-        </table>
-      </div>
-
-      <div class="card">
-        <h3>📡 Sample API Code (JavaScript)</h3>
-        <pre style="background:#0F172A;color:#E2E8F0;padding:14px;border-radius:8px;font-size:11px;overflow-x:auto;line-height:1.6;font-family:'Courier New',monospace">
-// Get all current positions from Traccar
-async function syncGPSToKALA() {
-  const TRACCAR_URL = 'http://your-server.la:8082/api';
-  const TOKEN = 'your-api-token';
-
-  const res = await fetch(TRACCAR_URL + '/positions', {
-    headers: { 'Authorization': 'Bearer ' + TOKEN }
-  });
-  const positions = await res.json();
-
-  for (const pos of positions) {
-    // Map Traccar deviceId -> KALA vehicle_id
-    const device = await db.gps_devices.get({ imei: pos.deviceId });
-    if (!device) continue;
-
-    // 1. Auto-update mileage
-    await db.mileage_log.add({
-      vehicle_id: device.vehicle_id,
-      date: pos.deviceTime.split('T')[0],
-      mileage: Math.round(pos.attributes.totalDistance / 1000),
-      source: 'gps',
-    });
-
-    // 2. Update vehicle current mileage
-    await db.vehicles.where('vehicle_id').equals(device.vehicle_id)
-      .modify({ mileage: Math.round(pos.attributes.totalDistance / 1000) });
-
-    // 3. Speed violation alert
-    if (pos.speed > 90) {
-      await db.incidents.add({
-        type: 'speeding',
-        vehicle_id: device.vehicle_id,
-        date: pos.deviceTime,
-        speed: pos.speed,
-        location: pos.latitude + ',' + pos.longitude,
-        severity: 'warning',
-      });
-    }
-  }
-}
-
-// Run every 15 minutes
-setInterval(syncGPSToKALA, 15 * 60 * 1000);
-        </pre>
-      </div>
-
-      <div class="card">
-        <h3>📅 Roadmap ການພັດທະນາ Integration (ໃນ KALA Garage App)</h3>
-        <ol style="margin-left:20px;line-height:1.9;font-size:13px">
-          <li><strong>Q1:</strong> Pilot 10 ລົດ + Setup Traccar Server</li>
-          <li><strong>Q2:</strong> Build GPS Device Module (ບັນທຶກ IMEI ↔ vehicle_id) — ✅ ສຳເລັດໃນ App ນີ້ແລ້ວ (table gps_devices)</li>
-          <li><strong>Q3:</strong> Build Cron Job ດຶງຂໍ້ມູນຈາກ Traccar ມາ Auto-update Mileage</li>
-          <li><strong>Q4:</strong> Real-time Map View (Leaflet.js + Traccar WebSocket)</li>
-          <li><strong>ປີ 2:</strong> Driver Score Integration + Geofence Alerts</li>
-        </ol>
-      </div>
-    `;
-  } else if (gpsTab === 'devices') {
-    tabContent = `
-      <div class="alert info">📱 ບັນທຶກ GPS Device ທີ່ຕິດໃນແຕ່ລະລົດ — ໃຊ້ IMEI ເຊື່ອມ Tracker ກັບລົດ. ເມື່ອມີ API Integration ແລ້ວ ຈະດຶງຂໍ້ມູນເຂົ້າຕາມ IMEI ນີ້</div>
-      ${adminOnly(`<div class="toolbar"><button class="btn" onclick="openGpsDeviceModal()">+ ບັນທຶກ GPS Device</button></div>`)}
-      <div class="card">
-        ${devices.length === 0 ? `<div class="empty"><div class="icon">📡</div><p>ຍັງບໍ່ມີ GPS Device ບັນທຶກ</p></div>` : `
-        <table>
-          <tr><th>ລົດ</th><th>Model</th><th>IMEI</th><th>Platform</th><th>ວັນຕິດຕັ້ງ</th><th>ສະຖານະ</th><th></th></tr>
-          ${devices.map(d => {
-            const v = vehs.find(x => x.vehicle_id === d.vehicle_id);
-            return `<tr>
-              <td><strong>${d.vehicle_id}</strong>${v?` <small class="muted">${v.type}</small>`:''}</td>
-              <td>${escapeHtml(d.model||'-')}</td>
-              <td style="font-family:monospace;font-size:11px">${d.imei||'-'}</td>
-              <td>${d.platform||'-'}</td>
-              <td>${d.installed_date||'-'}</td>
-              <td><span class="pill ${d.status==='active'?'ok':d.status==='broken'?'bad':'gray'}">${d.status==='active'?'ໃຊ້ງານ':d.status==='broken'?'ເສຍ':'ບໍ່ໃຊ້'}</span></td>
-              <td class="actions">
-                ${isAdmin()?`<button class="btn sm outline" onclick="openGpsDeviceModal(${d.id})">${t('edit')}</button>
-                <button class="btn sm danger" onclick="delGpsDevice(${d.id})">${t('delete')}</button>`:''}
-              </td>
-            </tr>`;
-          }).join('')}
-        </table>`}
-      </div>
-      <div class="card">
-        <h3>📊 ສະຖານະການເຊື່ອມຕໍ່ API Platform</h3>
-        <table>
-          <tr><th>ບໍລິການ</th><th>ສະຖານະ</th><th>URL / API Endpoint</th><th>ໝາຍເຫດ</th></tr>
-          <tr><td><strong>Traccar (Self-host)</strong></td><td><span class="pill gray">⚪ ບໍ່ໄດ້ເຊື່ອມ</td><td class="muted">http://your-server.la:8082/api</td><td>⭐ ແນະນຳ — ຟຣີ</td></tr>
-          <tr><td>Wialon</td><td><span class="pill gray">⚪ ບໍ່ໄດ້ເຊື່ອມ</td><td class="muted">https://hst-api.wialon.com</td><td>$1.5-3/ລົດ/ເດືອນ</td></tr>
-          <tr><td>Cartrack</td><td><span class="pill gray">⚪ ບໍ່ໄດ້ເຊື່ອມ</td><td class="muted">https://api.cartrack.com/v2</td><td>$5-15/ລົດ/ເດືອນ</td></tr>
-        </table>
-      </div>
-    `;
-  }
-
-  $('#main').innerHTML = `
-    <div class="crumbs">${t('nav_operations')} › ${t('nav_gps')}</div>
-    <div class="page-title">🗺 ${t('nav_gps')} — ຄຳແນະນຳ ແລະ ການຕິດຕັ້ງ</div>
-
-    <div class="card" style="padding:8px">
-      <div style="display:flex;gap:6px;flex-wrap:wrap">
-        <button class="btn sm ${gpsTab==='overview'?'':'outline'}" onclick="setGpsTab('overview')">📋 ພາບລວມ + Roadmap</button>
-        <button class="btn sm ${gpsTab==='hardware'?'':'outline'}" onclick="setGpsTab('hardware')">📡 Hardware</button>
-        <button class="btn sm ${gpsTab==='platform'?'':'outline'}" onclick="setGpsTab('platform')">🖥 Platform / Software</button>
-        <button class="btn sm ${gpsTab==='integration'?'':'outline'}" onclick="setGpsTab('integration')">🔗 ການເຊື່ອມຕໍ່ App</button>
-        <button class="btn sm ${gpsTab==='devices'?'':'outline'}" onclick="setGpsTab('devices')">📱 ບັນທຶກ Device (${devices.length})</button>
-      </div>
-    </div>
-
-    ${tabContent}
-  `;
+  const el = document.getElementById('content') || document.querySelector('main') || document.body;
+  if (el) el.innerHTML = '<div style="padding:40px;text-align:center;color:#64748b">'
+    + '<h2 style="margin-bottom:8px">ຄຸນສົມບັດນີ້ຖືກປິດໄວ້ຊົ່ວຄາວ</h2>'
+    + '<p>ໂມດູນຂົນສົ່ງ / ຕິດຕາມ (logistics &amp; tracking) ຖືກປິດໃນສະບັບນີ້.</p>'
+    + '</div>';
 };
 
 function setGpsTab(tab) { gpsTab = tab; pages.gps(); }
@@ -17333,182 +16985,11 @@ pages.intakes = async () => {
 // ໃຊ້ກ້ອງເປັນຫຼັກ — Manager ປ້ອນຈຳນວນລົດເຂົ້າ-ອອກ → ປຽບກັບ Labor Entry
 let camRecDate = '';
 pages.camera_reconciliation = async () => {
-  const today = camRecDate || todayISO();
-  const allCounts = await db.camera_counts.toArray();
-  const todayCount = allCounts.find(c => c.date === today);
-  const entries = await db.labor_entries.toArray();
-  const todayEntries = entries.filter(e => e.date === today);
-  const todayWalkin = todayEntries.filter(e => e.customer_type === 'walkin');
-  const todayInternal = todayEntries.filter(e => e.customer_type === 'internal');
-
-  // ການກວດສອບເງິນ
-  const expectedRevenue = todayWalkin.reduce((a,e) => a + (e.grand_total || e.charge_amount || 0), 0);
-
-  // ການກວດສອບ — ປ້ອນກ້ອງແລ້ວບໍ?
-  const camIn = todayCount?.vehicles_in || 0;
-  const camOut = todayCount?.vehicles_out || 0;
-  const expectedFromCam = camIn; // ລົດເຂົ້າທີ່ກ້ອງເຫັນ
-  const recordedInSystem = todayEntries.length;
-  const discrepancy = expectedFromCam - recordedInSystem;
-
-  // Last 7 days trend
-  const trend = [];
-  for (let i=6; i>=0; i--) {
-    const d = new Date(); d.setDate(d.getDate() - i);
-    const iso = d.toISOString().slice(0,10);
-    const cc = allCounts.find(c => c.date === iso);
-    const ents = entries.filter(e => e.date === iso);
-    trend.push({
-      date: iso.slice(5),
-      cam_in: cc?.vehicles_in||0,
-      entries: ents.length,
-      walkin: ents.filter(e=>e.customer_type==='walkin').length,
-      diff: (cc?.vehicles_in||0) - ents.length,
-    });
-  }
-
-  $('#main').innerHTML = `
-    <div class="crumbs">${t('nav_operations')} › 📷 Camera Reconciliation</div>
-    <div class="page-title">📷 ການກວດສອບປະຈຳວັນ <small style="font-weight:400;color:var(--muted);font-size:13px">— ${today}</small></div>
-
-    <div class="alert info" style="font-size:13px">
-      🛡️ <strong>ກວດສອບປະຈຳວັນ — Lightweight Anti-Fraud System</strong>
-      <br>💡 Manager ປ້ອນຈຳນວນລົດເຂົ້າ-ອອກຈາກກ້ອງ ທຸກວັນ → ລະບົບປຽບກັບ Labor Entry → ກວດຈັບຄວາມຜິດປົກກະຕິ
-    </div>
-
-    <div class="toolbar">
-      <label style="font-size:13px;font-weight:500">ວັນທີ:</label>
-      <input type="date" value="${today}" onchange="camRecDate=this.value;pages.camera_reconciliation()" style="padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px"/>
-      <button class="btn sm outline" onclick="camRecDate='';pages.camera_reconciliation()">📅 ມື້ນີ້</button>
-      <div style="flex:1"></div>
-      <button class="btn outline" onclick="go('customer_audit')">📞 Random Audit ລູກຄ້າ</button>
-      <button class="btn outline" onclick="window.print()">🖨 ພິມ</button>
-    </div>
-
-    <!-- Camera Count Entry Form -->
-    <div class="card" style="background:linear-gradient(135deg,#FEF3C7,#FDE68A);border:1px solid #F59E0B">
-      <h3 style="color:#92400E;display:flex;align-items:center;gap:8px">
-        📷 ປ້ອນຈຳນວນລົດຈາກກ້ອງ
-        ${todayCount ? '<span class="pill" style="background:#10B981;color:#fff">✅ ປ້ອນແລ້ວ</span>' : '<span class="pill" style="background:#EF4444;color:#fff">⚠️ ຍັງບໍ່ໄດ້ປ້ອນ</span>'}
-      </h3>
-      <p style="font-size:12px;color:#78350F;margin-bottom:10px">💡 ໃຫ້ Manager ປ້ອນຈຳນວນທີ່ກວດໄດ້ຈາກກ້ອງ CCTV ສຳລັບວັນທີ ${today}</p>
-
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px">
-        <div>
-          <label style="font-size:11px;font-weight:600;color:#92400E">🚪 ລົດເຂົ້າອູ່ (ກ້ອງເຫັນ)</label>
-          <input id="cam_in" type="number" min="0" value="${camIn}" style="width:100%;padding:14px;font-size:24px;font-weight:800;text-align:center;border:2px solid #F59E0B;border-radius:8px;background:white"/>
-        </div>
-        <div>
-          <label style="font-size:11px;font-weight:600;color:#92400E">🚗 ລົດອອກອູ່ (ກ້ອງເຫັນ)</label>
-          <input id="cam_out" type="number" min="0" value="${camOut}" style="width:100%;padding:14px;font-size:24px;font-weight:800;text-align:center;border:2px solid #F59E0B;border-radius:8px;background:white"/>
-        </div>
-        <div style="display:flex;align-items:flex-end">
-          <button class="btn ok" style="width:100%;padding:14px;font-size:14px;font-weight:700" onclick="saveCameraCount('${today}')">💾 ບັນທຶກ</button>
-        </div>
-      </div>
-      ${todayCount ? `<div style="margin-top:8px;font-size:11px;color:#78350F">📝 ບັນທຶກໂດຍ: <strong>${escapeHtml(todayCount.recorded_by||'-')}</strong> ໃນ ${todayCount.recorded_at?new Date(todayCount.recorded_at).toLocaleString('lo'):'-'}</div>` : ''}
-    </div>
-
-    <!-- Daily Comparison Dashboard -->
-    <div class="card">
-      <h3>📊 ການປຽບທຽບ ກ້ອງ vs ລະບົບ</h3>
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:10px">
-        <div style="background:#EFF6FF;padding:14px;border-radius:8px;text-align:center;border:2px solid #3B82F6">
-          <div style="font-size:11px;color:var(--muted);font-weight:600">📷 ກ້ອງເຫັນລົດເຂົ້າ</div>
-          <div style="font-size:32px;font-weight:800;color:#3B82F6">${camIn}</div>
-          <div style="font-size:10px;color:var(--muted)">ຄັນ</div>
-        </div>
-        <div style="background:#F0FDF4;padding:14px;border-radius:8px;text-align:center;border:2px solid #10B981">
-          <div style="font-size:11px;color:var(--muted);font-weight:600">📋 Labor Entry ໃນລະບົບ</div>
-          <div style="font-size:32px;font-weight:800;color:#10B981">${recordedInSystem}</div>
-          <div style="font-size:10px;color:var(--muted)">ລາຍການ (${todayWalkin.length} Walk-in + ${todayInternal.length} ບໍລິສັດ)</div>
-        </div>
-        <div style="background:${discrepancy>0?'#FEE2E2':discrepancy<0?'#FEF3C7':'#D1FAE5'};padding:14px;border-radius:8px;text-align:center;border:2px solid ${discrepancy>0?'#EF4444':discrepancy<0?'#F59E0B':'#10B981'}">
-          <div style="font-size:11px;color:var(--muted);font-weight:600">⚠️ ຄວາມຜິດປົກກະຕິ</div>
-          <div style="font-size:32px;font-weight:800;color:${discrepancy>0?'#DC2626':discrepancy<0?'#92400E':'#047857'}">
-            ${discrepancy===0?'✅ 0':discrepancy>0?'+'+discrepancy:discrepancy}
-          </div>
-          <div style="font-size:10px;color:var(--muted)">${discrepancy===0?'ກົງກັນ':discrepancy>0?'ກ້ອງເຫັນຫຼາຍກວ່າ ← ສ່ຽງ!':'ລະບົບເຫັນຫຼາຍກວ່າ'}</div>
-        </div>
-        <div style="background:#FAF5FF;padding:14px;border-radius:8px;text-align:center;border:2px solid #8B5CF6">
-          <div style="font-size:11px;color:var(--muted);font-weight:600">💵 Walk-in ຄາດໝາຍ</div>
-          <div style="font-size:22px;font-weight:800;color:#7C3AED">${fmt(expectedRevenue)}</div>
-          <div style="font-size:10px;color:var(--muted)">ກີບ</div>
-        </div>
-      </div>
-
-      ${discrepancy > 0 ? `
-        <div class="alert bad" style="margin-top:12px;font-size:13px">
-          🚨 <strong>ກວດສອບດ່ວນ!</strong> ກ້ອງເຫັນລົດເຂົ້າ <strong>${camIn} ຄັນ</strong> ແຕ່ລະບົບມີ Labor Entry ພຽງ <strong>${recordedInSystem} ລາຍການ</strong>
-          <br>💡 <strong>ສາເຫດທີ່ເປັນໄປໄດ້:</strong>
-          <ul style="margin:6px 0 0 18px">
-            <li>ລົດເຂົ້າມາໃຫ້ກວດ ແຕ່ບໍ່ໄດ້ສ້ອມ → ບໍ່ມີ Entry (ປົກກະຕິ)</li>
-            <li>ລົດເຂົ້າມາ Drop-off → ສ້ອມຍັງບໍ່ສຳເລັດ (ປົກກະຕິ)</li>
-            <li><strong style="color:var(--bad)">⚠️ ຊ່າງເຮັດໂດຍບໍ່ບັນທຶກ → ສ່ຽງ! ກວດສອບ CCTV + ສອບຖາມຊ່າງ</strong></li>
-          </ul>
-        </div>
-      ` : discrepancy === 0 && todayCount ? `
-        <div class="alert" style="background:#D1FAE5;color:#047857;margin-top:12px;font-size:13px">
-          ✅ <strong>ກົງກັນທຸກລາຍການ</strong> — ບໍ່ມີຄວາມຜິດປົກກະຕິໃນວັນທີ ${today}
-        </div>
-      ` : ''}
-    </div>
-
-    <!-- 7-Day Trend Table -->
-    <div class="card">
-      <h3>📈 ແນວໂນ້ມ 7 ມື້</h3>
-      <table style="font-size:12px">
-        <tr>
-          <th>ວັນທີ</th>
-          <th style="text-align:center">📷 ກ້ອງເຂົ້າ</th>
-          <th style="text-align:center">📋 Entry</th>
-          <th style="text-align:center">🚪 Walk-in</th>
-          <th style="text-align:center">⚠️ ຜິດປົກກະຕິ</th>
-          <th></th>
-        </tr>
-        ${trend.map(d => `<tr style="${d.diff>0?'background:#FEE2E2':d.diff===0&&d.cam_in>0?'background:#F0FDF4':''}">
-          <td><strong>${d.date}</strong></td>
-          <td style="text-align:center">${d.cam_in||'<span style="color:#CBD5E1">—</span>'}</td>
-          <td style="text-align:center">${d.entries}</td>
-          <td style="text-align:center">${d.walkin}</td>
-          <td style="text-align:center;font-weight:700;color:${d.diff>0?'var(--bad)':d.diff===0?'var(--ok)':'var(--warn)'}">
-            ${d.cam_in===0 && !allCounts.find(c=>c.date===new Date(Date.now()-(7-trend.indexOf(d))*86400000).toISOString().slice(0,10)) ? '<span style="color:#CBD5E1">ບໍ່ໄດ້ປ້ອນ</span>' : (d.diff>0?'+'+d.diff:d.diff===0?'✅':d.diff)}
-          </td>
-          <td></td>
-        </tr>`).join('')}
-      </table>
-      <small style="display:block;margin-top:10px;color:var(--muted);font-size:11px">💡 ປ້ອນກ້ອງທຸກວັນ — ຍ້ອນວ່າຍິ່ງປ້ອນສະໝ່ຳສະເໝີ ຍິ່ງເຫັນແນວໂນ້ມ + ດັກພົບຄວາມຜິດປົກກະຕິໄວ</small>
-    </div>
-
-    <!-- Walk-in Entries Today (with Audit eligibility) -->
-    <div class="card">
-      <h3>🚪 Walk-in Entries ມື້ນີ້ (${todayWalkin.length}) — ສຳລັບ Random Audit</h3>
-      ${todayWalkin.length === 0 ? '<p style="color:var(--muted);font-size:12px">ບໍ່ມີ Walk-in ມື້ນີ້</p>' : `
-        <table style="font-size:12px">
-          <tr><th>ເລກທີ</th><th>ລູກຄ້າ</th><th>ເບີໂທ</th><th>ບໍລິການ</th><th>ລາຄາ</th><th>ສະຖານະ</th><th></th></tr>
-          ${todayWalkin.map(e => `<tr>
-            <td><strong style="font-family:monospace;font-size:11px">${e.entry_id}</strong></td>
-            <td>${escapeHtml(e.customer_name||'-')}</td>
-            <td><strong>${escapeHtml(e.customer_phone||'-')}</strong></td>
-            <td>${escapeHtml(e.service_name||'-')}</td>
-            <td style="text-align:right;font-weight:700">${fmt(e.grand_total||e.charge_amount||0)}</td>
-            <td><span class="pill" style="background:${LABOR_STATUS[e.status]?.bg};color:${LABOR_STATUS[e.status]?.color};font-size:10px">${LABOR_STATUS[e.status]?.label}</span></td>
-            <td><button class="btn sm icon" style="background:#3B82F6;color:#fff" onclick="logCustomerAudit(${e.id})" title="ບັນທຶກການກວດສອບ">📞</button></td>
-          </tr>`).join('')}
-        </table>
-      `}
-    </div>
-
-    <div style="margin-top:14px;padding:12px 16px;background:#EFF6FF;border-left:4px solid var(--accent);border-radius:6px;font-size:12px;line-height:1.7">
-      🛡️ <strong>ຄຳແນະນຳ Manager:</strong>
-      <ol style="margin:6px 0 0 18px;padding:0">
-        <li>ປ້ອນຈຳນວນກ້ອງ <strong>ທຸກວັນກ່ອນປິດອູ່</strong> — ໃຊ້ເວລາ 1 ນາທີ</li>
-        <li>ຖ້າ ⚠️ ຄວາມຜິດປົກກະຕິ > 0 → ກວດ CCTV + ສອບຖາມຊ່າງ</li>
-        <li>ສຸ່ມໂທຫາ <strong>3-5 ລູກຄ້າ Walk-in/ອາທິດ</strong> ໃນ "Random Audit" → ກວດສອບໃບເຈ້ຍ + ຄວາມພໍໃຈ</li>
-        <li>ຄອມມິສຊັ່ນຈ່າຍສະເພາະຫຼັງ Mark Paid → ບໍ່ມີແຮງຈູງໃຈລັກເຮັດ</li>
-      </ol>
-    </div>
-  `;
+  const el = document.getElementById('content') || document.querySelector('main') || document.body;
+  if (el) el.innerHTML = '<div style="padding:40px;text-align:center;color:#64748b">'
+    + '<h2 style="margin-bottom:8px">ຄຸນສົມບັດນີ້ຖືກປິດໄວ້ຊົ່ວຄາວ</h2>'
+    + '<p>ໂມດູນຂົນສົ່ງ / ຕິດຕາມ (logistics &amp; tracking) ຖືກປິດໃນສະບັບນີ້.</p>'
+    + '</div>';
 };
 
 async function saveCameraCount(date) {
@@ -19115,6 +18596,12 @@ async function openVehicleUsageModal(prefillVehicleId, editId, forcedType) {
     const existing = await db.vehicle_usage.get(editId);
     if (existing) u = Object.assign(u, existing);
   }
+  // 🆕 Pre-fill data from Cost Calculator
+  if (window._usagePrefill && !editId) {
+    u = Object.assign(u, window._usagePrefill);
+    window._usagePrefill = null; // consume once
+    toast('🗺 ໂຫລດຂໍ້ມູນຈາກແຜນທີ່ — ກວດສອບ ແລະ ບັນທຶກ', 'info', 4000);
+  }
   // ດຶງ branches ທີ່ active=true (ໂດຍບໍ່ຜ່ານ index — ກັນປະຫຍັດ Dexie type-mismatch)
   const allBranches = await db.branches.toArray();
   const branches = allBranches.filter(b => b.active !== false);
@@ -19800,30 +19287,20 @@ async function delVehicleUsage(id) {
 
 // 📦 ສົ່ງສິນຄ້າໃຫ້ລູກຄ້າ
 pages.deliveries = async () => {
-  await renderUsageModulePage({
-    module: 'deliveries',
-    allowedTypes: ['customer_delivery'],
-    title: '📦 ການສົ່ງສິນຄ້າໃຫ້ລູກຄ້າ',
-    crumb: '🚚 ການຂົນສົ່ງ',
-    icon: '📦',
-    description: 'ບັນທຶກການສົ່ງສິນຄ້າໃຫ້ລູກຄ້າ — ຄິດຄ່າຂົນສົ່ງຕາມ km/ໂຕນ/ຄັ້ງ',
-    addLabel: '+ ສ້າງໃບສົ່ງສິນຄ້າ',
-    defaultType: 'customer_delivery',
-  });
+  const el = document.getElementById('content') || document.querySelector('main') || document.body;
+  if (el) el.innerHTML = '<div style="padding:40px;text-align:center;color:#64748b">'
+    + '<h2 style="margin-bottom:8px">ຄຸນສົມບັດນີ້ຖືກປິດໄວ້ຊົ່ວຄາວ</h2>'
+    + '<p>ໂມດູນຂົນສົ່ງ / ຕິດຕາມ (logistics &amp; tracking) ຖືກປິດໃນສະບັບນີ້.</p>'
+    + '</div>';
 };
 
 // 🔄 ໂອນສິນຄ້າພາຍໃນສາຂາ
 pages.inter_branch = async () => {
-  await renderUsageModulePage({
-    module: 'inter_branch',
-    allowedTypes: ['inter_branch'],
-    title: '🔄 ການໂອນສິນຄ້າພາຍໃນ (ສາຂາ ↔ ສາຂາ)',
-    crumb: '🚚 ການຂົນສົ່ງ',
-    icon: '🔄',
-    description: 'ບັນທຶກການໂອນສິນຄ້າຈາກສາຂາໜຶ່ງໄປສາຂາໜຶ່ງ — ບໍ່ຄິດເງິນ ແຕ່ຕິດຕາມ km/ນ້ຳມັນ',
-    addLabel: '+ ສ້າງໃບໂອນສາຂາ',
-    defaultType: 'inter_branch',
-  });
+  const el = document.getElementById('content') || document.querySelector('main') || document.body;
+  if (el) el.innerHTML = '<div style="padding:40px;text-align:center;color:#64748b">'
+    + '<h2 style="margin-bottom:8px">ຄຸນສົມບັດນີ້ຖືກປິດໄວ້ຊົ່ວຄາວ</h2>'
+    + '<p>ໂມດູນຂົນສົ່ງ / ຕິດຕາມ (logistics &amp; tracking) ຖືກປິດໃນສະບັບນີ້.</p>'
+    + '</div>';
 };
 
 // 🏗 ການເຊົ່າເຄນ/ລົດໜັກ
@@ -19842,13 +19319,11 @@ pages.rentals = async () => {
 
 // 📊 ລາຍງານຂົນສົ່ງ
 pages.logistics_report = async () => {
-  const all = (await db.vehicle_usage.toArray()).filter(u => u.usage_type === 'customer_delivery' || u.usage_type === 'inter_branch');
-  await renderUsageReport({
-    title: '📊 ລາຍງານການຂົນສົ່ງ',
-    crumb: '🚚 ການຂົນສົ່ງ',
-    entries: all,
-    revenueTypes: ['customer_delivery'],
-  });
+  const el = document.getElementById('content') || document.querySelector('main') || document.body;
+  if (el) el.innerHTML = '<div style="padding:40px;text-align:center;color:#64748b">'
+    + '<h2 style="margin-bottom:8px">ຄຸນສົມບັດນີ້ຖືກປິດໄວ້ຊົ່ວຄາວ</h2>'
+    + '<p>ໂມດູນຂົນສົ່ງ / ຕິດຕາມ (logistics &amp; tracking) ຖືກປິດໃນສະບັບນີ້.</p>'
+    + '</div>';
 };
 
 // 📊 ລາຍງານການເຊົ່າ
@@ -19912,9 +19387,46 @@ async function renderUsageModulePage(cfg) {
         style="padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;min-width:200px"/>
       <button class="btn outline" onclick="window._modFilter['${cfg.module}']={status:'',month:'',q:''};pages.${cfg.module}()">🔄 ລ້າງ</button>
       <div style="flex:1"></div>
+      <div style="display:flex;gap:0;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:3px">
+        <button onclick="window._modView='${cfg.module}_table';pages.${cfg.module}()" style="padding:7px 14px;border-radius:6px;border:none;background:${window._modView!==cfg.module+'_map'?'#0F3D7A':'transparent'};color:${window._modView!==cfg.module+'_map'?'#fff':'var(--text)'};cursor:pointer;font-size:13px;font-weight:600;font-family:inherit">☰ ຕາຕະລາງ</button>
+        <button onclick="window._modView='${cfg.module}_map';pages.${cfg.module}()" style="padding:7px 14px;border-radius:6px;border:none;background:${window._modView===cfg.module+'_map'?'#F97316':'transparent'};color:${window._modView===cfg.module+'_map'?'#fff':'var(--text)'};cursor:pointer;font-size:13px;font-weight:600;font-family:inherit">🗺 ແຜນທີ່</button>
+        <button onclick="openRoutePlanner('${cfg.module}')" style="padding:7px 14px;border-radius:6px;border:none;background:#7C3AED;color:#fff;cursor:pointer;font-size:13px;font-weight:600;font-family:inherit;margin-left:6px" title="ວາງເສັ້ນທາງສົ່ງສິນຄ້າຫຼາຍຈຸດ + TSP Optimize">🎯 ວາງເສັ້ນທາງ</button>
+        <button onclick="openCostCalculator('${cfg.defaultType}')" style="padding:7px 14px;border-radius:6px;border:none;background:#F97316;color:#fff;cursor:pointer;font-size:13px;font-weight:600;font-family:inherit;margin-left:6px" title="ກົດໝຸດໃນແຜນທີ່ ໄລ່ຄ່າຂົນສົ່ງ + ບັນທຶກເປັນໃບສົ່ງ">💰 ໄລ່ຄ່າຂົນສົ່ງ</button>
+      </div>
       <button class="btn ok" onclick="openVehicleUsageModal(null,null,'${cfg.defaultType}')">${cfg.addLabel}</button>
     </div>
 
+    ${window._modView === cfg.module+'_map' ? `
+      <div style="display:grid;grid-template-columns:240px 1fr;gap:14px;margin-top:6px">
+        <aside style="background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px;font-size:13px;max-height:680px;overflow-y:auto">
+          <h4 style="margin:0 0 10px;font-size:13px;color:var(--primary)">🗺 ການສະແດງ</h4>
+          <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px">
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="radio" name="dmap_filter" value="all" checked onchange="renderDeliveriesMap('${cfg.module}')"/> ທຸກລາຍການ</label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="radio" name="dmap_filter" value="in_progress" onchange="renderDeliveriesMap('${cfg.module}')"/> 🚧 ກຳລັງດຳເນີນ</label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="radio" name="dmap_filter" value="completed" onchange="renderDeliveriesMap('${cfg.module}')"/> ✅ ສຳເລັດ</label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="radio" name="dmap_filter" value="pending_pay" onchange="renderDeliveriesMap('${cfg.module}')"/> 💰 ຄ້າງຊຳລະ</label>
+          </div>
+          <hr style="border:none;border-top:1px solid var(--line);margin:10px 0">
+          <h5 style="margin:0 0 6px;font-size:11px;color:var(--muted);text-transform:uppercase">🎨 ສີຕາມສະຖານະ</h5>
+          <div style="display:flex;flex-direction:column;gap:4px;font-size:11px">
+            <div style="display:flex;align-items:center;gap:6px"><span style="width:24px;height:3px;background:#10B981"></span>ສຳເລັດແລ້ວ</div>
+            <div style="display:flex;align-items:center;gap:6px"><span style="width:24px;height:3px;background:#F59E0B"></span>ກຳລັງດຳເນີນ</div>
+            <div style="display:flex;align-items:center;gap:6px"><span style="width:24px;height:3px;background:#3B82F6"></span>ວາງແຜນ</div>
+            <div style="display:flex;align-items:center;gap:6px"><span style="width:24px;height:3px;background:#EF4444"></span>ຍົກເລີກ</div>
+          </div>
+          <hr style="border:none;border-top:1px solid var(--line);margin:10px 0">
+          <div style="font-size:11px;color:var(--muted);line-height:1.6">
+            💡 <strong>ຄຸນສົມບັດ:</strong><br>
+            • Click ເສັ້ນ → ເບິ່ງລາຍລະອຽດໃບສົ່ງ<br>
+            • Click pin → ເບິ່ງສະຖານທີ່<br>
+            • ໃບສົ່ງທີ່ບໍ່ມີຈຸດເລີ່ມ-ປາຍ ບໍ່ສະແດງ
+          </div>
+        </aside>
+        <div style="position:relative">
+          <div id="kala_del_map" style="width:100%;height:680px;border-radius:10px;border:1px solid var(--line);background:#E5E7EB"></div>
+        </div>
+      </div>
+    ` : `
     <div class="card" style="padding:0;overflow-x:auto">
       ${filtered.length === 0 ? `<div class="empty" style="padding:30px"><div class="icon">${cfg.icon}</div><p>ບໍ່ມີຂໍ້ມູນ — ກົດ "${cfg.addLabel}" ເພື່ອເລີ່ມຕົ້ນ</p></div>` : `
       <table style="font-size:12.5px;min-width:1000px">
@@ -19947,7 +19459,593 @@ async function renderUsageModulePage(cfg) {
         }).join('')}
       </table>`}
     </div>
+    `}
   `;
+
+  // Render map if requested
+  if (window._modView === cfg.module+'_map') {
+    setTimeout(() => renderDeliveriesMap(cfg.module), 50);
+  }
+}
+
+// 🗺 Render Deliveries map with routes
+let _delMapInstance = null;
+let _delMapLayers = [];
+async function renderDeliveriesMap(moduleName) {
+  const cfg_types = moduleName === 'deliveries' ? ['customer_delivery'] : moduleName === 'inter_branch' ? ['inter_branch'] : ['crane_rental'];
+  const all = (await db.vehicle_usage.toArray()).filter(u => cfg_types.includes(u.usage_type));
+  const locations = await db.locations.toArray();
+  const locById = {};
+  locations.forEach(l => { locById[l.id] = l; locById[l.location_id] = l; });
+
+  // Filter
+  const f = window._modFilter[moduleName] || {};
+  let filtered = all;
+  if (f.status) filtered = filtered.filter(u => u.payment_status === f.status);
+  if (f.month) filtered = filtered.filter(u => (u.date||'').startsWith(f.month));
+  const radioFilter = document.querySelector('input[name="dmap_filter"]:checked')?.value || 'all';
+  if (radioFilter === 'in_progress') filtered = filtered.filter(u => u.status === 'in_progress' || u.status === 'planned');
+  else if (radioFilter === 'completed') filtered = filtered.filter(u => u.status === 'completed');
+  else if (radioFilter === 'pending_pay') filtered = filtered.filter(u => u.payment_status === 'pending' && (u.total_amount||0) > 0);
+
+  // Init map
+  if (_delMapInstance) {
+    _delMapLayers.forEach(l => _delMapInstance.removeLayer(l));
+    _delMapLayers = [];
+  } else {
+    _delMapInstance = KALA_MAP.init('kala_del_map');
+  }
+
+  // Build route lines
+  const allPoints = [];
+  const branchLayer = L.layerGroup();
+  const drawnBranches = new Set();
+  filtered.forEach(u => {
+    const from = locById[u.from_location_id] || locById[u.from_location] || locations.find(l => l.type === 'branch' && (l.name||'').includes(u.branch_from||''));
+    const to = locById[u.to_location_id] || locById[u.to_location] || locations.find(l => (l.name||'').includes(u.branch_to||u.customer_name||''));
+    if (!from || !to || !from.lat || !to.lat) return;
+
+    const color = u.status === 'completed' ? '#10B981' :
+                  u.status === 'cancelled' ? '#EF4444' :
+                  u.status === 'in_progress' ? '#F59E0B' : '#3B82F6';
+
+    const line = L.polyline([[from.lat, from.lng], [to.lat, to.lng]], {
+      color, weight: 4, opacity: 0.75,
+    });
+    line.bindPopup(`
+      <div style="font-family:inherit;min-width:220px">
+        <div style="font-weight:700;color:${color};font-size:13px">📦 ${escapeHtml(u.usage_id||'-')}</div>
+        <div style="font-size:11px;color:#64748B;margin-top:3px">${u.date||''}</div>
+        <hr style="border:none;border-top:1px solid #E2E8F0;margin:6px 0">
+        <div style="font-size:12px">🚩 <strong>ຕົ້ນທາງ:</strong> ${escapeHtml(from.name||'-')}</div>
+        <div style="font-size:12px">🎯 <strong>ປາຍທາງ:</strong> ${escapeHtml(to.name||'-')}</div>
+        ${u.customer_name?`<div style="font-size:12px">👤 ${escapeHtml(u.customer_name)}</div>`:''}
+        ${u.total_km?`<div style="font-size:12px">🛣 ${fmt(u.total_km)} km</div>`:''}
+        ${u.total_amount?`<div style="font-size:12px">💰 <strong>${fmt(u.total_amount)} ກີບ</strong></div>`:''}
+        <div style="margin-top:8px"><button onclick="openVehicleUsageModal(null,${u.id})" style="width:100%;padding:5px;background:${color};color:#fff;border:none;border-radius:4px;font-size:11px;cursor:pointer;font-family:inherit">✏️ ເບິ່ງລາຍລະອຽດ</button></div>
+      </div>
+    `);
+    line.addTo(_delMapInstance);
+    _delMapLayers.push(line);
+
+    allPoints.push(from, to);
+    // Add markers for origin/dest (deduplicate)
+    [from, to].forEach((p, idx) => {
+      const key = p.id || (p.lat+'_'+p.lng);
+      if (drawnBranches.has(key)) return;
+      drawnBranches.add(key);
+      const isOrigin = idx === 0;
+      const marker = L.marker([p.lat, p.lng], {
+        icon: KALA_MAP.createPin(p, { color: isOrigin ? '#0F3D7A' : KALA_MAP.TYPE_COLORS[p.type] || '#64748B' })
+      }).bindPopup(`<strong>${escapeHtml(p.name||'-')}</strong>`);
+      branchLayer.addLayer(marker);
+    });
+  });
+
+  branchLayer.addTo(_delMapInstance);
+  _delMapLayers.push(branchLayer);
+
+  if (allPoints.length > 0) {
+    KALA_MAP.fitBounds(_delMapInstance, allPoints);
+  }
+
+  // Show count
+  toast(`🗺 ສະແດງ ${filtered.length} ໃບສົ່ງ — ມີ GPS ${_delMapLayers.length-1} ເສັ້ນ`, 'info', 2000);
+}
+
+// 🎯 Route Planner — Multi-stop TSP optimization
+window._routePlanner = { stops: [], optimized: [] };
+async function openRoutePlanner(moduleName) {
+  const locations = (await db.locations.toArray()).filter(l => l.lat && l.lng);
+  const branches = locations.filter(l => l.type === 'branch');
+  const others = locations.filter(l => l.type !== 'branch');
+
+  window._routePlanner = { stops: [], optimized: [] };
+
+  modal('🎯 ວາງເສັ້ນທາງ — Multi-Stop TSP Optimizer', `
+    <div style="display:grid;grid-template-columns:340px 1fr;gap:12px;height:600px">
+      <aside style="background:var(--bg);padding:12px;border-radius:8px;overflow-y:auto">
+        <h4 style="margin:0 0 8px;font-size:13px">🚩 ຈຸດເລີ່ມຕົ້ນ (ສາຂາ)</h4>
+        <select id="rp_origin" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:6px;font-size:13px;margin-bottom:10px" onchange="rpUpdate()">
+          ${branches.map(b => `<option value="${b.id}">${escapeHtml(b.name)} (${escapeHtml(b.province||'')})</option>`).join('')}
+        </select>
+
+        <h4 style="margin:10px 0 8px;font-size:13px">🎯 ຈຸດສົ່ງ (ເລືອກໄດ້ຫຼາຍ)</h4>
+        <input type="search" id="rp_search" placeholder="🔍 ຄົ້ນຫາສະຖານທີ່..." style="width:100%;padding:7px;border:1px solid var(--line);border-radius:6px;font-size:12px;margin-bottom:8px" oninput="rpFilterStops()"/>
+        <div id="rp_stop_list" style="max-height:280px;overflow-y:auto;border:1px solid var(--line);border-radius:6px;padding:6px;background:#fff">
+          ${others.map(l => `
+            <label style="display:flex;align-items:center;gap:6px;padding:5px;cursor:pointer;font-size:12px;border-bottom:1px dashed #F1F5F9" data-name="${escapeHtml((l.name||'')+(l.village||'')+(l.district||'')).toLowerCase()}">
+              <input type="checkbox" value="${l.id}" onchange="rpUpdate()"/>
+              <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${KALA_MAP.TYPE_COLORS[l.type]||'#888'}"></span>
+              <span style="flex:1">${escapeHtml(l.name||'-')}</span>
+              <span style="color:var(--muted);font-size:10px">${escapeHtml(l.district||'')}</span>
+            </label>
+          `).join('')}
+        </div>
+
+        <hr style="border:none;border-top:1px solid var(--line);margin:12px 0">
+        <div id="rp_summary" style="font-size:12px;color:var(--muted)">ເລືອກຢ່າງໜ້ອຍ 2 ຈຸດສົ່ງ ເພື່ອເລີ່ມ Optimize</div>
+
+        <div style="display:flex;gap:6px;margin-top:10px">
+          <button class="btn ok" style="flex:1" onclick="rpOptimize()">🎯 Optimize</button>
+          <button class="btn outline" onclick="rpClear()">🔄 ລ້າງ</button>
+        </div>
+      </aside>
+      <div style="position:relative">
+        <div id="rp_map" style="width:100%;height:600px;border-radius:8px;background:#E5E7EB"></div>
+      </div>
+    </div>
+  `, `
+    <button class="btn outline" onclick="closeModal()">${t('cancel')}</button>
+    <button class="btn ok" onclick="rpSaveAsDelivery('${moduleName}')" disabled id="rp_save">💾 ສ້າງເປັນໃບສົ່ງ</button>
+  `, 'xl');
+
+  setTimeout(() => {
+    window._rpMap = KALA_MAP.init('rp_map');
+    KALA_MAP.pinLocations(window._rpMap, locations, { cluster: true });
+    rpUpdate();
+  }, 100);
+}
+
+function rpFilterStops() {
+  const q = (document.getElementById('rp_search')?.value || '').toLowerCase();
+  document.querySelectorAll('#rp_stop_list label').forEach(lbl => {
+    const name = lbl.getAttribute('data-name');
+    lbl.style.display = !q || name.includes(q) ? 'flex' : 'none';
+  });
+}
+
+async function rpUpdate() {
+  const originId = parseInt(document.getElementById('rp_origin')?.value);
+  const stopIds = Array.from(document.querySelectorAll('#rp_stop_list input:checked')).map(c => parseInt(c.value));
+  const summary = document.getElementById('rp_summary');
+  const saveBtn = document.getElementById('rp_save');
+  if (!originId || stopIds.length < 1) {
+    if (summary) summary.innerHTML = `<span style="color:var(--muted)">ເລືອກຢ່າງໜ້ອຍ 1 ຈຸດສົ່ງ</span>`;
+    if (saveBtn) saveBtn.disabled = true;
+    return;
+  }
+  const all = await db.locations.toArray();
+  const origin = all.find(l => l.id === originId);
+  const stops = stopIds.map(id => all.find(l => l.id === id)).filter(Boolean);
+  if (!origin) return;
+
+  // Naive distance (not optimized)
+  const naiveRoute = [origin, ...stops, origin]; // round trip
+  const naiveDist = KALA_MAP.routeDistance(naiveRoute);
+
+  // Optimized
+  const optimized = KALA_MAP.optimizeTSP([origin, ...stops, origin]);
+  const optDist = KALA_MAP.routeDistance(optimized);
+
+  window._routePlanner.stops = stops;
+  window._routePlanner.origin = origin;
+  window._routePlanner.optimized = optimized;
+
+  if (summary) summary.innerHTML = `
+    <div style="background:#fff;padding:8px;border-radius:6px;border:1px solid var(--line)">
+      <div style="font-weight:700;color:var(--primary)">📊 ສະຫຼຸບ</div>
+      <div style="font-size:11px;margin-top:4px">🎯 ${stops.length} ຈຸດສົ່ງ</div>
+      <div style="font-size:11px">📏 ໄລຍະທາງ (ປົກກະຕິ): <strong>${naiveDist.toFixed(1)} km</strong></div>
+      <div style="font-size:11px;color:var(--ok)">⚡ ໄລຍະທາງ (Optimize): <strong>${optDist.toFixed(1)} km</strong></div>
+      <div style="font-size:11px;color:var(--ok);font-weight:700">💰 ປະຢັດ: ${(naiveDist-optDist).toFixed(1)} km (${naiveDist>0?Math.round((naiveDist-optDist)/naiveDist*100):0}%)</div>
+    </div>
+  `;
+  if (saveBtn) saveBtn.disabled = false;
+
+  // Draw on map
+  if (window._rpMap) {
+    if (window._rpRouteLine) window._rpMap.removeLayer(window._rpRouteLine);
+    if (window._rpStops) window._rpStops.forEach(m => window._rpMap.removeLayer(m));
+    window._rpStops = [];
+    window._rpRouteLine = KALA_MAP.drawMultiRoute(window._rpMap, optimized, { color: '#F97316', weight: 5 });
+    KALA_MAP.fitBounds(window._rpMap, optimized);
+  }
+}
+
+async function rpOptimize() {
+  await rpUpdate();
+  toast('🎯 ປັບປຸງເສັ້ນທາງສຳເລັດ — ໃຊ້ Nearest-Neighbor + 2-opt', 'ok', 3000);
+}
+
+function rpClear() {
+  document.querySelectorAll('#rp_stop_list input').forEach(c => c.checked = false);
+  rpUpdate();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 💰 COST CALCULATOR ON MAP — Click to pin origin/destination, get cost
+// ═══════════════════════════════════════════════════════════════════════════
+window._costCalc = window._costCalc || {
+  origin: null, destination: null, waypoints: [],
+  mode: 'road',
+  routeData: null,
+  vehicle_id: null, rate_per_km: 0,
+};
+
+async function openCostCalculator(forcedType) {
+  const vehicles = (await db.vehicles.toArray()).filter(v => v.status !== 'sold');
+  const rates = await db.vehicle_usage_rates.toArray();
+  const branches = (await db.locations.toArray()).filter(l => l.type === 'branch' && l.lat);
+
+  window._costCalc = {
+    origin: branches[0] ? { lat: branches[0].lat, lng: branches[0].lng, name: branches[0].name, type: 'branch', id: branches[0].id } : null,
+    destination: null, waypoints: [],
+    mode: KALA_MAP.getApiKey('openrouteservice') ? 'road' : 'straight',
+    routeData: null,
+    vehicle_id: vehicles[0]?.vehicle_id || '',
+    forced_type: forcedType || 'customer_delivery',
+  };
+
+  const defaultRate = vehicles[0] ? (rates.find(r => r.vehicle_id === vehicles[0].vehicle_id)?.rate_per_km || 0) : 0;
+  window._costCalc.rate_per_km = defaultRate;
+
+  modal('💰 ໄລ່ຄ່າຂົນສົ່ງ ໃນແຜນທີ່ — Cost Calculator', `
+    <div style="display:grid;grid-template-columns:340px 1fr;gap:14px;height:680px">
+
+      <aside style="background:var(--bg);padding:14px;border-radius:8px;overflow-y:auto;font-size:13px">
+        <h4 style="margin:0 0 8px;font-size:13px;color:var(--primary)">📍 ຈຸດເລີ່ມ - ປາຍ</h4>
+
+        <div style="background:#fff;padding:10px;border-radius:8px;margin-bottom:8px;border-left:4px solid #10B981">
+          <div style="font-size:11px;font-weight:700;color:#065F46;margin-bottom:4px">🅰 ຕົ້ນທາງ</div>
+          <select id="cc_origin_select" onchange="ccSelectOrigin(this.value)" style="width:100%;padding:6px;border:1px solid var(--line);border-radius:4px;font-size:12px">
+            <option value="">— ກົດໃນແຜນທີ່ —</option>
+            <optgroup label="🏢 ສາຂາ KALA">
+              ${branches.map(b => `<option value="branch:${b.id}">${escapeHtml(b.name)}</option>`).join('')}
+            </optgroup>
+          </select>
+          <div id="cc_origin_info" style="font-size:11px;color:var(--muted);margin-top:4px">${window._costCalc.origin ? '📍 ' + escapeHtml(window._costCalc.origin.name) : '⚪ ຍັງບໍ່ໄດ້ເລືອກ'}</div>
+        </div>
+
+        <div style="background:#fff;padding:10px;border-radius:8px;margin-bottom:8px;border-left:4px solid #EF4444">
+          <div style="font-size:11px;font-weight:700;color:#991B1B;margin-bottom:4px">🅱 ປາຍທາງ</div>
+          <div id="cc_dest_info" style="font-size:11px;color:var(--muted)">⚪ ກົດໃນແຜນທີ່ ເພື່ອປັກໝຸດປາຍທາງ</div>
+          <input id="cc_dest_name" type="text" placeholder="ຊື່ປາຍທາງ" style="width:100%;margin-top:6px;padding:6px;border:1px solid var(--line);border-radius:4px;font-size:12px;display:none"/>
+        </div>
+
+        <button onclick="ccAddWaypoint()" class="btn outline" style="width:100%;font-size:12px;margin-bottom:8px">➕ ເພີ່ມຈຸດແວ່ (Waypoint)</button>
+
+        <hr style="border:none;border-top:1px solid var(--line);margin:12px 0">
+
+        <h4 style="margin:0 0 6px;font-size:13px;color:var(--primary)">🛣 ປະເພດເສັ້ນທາງ</h4>
+        <div style="display:flex;gap:0;background:#fff;border:1px solid var(--line);border-radius:6px;padding:3px;margin-bottom:10px">
+          <button onclick="ccSetMode('road')" id="cc_mode_road" style="flex:1;padding:6px;border-radius:4px;border:none;background:${window._costCalc.mode==='road'?'#F97316':'transparent'};color:${window._costCalc.mode==='road'?'#fff':'var(--text)'};cursor:pointer;font-size:11px;font-weight:600;font-family:inherit">🛣 ຖະໜົນຈິງ</button>
+          <button onclick="ccSetMode('straight')" id="cc_mode_straight" style="flex:1;padding:6px;border-radius:4px;border:none;background:${window._costCalc.mode==='straight'?'#0F3D7A':'transparent'};color:${window._costCalc.mode==='straight'?'#fff':'var(--text)'};cursor:pointer;font-size:11px;font-weight:600;font-family:inherit">📏 ຕົ້ນ→ປາຍ</button>
+        </div>
+        ${!KALA_MAP.getApiKey('openrouteservice') ? '<div style="font-size:10px;color:#B45309;background:#FEF3C7;padding:6px;border-radius:4px;margin-bottom:8px">⚠️ ບໍ່ມີ OpenRouteService key — ໂໝດ "ຖະໜົນຈິງ" ຈະໃຊ້ໄລຍະຄາດຄະເນ (×1.4). <a href="#" onclick="closeModal();openMapApiKeysModal(null,()=>{});return false" style="color:#F97316;font-weight:700">ຕັ້ງຄ່າ →</a></div>' : ''}
+
+        <hr style="border:none;border-top:1px solid var(--line);margin:12px 0">
+
+        <h4 style="margin:0 0 6px;font-size:13px;color:var(--primary)">🚚 ລົດ + ຄ່າແຮງ</h4>
+        <select id="cc_vehicle" onchange="ccChangeVehicle(this.value)" style="width:100%;padding:6px;border:1px solid var(--line);border-radius:4px;font-size:12px;margin-bottom:6px">
+          ${vehicles.map(v => `<option value="${v.vehicle_id}">${escapeHtml(v.plate||v.vehicle_id)} (${escapeHtml(v.type||'-')})</option>`).join('')}
+        </select>
+        <label style="font-size:11px;color:var(--muted)">ອັດຕາ ກີບ/km</label>
+        <input id="cc_rate" type="number" value="${defaultRate}" onchange="ccCalculate()" style="width:100%;padding:6px;border:1px solid var(--line);border-radius:4px;font-size:12px;font-family:monospace"/>
+
+        <hr style="border:none;border-top:2px solid var(--primary);margin:12px 0">
+
+        <div id="cc_result" style="background:#fff;padding:14px;border-radius:8px;border:2px solid var(--line)">
+          <div style="text-align:center;color:var(--muted);font-size:12px">ກົດປຸ່ມ "🧮 ໄລ່" ຫຼັງເລືອກ ຕົ້ນ-ປາຍ</div>
+        </div>
+
+        <button onclick="ccCalculate(true)" class="btn ok" style="width:100%;margin-top:10px;font-size:13px;padding:10px">🧮 ໄລ່ຄ່າຂົນສົ່ງ</button>
+        <button onclick="ccClear()" class="btn outline" style="width:100%;margin-top:6px;font-size:12px">🔄 ລ້າງ</button>
+      </aside>
+
+      <div style="position:relative">
+        <div id="cc_map" style="width:100%;height:680px;border-radius:8px;background:#E5E7EB"></div>
+        <div style="position:absolute;top:12px;left:12px;background:rgba(255,255,255,.95);padding:8px 12px;border-radius:8px;font-size:11px;box-shadow:0 2px 8px rgba(0,0,0,.15);z-index:1000;max-width:280px">
+          💡 <strong>ວິທີໃຊ້:</strong><br>
+          1️⃣ ເລືອກສາຂາຕົ້ນທາງ (ຊ້າຍ) ຫຼື ກົດໃນແຜນທີ່<br>
+          2️⃣ ກົດ <strong>ຄັ້ງທີ່ສອງ</strong> ໃນແຜນທີ່ ເພື່ອປັກໝຸດປາຍທາງ<br>
+          3️⃣ ກົດປຸ່ມ <strong>🧮 ໄລ່</strong><br>
+          4️⃣ ກົດ <strong>💾 ບັນທຶກເປັນໃບສົ່ງ</strong>
+        </div>
+      </div>
+    </div>
+  `, `
+    <button class="btn outline" onclick="closeModal()">${t('cancel')}</button>
+    <button id="cc_save_btn" class="btn ok" onclick="ccSaveAsDelivery()" disabled>💾 ບັນທຶກເປັນໃບສົ່ງ</button>
+  `, 'xl');
+
+  setTimeout(() => initCostCalcMap(branches), 100);
+}
+
+let _ccMap = null;
+let _ccMarkers = { origin: null, destination: null, waypoints: [], route: null };
+
+async function initCostCalcMap(branches) {
+  if (_ccMap) { _ccMap.remove(); _ccMap = null; }
+  _ccMap = KALA_MAP.init('cc_map');
+  _ccMarkers = { origin: null, destination: null, waypoints: [], route: null };
+
+  _ccMap.on('click', async (e) => {
+    const cc = window._costCalc;
+    if (!cc.origin) {
+      cc.origin = { lat: e.latlng.lat, lng: e.latlng.lng, name: 'ຈຸດທີ່ກົດ A', custom: true };
+      ccUpdateMarkers();
+      const infoEl = document.getElementById('cc_origin_info');
+      if (infoEl) infoEl.innerHTML = `📍 ${cc.origin.lat.toFixed(5)}, ${cc.origin.lng.toFixed(5)} <span style="color:var(--ok)">(ກົດໃນແຜນທີ່)</span>`;
+    } else if (!cc.destination) {
+      cc.destination = { lat: e.latlng.lat, lng: e.latlng.lng, name: 'ປາຍທາງ', custom: true };
+      ccUpdateMarkers();
+      const infoEl = document.getElementById('cc_dest_info');
+      if (infoEl) infoEl.innerHTML = `📍 ${cc.destination.lat.toFixed(5)}, ${cc.destination.lng.toFixed(5)} <span style="color:var(--bad)">(ກົດໃນແຜນທີ່)</span>`;
+      const nameInput = document.getElementById('cc_dest_name');
+      if (nameInput) {
+        nameInput.style.display = 'block';
+        nameInput.focus();
+        nameInput.addEventListener('input', (ev) => { cc.destination.name = ev.target.value || 'ປາຍທາງ'; });
+      }
+      ccCalculate();
+    } else {
+      cc.waypoints.push({ lat: e.latlng.lat, lng: e.latlng.lng, name: 'ຈຸດແວ່ ' + (cc.waypoints.length+1) });
+      ccUpdateMarkers();
+      ccCalculate();
+    }
+  });
+
+  branches.forEach(b => {
+    L.marker([b.lat, b.lng], { icon: KALA_MAP.createPin(b, { size: 24 }), opacity: 0.6 })
+      .bindPopup('<strong>🏢 ' + escapeHtml(b.name) + '</strong>')
+      .on('click', (e) => {
+        L.DomEvent.stopPropagation(e);
+        const cc = window._costCalc;
+        if (!cc.origin) {
+          cc.origin = { lat: b.lat, lng: b.lng, name: b.name, id: b.id, type: 'branch' };
+        } else if (!cc.destination) {
+          cc.destination = { lat: b.lat, lng: b.lng, name: b.name, id: b.id };
+        }
+        ccUpdateMarkers();
+        ccCalculate();
+      })
+      .addTo(_ccMap);
+  });
+
+  ccUpdateMarkers();
+}
+
+function ccUpdateMarkers() {
+  const cc = window._costCalc;
+  if (_ccMarkers.origin) { _ccMap.removeLayer(_ccMarkers.origin); _ccMarkers.origin = null; }
+  if (_ccMarkers.destination) { _ccMap.removeLayer(_ccMarkers.destination); _ccMarkers.destination = null; }
+  _ccMarkers.waypoints.forEach(m => _ccMap.removeLayer(m));
+  _ccMarkers.waypoints = [];
+  if (_ccMarkers.route) { _ccMap.removeLayer(_ccMarkers.route); _ccMarkers.route = null; }
+
+  if (cc.origin) {
+    _ccMarkers.origin = L.marker([cc.origin.lat, cc.origin.lng], {
+      draggable: true,
+      icon: L.divIcon({ html: '<div style="background:#10B981;color:#fff;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.4)">A</div>', iconSize:[36,36], iconAnchor:[18,18] }),
+    }).bindPopup('<strong>🅰 ຕົ້ນທາງ:</strong><br>' + escapeHtml(cc.origin.name)).addTo(_ccMap);
+    _ccMarkers.origin.on('dragend', (e) => {
+      const p = e.target.getLatLng();
+      cc.origin.lat = p.lat; cc.origin.lng = p.lng;
+      const infoEl = document.getElementById('cc_origin_info');
+      if (infoEl) infoEl.innerHTML = `📍 ${p.lat.toFixed(5)}, ${p.lng.toFixed(5)} <span style="color:var(--ok)">(ລາກປ່ຽນ)</span>`;
+      ccCalculate();
+    });
+  }
+  if (cc.destination) {
+    _ccMarkers.destination = L.marker([cc.destination.lat, cc.destination.lng], {
+      draggable: true,
+      icon: L.divIcon({ html: '<div style="background:#EF4444;color:#fff;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.4)">B</div>', iconSize:[36,36], iconAnchor:[18,18] }),
+    }).bindPopup('<strong>🅱 ປາຍທາງ:</strong><br>' + escapeHtml(cc.destination.name)).addTo(_ccMap);
+    _ccMarkers.destination.on('dragend', (e) => {
+      const p = e.target.getLatLng();
+      cc.destination.lat = p.lat; cc.destination.lng = p.lng;
+      const infoEl = document.getElementById('cc_dest_info');
+      if (infoEl) infoEl.innerHTML = `📍 ${p.lat.toFixed(5)}, ${p.lng.toFixed(5)} <span style="color:var(--bad)">(ລາກປ່ຽນ)</span>`;
+      ccCalculate();
+    });
+  }
+  cc.waypoints.forEach((w, i) => {
+    const m = L.marker([w.lat, w.lng], {
+      draggable: true,
+      icon: L.divIcon({ html: '<div style="background:#3B82F6;color:#fff;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.4)">' + (i+1) + '</div>', iconSize:[30,30], iconAnchor:[15,15] }),
+    }).bindPopup('<strong>ຈຸດແວ່ ' + (i+1) + '</strong><br><button onclick="ccRemoveWaypoint(' + i + ')" style="background:#EF4444;color:#fff;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;font-family:inherit">🗑 ລົບ</button>').addTo(_ccMap);
+    m.on('dragend', (e) => {
+      const p = e.target.getLatLng();
+      w.lat = p.lat; w.lng = p.lng;
+      ccCalculate();
+    });
+    _ccMarkers.waypoints.push(m);
+  });
+
+  const all = [cc.origin, ...cc.waypoints, cc.destination].filter(Boolean);
+  if (all.length > 0) {
+    if (all.length === 1) _ccMap.setView([all[0].lat, all[0].lng], 13);
+    else _ccMap.fitBounds(L.latLngBounds(all.map(p => [p.lat, p.lng])), { padding:[60,60] });
+  }
+}
+
+async function ccSelectOrigin(val) {
+  if (!val) return;
+  if (val.startsWith('branch:')) {
+    const id = parseInt(val.split(':')[1]);
+    const loc = await db.locations.get(id);
+    if (!loc || !loc.lat) return;
+    window._costCalc.origin = { lat: loc.lat, lng: loc.lng, name: loc.name, id: loc.id, type: 'branch' };
+    const infoEl = document.getElementById('cc_origin_info');
+    if (infoEl) infoEl.innerHTML = '📍 ' + escapeHtml(loc.name);
+    ccUpdateMarkers();
+    ccCalculate();
+  }
+}
+
+function ccSetMode(mode) {
+  window._costCalc.mode = mode;
+  ['road','straight'].forEach(m => {
+    const btn = document.getElementById('cc_mode_'+m);
+    if (btn) {
+      btn.style.background = m === mode ? (m === 'road' ? '#F97316' : '#0F3D7A') : 'transparent';
+      btn.style.color = m === mode ? '#fff' : 'var(--text)';
+    }
+  });
+  ccCalculate();
+}
+
+async function ccChangeVehicle(vid) {
+  window._costCalc.vehicle_id = vid;
+  const rates = await db.vehicle_usage_rates.toArray();
+  const r = rates.find(x => x.vehicle_id === vid);
+  const defaultRate = r?.rate_per_km || 0;
+  window._costCalc.rate_per_km = defaultRate;
+  const rateEl = document.getElementById('cc_rate');
+  if (rateEl) rateEl.value = defaultRate;
+  ccCalculate();
+}
+
+function ccAddWaypoint() {
+  toast('💡 ກົດໃນແຜນທີ່ເພື່ອປັກໝຸດຈຸດແວ່ (ຈະເຂົ້າຄິວຫລັງປາຍທາງ)', 'info', 3000);
+}
+
+function ccRemoveWaypoint(i) {
+  window._costCalc.waypoints.splice(i, 1);
+  ccUpdateMarkers();
+  ccCalculate();
+}
+
+async function ccCalculate(showLoading) {
+  const cc = window._costCalc;
+  const resEl = document.getElementById('cc_result');
+  const saveBtn = document.getElementById('cc_save_btn');
+  if (!cc.origin || !cc.destination) {
+    if (resEl) resEl.innerHTML = '<div style="text-align:center;color:var(--muted);font-size:12px">ກະລຸນາເລືອກ ຕົ້ນທາງ + ປາຍທາງ</div>';
+    if (saveBtn) saveBtn.disabled = true;
+    return;
+  }
+
+  if (showLoading && resEl) resEl.innerHTML = '<div style="text-align:center;color:var(--muted);font-size:12px">⏳ ກຳລັງໄລ່...</div>';
+
+  const rateInput = document.getElementById('cc_rate');
+  const ratePerKm = rateInput ? (parseFloat(rateInput.value) || cc.rate_per_km) : cc.rate_per_km;
+
+  let route;
+  if (cc.mode === 'road') {
+    route = await fetchRoadRoute(cc.origin, cc.destination, cc.waypoints);
+  } else {
+    const all = [cc.origin, ...cc.waypoints, cc.destination];
+    let dist = 0;
+    for (let i = 0; i < all.length - 1; i++) dist += KALA_MAP.haversineKm(all[i], all[i+1]);
+    route = {
+      ok: true,
+      method: 'straight-direct',
+      distance_km: dist,
+      duration_min: dist / 50 * 60,
+      coordinates: all.map(p => [p.lng, p.lat]),
+    };
+  }
+
+  cc.routeData = route;
+
+  if (_ccMarkers.route) { _ccMap.removeLayer(_ccMarkers.route); _ccMarkers.route = null; }
+  if (route.coordinates) {
+    _ccMarkers.route = L.polyline(route.coordinates.map(c => [c[1], c[0]]), {
+      color: cc.mode === 'road' ? '#F97316' : '#0F3D7A',
+      weight: 5,
+      opacity: 0.85,
+      dashArray: cc.mode === 'straight' ? '10, 8' : null,
+    }).addTo(_ccMap);
+  }
+
+  const cost = route.distance_km * ratePerKm;
+  const hours = Math.floor(route.duration_min / 60);
+  const minutes = Math.round(route.duration_min % 60);
+
+  if (resEl) resEl.innerHTML = `
+    <div style="text-align:center">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:6px">${route.method === 'road' ? '🛣 ໄລຍະຖະໜົນຈິງ (OpenRouteService)' : route.method === 'straight' ? '📏 ໄລຍະຄາດຄະເນ (Haversine ×1.4)' : '📏 ໄລຍະຕົ້ນ→ປາຍ'}</div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:2px">ໄລຍະທາງ</div>
+      <div style="font-size:28px;font-weight:700;color:var(--primary)">${route.distance_km.toFixed(1)} <span style="font-size:14px;color:var(--muted)">km</span></div>
+      <hr style="border:none;border-top:1px solid var(--line);margin:10px 0">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:2px">⏱ ເວລາເດີນທາງ</div>
+      <div style="font-size:18px;font-weight:600;color:#1E40AF">${hours > 0 ? hours+' ຊມ. ' : ''}${minutes} ນາທີ</div>
+      <hr style="border:none;border-top:1px solid var(--line);margin:10px 0">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:2px">💰 ຄ່າຂົນສົ່ງ</div>
+      <div style="font-size:32px;font-weight:700;color:var(--ok)">${fmt(Math.round(cost))} <span style="font-size:14px;color:var(--muted)">ກີບ</span></div>
+      <div style="font-size:10px;color:var(--muted);margin-top:4px">@ ${fmt(ratePerKm)} ກີບ/km</div>
+    </div>
+  `;
+  if (saveBtn) saveBtn.disabled = false;
+}
+
+function ccClear() {
+  window._costCalc.origin = null;
+  window._costCalc.destination = null;
+  window._costCalc.waypoints = [];
+  window._costCalc.routeData = null;
+  document.getElementById('cc_origin_info').textContent = '⚪ ຍັງບໍ່ໄດ້ເລືອກ';
+  document.getElementById('cc_dest_info').textContent = '⚪ ກົດໃນແຜນທີ່ ເພື່ອປັກໝຸດປາຍທາງ';
+  const nameInput = document.getElementById('cc_dest_name');
+  if (nameInput) { nameInput.style.display = 'none'; nameInput.value = ''; }
+  ccUpdateMarkers();
+  document.getElementById('cc_result').innerHTML = '<div style="text-align:center;color:var(--muted);font-size:12px">ກົດປຸ່ມ "🧮 ໄລ່" ຫຼັງເລືອກ ຕົ້ນ-ປາຍ</div>';
+  document.getElementById('cc_save_btn').disabled = true;
+}
+
+async function ccSaveAsDelivery() {
+  const cc = window._costCalc;
+  if (!cc.origin || !cc.destination || !cc.routeData) {
+    toast('⚠️ ກະລຸນາໄລ່ຄ່າຂົນສົ່ງກ່ອນ', 'warn');
+    return;
+  }
+  const rate = parseFloat(document.getElementById('cc_rate')?.value) || cc.rate_per_km;
+  const cost = cc.routeData.distance_km * rate;
+
+  window._usagePrefill = {
+    usage_type: cc.forced_type || 'customer_delivery',
+    vehicle_id: cc.vehicle_id,
+    branch_from: cc.origin.type === 'branch' ? cc.origin.name : '',
+    start_location: cc.origin.name,
+    start_location_id: cc.origin.id || null,
+    end_location: cc.destination.name,
+    end_location_id: cc.destination.id || null,
+    customer_name: cc.destination.name,
+    total_km: parseFloat(cc.routeData.distance_km.toFixed(2)),
+    total_hours: parseFloat((cc.routeData.duration_min/60).toFixed(2)),
+    rate: rate,
+    billing_type: 'per_km',
+    subtotal: Math.round(cost),
+    total_amount: Math.round(cost),
+    notes: `📍 GPS: ${cc.origin.lat.toFixed(5)},${cc.origin.lng.toFixed(5)} → ${cc.destination.lat.toFixed(5)},${cc.destination.lng.toFixed(5)}\n🛣 ${cc.routeData.method === 'road' ? 'ໄລຍະຖະໜົນຈິງ' : 'ໄລຍະຄາດຄະເນ'}: ${cc.routeData.distance_km.toFixed(1)} km`,
+  };
+  closeModal();
+  setTimeout(() => openVehicleUsageModal(cc.vehicle_id, null, cc.forced_type || 'customer_delivery'), 200);
+}
+
+async function rpSaveAsDelivery(moduleName) {
+  const p = window._routePlanner;
+  if (!p.origin || !p.optimized || p.optimized.length < 3) {
+    toast('⚠️ ກະລຸນາເລືອກຈຸດສົ່ງກ່ອນ', 'warn');
+    return;
+  }
+  const stops = p.optimized.slice(1, -1); // ບໍ່ນັບ origin ທີ່ສຸດ-ປາຍ
+  const totalKm = KALA_MAP.routeDistance(p.optimized);
+  closeModal();
+  toast(`💾 ບັນທຶກເສັ້ນທາງ ${stops.length} ຈຸດ • ${totalKm.toFixed(1)} km — ກະລຸນາສ້າງໃບສົ່ງສິນຄ້າແບບປົກກະຕິ`, 'info', 5000);
+  // ສາມາດເຊື່ອມ vehicle usage form ໄດ້ໃນອະນາຄົດ
 }
 
 // Generic Report Renderer
@@ -20091,8 +20189,696 @@ const PROVINCE_ORDER = [
   'ອຸດົມໄຊ', 'ຫຼວງນ້ຳທາ', 'ບໍ່ແກ້ວ', 'ຜົ້ງສາລີ'
 ];
 
+// ═══════════════════════════════════════════════════════════════════════════
+// 🗺 LOGISTICS COMMAND CENTER — Leaflet.js Map Module
+// ═══════════════════════════════════════════════════════════════════════════
+window.KALA_MAP = (function() {
+  // Default center: Pakse, Champasak (KALA HQ)
+  const DEFAULT_CENTER = [15.1156, 105.7857];
+  const DEFAULT_ZOOM = 8;
+
+  // 🔑 API Keys (stored in localStorage — user can set in Settings)
+  function getApiKey(provider) {
+    return localStorage.getItem('kala_apikey_' + provider) || '';
+  }
+  function setApiKey(provider, key) {
+    if (key) localStorage.setItem('kala_apikey_' + provider, key);
+    else localStorage.removeItem('kala_apikey_' + provider);
+  }
+
+  // 🗺 Map Tile Providers — Many options, some need API keys
+  const PROVIDERS = {
+    osm: {
+      name: '🗺 OpenStreetMap (ຟຣີ)',
+      url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      attribution: '&copy; OpenStreetMap',
+      maxZoom: 19,
+      free: true,
+    },
+    cartoLight: {
+      name: '⚪ Carto Light (ຟຣີ)',
+      url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+      attribution: '&copy; CARTO &copy; OSM',
+      maxZoom: 20,
+      free: true,
+    },
+    cartoDark: {
+      name: '⚫ Carto Dark (ຟຣີ)',
+      url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+      attribution: '&copy; CARTO &copy; OSM',
+      maxZoom: 20,
+      free: true,
+    },
+    cartoVoyager: {
+      name: '🎨 Carto Voyager (ສວຍ ຟຣີ)',
+      url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+      attribution: '&copy; CARTO &copy; OSM',
+      maxZoom: 20,
+      free: true,
+    },
+    esriSat: {
+      name: '🛰 Satellite ESRI (ຟຣີ)',
+      url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      attribution: 'Tiles &copy; Esri',
+      maxZoom: 19,
+      free: true,
+    },
+    esriHybrid: {
+      name: '🌐 Hybrid Sat+Labels (ຟຣີ)',
+      hybrid: true,
+      url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      labelUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+      attribution: 'Tiles &copy; Esri',
+      maxZoom: 19,
+      free: true,
+    },
+    esriTopo: {
+      name: '⛰ ESRI Topographic (ຟຣີ)',
+      url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',
+      attribution: 'Tiles &copy; Esri',
+      maxZoom: 19,
+      free: true,
+    },
+    opentopo: {
+      name: '🏔 OpenTopoMap (ຟຣີ)',
+      url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+      attribution: '&copy; OSM, SRTM | OpenTopoMap',
+      maxZoom: 17,
+      free: true,
+    },
+    osmHot: {
+      name: '🚜 OSM Humanitarian (ຟຣີ)',
+      url: 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
+      attribution: '&copy; OSM, HOT',
+      maxZoom: 19,
+      free: true,
+    },
+    // ===== Providers requiring free API key =====
+    maptilerStreets: {
+      name: '✨ MapTiler Streets (ສວຍສຸດ)',
+      keyName: 'maptiler',
+      url: 'https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key={apikey}',
+      attribution: '&copy; <a href="https://www.maptiler.com/">MapTiler</a> &copy; OSM',
+      maxZoom: 22,
+      signupUrl: 'https://maptiler.com',
+    },
+    maptilerBasic: {
+      name: '✨ MapTiler Basic',
+      keyName: 'maptiler',
+      url: 'https://api.maptiler.com/maps/basic-v2/{z}/{x}/{y}.png?key={apikey}',
+      attribution: '&copy; MapTiler &copy; OSM',
+      maxZoom: 22,
+      signupUrl: 'https://maptiler.com',
+    },
+    maptilerOutdoor: {
+      name: '🏕 MapTiler Outdoor',
+      keyName: 'maptiler',
+      url: 'https://api.maptiler.com/maps/outdoor-v2/{z}/{x}/{y}.png?key={apikey}',
+      attribution: '&copy; MapTiler &copy; OSM',
+      maxZoom: 22,
+      signupUrl: 'https://maptiler.com',
+    },
+    maptilerSat: {
+      name: '🛰 MapTiler Satellite HD',
+      keyName: 'maptiler',
+      url: 'https://api.maptiler.com/maps/satellite/{z}/{x}/{y}.jpg?key={apikey}',
+      attribution: '&copy; MapTiler',
+      maxZoom: 22,
+      signupUrl: 'https://maptiler.com',
+    },
+    maptilerHybrid: {
+      name: '🌐 MapTiler Hybrid HD',
+      keyName: 'maptiler',
+      url: 'https://api.maptiler.com/maps/hybrid/{z}/{x}/{y}.jpg?key={apikey}',
+      attribution: '&copy; MapTiler &copy; OSM',
+      maxZoom: 22,
+      signupUrl: 'https://maptiler.com',
+    },
+    stadiaSmooth: {
+      name: '🎨 Stadia Alidade Smooth (ສວຍ)',
+      keyName: 'stadia',
+      url: 'https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}{r}.png?api_key={apikey}',
+      attribution: '&copy; Stadia Maps &copy; OSM',
+      maxZoom: 20,
+      signupUrl: 'https://stadiamaps.com',
+    },
+    stadiaSmoothDark: {
+      name: '🌙 Stadia Smooth Dark',
+      keyName: 'stadia',
+      url: 'https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png?api_key={apikey}',
+      attribution: '&copy; Stadia Maps &copy; OSM',
+      maxZoom: 20,
+      signupUrl: 'https://stadiamaps.com',
+    },
+    stadiaOutdoors: {
+      name: '🏞 Stadia Outdoors',
+      keyName: 'stadia',
+      url: 'https://tiles.stadiamaps.com/tiles/outdoors/{z}/{x}/{y}{r}.png?api_key={apikey}',
+      attribution: '&copy; Stadia Maps &copy; OSM',
+      maxZoom: 20,
+      signupUrl: 'https://stadiamaps.com',
+    },
+    mapboxStreets: {
+      name: '💎 Mapbox Streets',
+      keyName: 'mapbox',
+      url: 'https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/{z}/{x}/{y}?access_token={apikey}',
+      attribution: '&copy; Mapbox &copy; OSM',
+      maxZoom: 22,
+      tileSize: 512,
+      zoomOffset: -1,
+      signupUrl: 'https://mapbox.com',
+    },
+    mapboxSat: {
+      name: '🛰 Mapbox Satellite Streets',
+      keyName: 'mapbox',
+      url: 'https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/tiles/{z}/{x}/{y}?access_token={apikey}',
+      attribution: '&copy; Mapbox',
+      maxZoom: 22,
+      tileSize: 512,
+      zoomOffset: -1,
+      signupUrl: 'https://mapbox.com',
+    },
+    mapboxOutdoors: {
+      name: '🏔 Mapbox Outdoors',
+      keyName: 'mapbox',
+      url: 'https://api.mapbox.com/styles/v1/mapbox/outdoors-v12/tiles/{z}/{x}/{y}?access_token={apikey}',
+      attribution: '&copy; Mapbox &copy; OSM',
+      maxZoom: 22,
+      tileSize: 512,
+      zoomOffset: -1,
+      signupUrl: 'https://mapbox.com',
+    },
+    thunderforestTransport: {
+      name: '🚚 Thunderforest Transport',
+      keyName: 'thunderforest',
+      url: 'https://{s}.tile.thunderforest.com/transport/{z}/{x}/{y}.png?apikey={apikey}',
+      attribution: '&copy; Thunderforest &copy; OSM',
+      maxZoom: 22,
+      signupUrl: 'https://thunderforest.com',
+    },
+    thunderforestLandscape: {
+      name: '🌳 Thunderforest Landscape',
+      keyName: 'thunderforest',
+      url: 'https://{s}.tile.thunderforest.com/landscape/{z}/{x}/{y}.png?apikey={apikey}',
+      attribution: '&copy; Thunderforest &copy; OSM',
+      maxZoom: 22,
+      signupUrl: 'https://thunderforest.com',
+    },
+    thunderforestOutdoors: {
+      name: '🏞 Thunderforest Outdoors',
+      keyName: 'thunderforest',
+      url: 'https://{s}.tile.thunderforest.com/outdoors/{z}/{x}/{y}.png?apikey={apikey}',
+      attribution: '&copy; Thunderforest &copy; OSM',
+      maxZoom: 22,
+      signupUrl: 'https://thunderforest.com',
+    },
+  };
+
+  // Check if provider is usable (has API key if needed)
+  function isProviderUsable(key) {
+    const p = PROVIDERS[key];
+    if (!p) return false;
+    if (p.free) return true;
+    return !!getApiKey(p.keyName);
+  }
+
+  // Save provider preference
+  function getActiveProvider() {
+    return localStorage.getItem('kala_map_provider') || 'osm';
+  }
+  function setActiveProvider(key) {
+    localStorage.setItem('kala_map_provider', key);
+  }
+
+  // Create the tile layer based on provider key
+  function createTileLayer(providerKey) {
+    let p = PROVIDERS[providerKey];
+    if (!p) p = PROVIDERS.osm;
+    // Fallback if API key required but missing
+    if (!p.free && !getApiKey(p.keyName)) {
+      console.warn(`Provider ${providerKey} requires API key, falling back to OSM`);
+      p = PROVIDERS.osm;
+    }
+    const apikey = p.keyName ? getApiKey(p.keyName) : '';
+    const opts = { maxZoom: p.maxZoom, attribution: p.attribution };
+    if (p.tileSize) opts.tileSize = p.tileSize;
+    if (p.zoomOffset != null) opts.zoomOffset = p.zoomOffset;
+    if (p.hybrid) {
+      const sat = L.tileLayer(p.url.replace('{apikey}', apikey), opts);
+      const labels = L.tileLayer(p.labelUrl.replace('{apikey}', apikey), { maxZoom: p.maxZoom });
+      return L.layerGroup([sat, labels]);
+    }
+    return L.tileLayer(p.url.replace('{apikey}', apikey), opts);
+  }
+
+  // Initialize a map in the given container
+  function init(containerId, opts = {}) {
+    if (typeof L === 'undefined') {
+      console.error('Leaflet not loaded');
+      return null;
+    }
+    const center = opts.center || DEFAULT_CENTER;
+    const zoom = opts.zoom || DEFAULT_ZOOM;
+    const map = L.map(containerId, { zoomControl: true, attributionControl: true }).setView(center, zoom);
+
+    // Add active tile layer
+    let activeKey = getActiveProvider();
+    let tileLayer = createTileLayer(activeKey);
+    tileLayer.addTo(map);
+
+    // 🗂 Custom provider switcher control — grouped by free/premium
+    const ProviderControl = L.Control.extend({
+      options: { position: 'topright' },
+      onAdd: function() {
+        const div = L.DomUtil.create('div', 'leaflet-bar');
+        div.style.background = '#fff';
+        div.style.padding = '6px 8px';
+        div.style.fontSize = '12px';
+        div.style.display = 'flex';
+        div.style.gap = '4px';
+        div.style.alignItems = 'center';
+        const freeOpts = Object.entries(PROVIDERS).filter(([k,v]) => v.free).map(([k,v]) => `<option value="${k}" ${k===activeKey?'selected':''}>${v.name}</option>`).join('');
+        const premiumOpts = Object.entries(PROVIDERS).filter(([k,v]) => !v.free).map(([k,v]) => {
+          const ok = !!getApiKey(v.keyName);
+          return `<option value="${k}" ${k===activeKey?'selected':''} ${!ok?'disabled':''}>${v.name}${!ok?' 🔒':''}</option>`;
+        }).join('');
+        div.innerHTML = `<select style="border:none;font-size:12px;font-family:inherit;padding:2px;cursor:pointer;max-width:220px">
+          <optgroup label="🆓 ຟຣີ ບໍ່ຕ້ອງສະໝັກ">${freeOpts}</optgroup>
+          <optgroup label="💎 ຄຸນນະພາບສູງ (ຕ້ອງ API Key)">${premiumOpts}</optgroup>
+        </select>
+        <button title="🔑 ຕັ້ງຄ່າ API Keys" style="background:#F97316;color:#fff;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;font-family:inherit;font-size:12px">🔑</button>`;
+        const sel = div.querySelector('select');
+        const keyBtn = div.querySelector('button');
+        L.DomEvent.disableClickPropagation(div);
+        sel.addEventListener('change', (e) => {
+          activeKey = e.target.value;
+          setActiveProvider(activeKey);
+          map.removeLayer(tileLayer);
+          tileLayer = createTileLayer(activeKey);
+          tileLayer.addTo(map);
+        });
+        keyBtn.addEventListener('click', () => openMapApiKeysModal(map, () => {
+          // Re-render the control to reflect new key states
+          map.removeControl(this);
+          map.removeLayer(tileLayer);
+          tileLayer = createTileLayer(activeKey);
+          tileLayer.addTo(map);
+          map.addControl(new ProviderControl());
+        }));
+        return div;
+      }
+    });
+    map.addControl(new ProviderControl());
+
+    // Scale bar
+    L.control.scale({ imperial: false, metric: true }).addTo(map);
+
+    return map;
+  }
+
+  // Marker colors by location type
+  const TYPE_COLORS = {
+    branch: '#F97316',       // Orange — KALA branches
+    province: '#7C3AED',     // Purple — Province capital
+    district: '#3B82F6',     // Blue — District
+    village: '#10B981',      // Green — Village
+    town: '#06B6D4',         // Cyan — Town
+    market: '#F59E0B',       // Amber — Market
+    construction_site: '#EF4444',  // Red — Construction
+    customer_site: '#8B5CF6',      // Violet — Customer
+    landmark: '#EC4899',           // Pink — Landmark
+    poi: '#64748B',                // Gray — POI
+  };
+  const TYPE_ICONS = {
+    branch: '🏢', province: '🏛', district: '🏛', village: '🏘',
+    town: '🏙', market: '🏪', construction_site: '🚧',
+    customer_site: '👤', landmark: '📍', poi: '📌',
+  };
+
+  // Create a styled circular div marker
+  function createPin(loc, opts = {}) {
+    const color = opts.color || TYPE_COLORS[loc.type] || '#64748B';
+    const icon = opts.icon || TYPE_ICONS[loc.type] || '📍';
+    const size = opts.size || 32;
+    const html = `<div style="background:${color};color:#fff;width:${size}px;height:${size}px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:${Math.floor(size*0.55)}px;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.35);font-weight:700">${icon}</div>`;
+    return L.divIcon({
+      className: 'kala-pin',
+      html: html,
+      iconSize: [size, size],
+      iconAnchor: [size/2, size/2],
+      popupAnchor: [0, -size/2],
+    });
+  }
+
+  // Create a truck marker (for live tracking)
+  function createTruckMarker(vehicle, opts = {}) {
+    const color = opts.color || '#F97316';
+    const heading = opts.heading || 0;
+    const html = `<div style="transform:rotate(${heading}deg);font-size:30px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))">🚚</div>
+      <div style="background:${color};color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:8px;text-align:center;margin-top:-4px;white-space:nowrap;border:1px solid #fff">${escapeHtml(vehicle.plate||vehicle.vehicle_id||'')}</div>`;
+    return L.divIcon({
+      className: 'kala-truck',
+      html: html,
+      iconSize: [60, 50],
+      iconAnchor: [30, 25],
+    });
+  }
+
+  // Pin all locations on the map (with clustering for many points)
+  function pinLocations(map, locations, opts = {}) {
+    const withGPS = locations.filter(l => l.lat != null && l.lng != null);
+    if (withGPS.length === 0) return null;
+
+    const useCluster = opts.cluster !== false && withGPS.length > 30 && typeof L.markerClusterGroup === 'function';
+    const layer = useCluster ? L.markerClusterGroup({
+      maxClusterRadius: 50,
+      spiderfyOnMaxZoom: true,
+      showCoverageOnHover: false,
+    }) : L.layerGroup();
+
+    withGPS.forEach(loc => {
+      const marker = L.marker([loc.lat, loc.lng], { icon: createPin(loc) });
+      const typeLabel = (LOCATION_TYPES && LOCATION_TYPES.find(t => t.key === loc.type)?.label) || loc.type;
+      marker.bindPopup(`
+        <div style="font-family:inherit;min-width:200px">
+          <div style="font-weight:700;font-size:14px;color:${TYPE_COLORS[loc.type]||'#1F2937'};margin-bottom:4px">${TYPE_ICONS[loc.type]||'📍'} ${escapeHtml(loc.name||'-')}</div>
+          <div style="font-size:11px;color:#64748B;margin-bottom:6px">${escapeHtml(typeLabel)} ${loc.location_id?'· '+loc.location_id:''}</div>
+          ${loc.village ? `<div style="font-size:12px">🏘 ${escapeHtml(loc.village)}</div>` : ''}
+          ${loc.district ? `<div style="font-size:12px">🏛 ${escapeHtml(loc.district)}</div>` : ''}
+          ${loc.province ? `<div style="font-size:12px">🌏 ${escapeHtml(loc.province)}</div>` : ''}
+          <div style="font-size:11px;color:#94A3B8;margin-top:6px">🌐 ${loc.lat.toFixed(5)}, ${loc.lng.toFixed(5)}</div>
+          <div style="margin-top:8px;display:flex;gap:6px">
+            <button onclick="openLocationModal(${loc.id})" style="flex:1;padding:5px 8px;background:#0F3D7A;color:#fff;border:none;border-radius:4px;font-size:11px;cursor:pointer;font-family:inherit">✏️ ແກ້ໄຂ</button>
+            <button onclick="openLocationDistances(${loc.id})" style="flex:1;padding:5px 8px;background:#F97316;color:#fff;border:none;border-radius:4px;font-size:11px;cursor:pointer;font-family:inherit">🛣 ໄລຍະ</button>
+          </div>
+        </div>
+      `);
+      if (opts.onClick) marker.on('click', () => opts.onClick(loc));
+      layer.addLayer(marker);
+    });
+
+    layer.addTo(map);
+    return layer;
+  }
+
+  // Draw a route polyline between two points (Haversine straight line)
+  function drawRoute(map, from, to, opts = {}) {
+    const color = opts.color || '#F97316';
+    const weight = opts.weight || 4;
+    const dashArray = opts.dashed ? '8, 8' : null;
+    const line = L.polyline([[from.lat, from.lng], [to.lat, to.lng]], {
+      color, weight, opacity: 0.85, dashArray,
+    });
+    if (opts.label) line.bindTooltip(opts.label, { permanent: true, direction: 'center', className: 'kala-route-label' });
+    line.addTo(map);
+    return line;
+  }
+
+  // Draw a multi-stop route through ordered points
+  function drawMultiRoute(map, stops, opts = {}) {
+    if (stops.length < 2) return null;
+    const points = stops.map(s => [s.lat, s.lng]);
+    const line = L.polyline(points, {
+      color: opts.color || '#F97316',
+      weight: opts.weight || 5,
+      opacity: 0.9,
+    });
+    line.addTo(map);
+
+    // Numbered markers for each stop
+    stops.forEach((s, i) => {
+      const num = i + 1;
+      const isStart = i === 0;
+      const isEnd = i === stops.length - 1;
+      const bg = isStart ? '#10B981' : isEnd ? '#EF4444' : '#3B82F6';
+      const lbl = isStart ? 'A' : isEnd ? 'B' : String(num);
+      const icon = L.divIcon({
+        className: 'kala-stop',
+        html: `<div style="background:${bg};color:#fff;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.4)">${lbl}</div>`,
+        iconSize: [30, 30],
+        iconAnchor: [15, 15],
+      });
+      L.marker([s.lat, s.lng], { icon }).bindPopup(`<strong>${lbl}. ${escapeHtml(s.name||'-')}</strong>`).addTo(map);
+    });
+
+    return line;
+  }
+
+  // Haversine distance in km
+  function haversineKm(a, b) {
+    const R = 6371;
+    const toRad = d => d * Math.PI / 180;
+    const dLat = toRad(b.lat - a.lat);
+    const dLng = toRad(b.lng - a.lng);
+    const lat1 = toRad(a.lat), lat2 = toRad(b.lat);
+    const aH = Math.sin(dLat/2)**2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng/2)**2;
+    return 2 * R * Math.asin(Math.sqrt(aH));
+  }
+
+  // TSP — Nearest Neighbor + 2-opt improvement
+  function optimizeTSP(stops, opts = {}) {
+    if (stops.length < 3) return stops.slice();
+    const fixed = opts.fixedStart !== false; // ໂດຍປົກກະຕິ stops[0] ເປັນຕົ້ນທາງຄົງທີ່
+    let route = nearestNeighbor(stops, fixed);
+    route = twoOpt(route, fixed);
+    return route;
+  }
+
+  function nearestNeighbor(stops, fixedStart) {
+    const remaining = stops.slice();
+    const route = [];
+    let current = remaining.shift(); // ຕົ້ນທາງ
+    route.push(current);
+    while (remaining.length) {
+      let bestIdx = 0;
+      let bestDist = haversineKm(current, remaining[0]);
+      for (let i = 1; i < remaining.length; i++) {
+        const d = haversineKm(current, remaining[i]);
+        if (d < bestDist) { bestDist = d; bestIdx = i; }
+      }
+      current = remaining.splice(bestIdx, 1)[0];
+      route.push(current);
+    }
+    return route;
+  }
+
+  function routeDistance(route) {
+    let total = 0;
+    for (let i = 0; i < route.length - 1; i++) total += haversineKm(route[i], route[i+1]);
+    return total;
+  }
+
+  function twoOpt(route, fixedStart) {
+    const start = fixedStart ? 1 : 0;
+    let improved = true;
+    let best = route.slice();
+    let bestDist = routeDistance(best);
+    let iter = 0;
+    while (improved && iter < 50) {
+      improved = false;
+      for (let i = start; i < best.length - 1; i++) {
+        for (let j = i + 1; j < best.length; j++) {
+          const newRoute = best.slice(0, i).concat(best.slice(i, j+1).reverse(), best.slice(j+1));
+          const newDist = routeDistance(newRoute);
+          if (newDist < bestDist - 0.01) {
+            best = newRoute;
+            bestDist = newDist;
+            improved = true;
+          }
+        }
+      }
+      iter++;
+    }
+    return best;
+  }
+
+  // Fit bounds to a list of items with lat/lng
+  function fitBounds(map, items, padding = 0.1) {
+    const pts = items.filter(i => i.lat != null && i.lng != null);
+    if (pts.length === 0) return;
+    if (pts.length === 1) { map.setView([pts[0].lat, pts[0].lng], 14); return; }
+    const bounds = L.latLngBounds(pts.map(p => [p.lat, p.lng]));
+    map.fitBounds(bounds, { padding: [40, 40] });
+  }
+
+  // Heatmap layer
+  function addHeatmap(map, points, opts = {}) {
+    if (typeof L.heatLayer !== 'function') {
+      console.warn('leaflet.heat not loaded');
+      return null;
+    }
+    const heatData = points.filter(p => p.lat != null && p.lng != null).map(p => [p.lat, p.lng, p.weight || 1]);
+    return L.heatLayer(heatData, {
+      radius: opts.radius || 25,
+      blur: opts.blur || 18,
+      maxZoom: opts.maxZoom || 17,
+      gradient: opts.gradient || { 0.2: '#3B82F6', 0.5: '#F59E0B', 0.8: '#EF4444', 1: '#7C2D12' },
+    }).addTo(map);
+  }
+
+  // Geofence circle
+  function addGeofence(map, fence, opts = {}) {
+    if (!fence.center_lat || !fence.center_lng) return null;
+    const circle = L.circle([fence.center_lat, fence.center_lng], {
+      radius: fence.radius_m || 1000,
+      color: fence.color || '#F97316',
+      fillColor: fence.color || '#F97316',
+      fillOpacity: 0.18,
+      weight: 2,
+    });
+    circle.bindPopup(`<strong>🛡 ${escapeHtml(fence.name)}</strong><br><small>ລັດສະໝີ ${fence.radius_m||1000}m</small>`);
+    circle.addTo(map);
+    return circle;
+  }
+
+  return {
+    DEFAULT_CENTER, DEFAULT_ZOOM, PROVIDERS, TYPE_COLORS, TYPE_ICONS,
+    init, createPin, createTruckMarker, pinLocations, drawRoute, drawMultiRoute,
+    optimizeTSP, routeDistance, haversineKm, fitBounds, addHeatmap, addGeofence,
+    getActiveProvider, setActiveProvider,
+    getApiKey, setApiKey, isProviderUsable,
+  };
+})();
+
+// 🔑 Map API Keys Modal
+function openMapApiKeysModal(callbackMap, onChange) {
+  const keys = {
+    maptiler: KALA_MAP.getApiKey('maptiler'),
+    stadia: KALA_MAP.getApiKey('stadia'),
+    mapbox: KALA_MAP.getApiKey('mapbox'),
+    thunderforest: KALA_MAP.getApiKey('thunderforest'),
+    openrouteservice: KALA_MAP.getApiKey('openrouteservice'),
+  };
+  modal('🔑 ຕັ້ງຄ່າ API Keys — Map Providers', `
+    <div class="alert info" style="font-size:12px;line-height:1.7">
+      💡 API Keys ໂດຍປົກກະຕິແມ່ນ <strong>ຟຣີ</strong> — ສະໝັກໃຊ້ເວລາ 1-2 ນາທີເທົ່ານັ້ນ.
+      ກົດປຸ່ມ "📋 ສະໝັກ" ດ້ານຂ້າງ → ສ້າງບັນຊີ → Copy API Key ມາໃສ່ນີ້.
+      Keys ຈະຖືກບັນທຶກໃນ browser ນີ້ເທົ່ານັ້ນ.
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:12px;margin-top:14px">
+
+      <div style="background:var(--bg);padding:12px;border-radius:8px;border-left:4px solid #3B82F6">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <strong style="color:#1E40AF">✨ MapTiler</strong>
+          <button class="btn sm outline" onclick="window.open('https://www.maptiler.com/cloud/','_blank')">📋 ສະໝັກ</button>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:6px">ຟຣີ 100,000 loads/ເດືອນ — Streets, Satellite, Outdoor, Hybrid HD</div>
+        <input type="text" id="apikey_maptiler" value="${escapeHtml(keys.maptiler)}" placeholder="ປ້ອນ API Key ທີ່ນີ້..." style="width:100%;padding:8px;border:1px solid var(--line);border-radius:6px;font-family:monospace;font-size:12px"/>
+      </div>
+
+      <div style="background:var(--bg);padding:12px;border-radius:8px;border-left:4px solid #8B5CF6">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <strong style="color:#6D28D9">🎨 Stadia Maps</strong>
+          <button class="btn sm outline" onclick="window.open('https://client.stadiamaps.com/signup/','_blank')">📋 ສະໝັກ</button>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:6px">ຟຣີ 200K req/ເດືອນ (ບໍ່ຄ້າພານິດ) — Alidade Smooth, Dark, Outdoors</div>
+        <input type="text" id="apikey_stadia" value="${escapeHtml(keys.stadia)}" placeholder="ປ້ອນ API Key ທີ່ນີ້..." style="width:100%;padding:8px;border:1px solid var(--line);border-radius:6px;font-family:monospace;font-size:12px"/>
+      </div>
+
+      <div style="background:var(--bg);padding:12px;border-radius:8px;border-left:4px solid #10B981">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <strong style="color:#065F46">💎 Mapbox</strong>
+          <button class="btn sm outline" onclick="window.open('https://account.mapbox.com/auth/signup/','_blank')">📋 ສະໝັກ</button>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:6px">ຟຣີ 50K loads/ເດືອນ — ຄຸນນະພາບສູງສຸດ Streets, Satellite Streets, Outdoors</div>
+        <input type="text" id="apikey_mapbox" value="${escapeHtml(keys.mapbox)}" placeholder="ປ້ອນ Public Access Token (ເລີ່ມຕົ້ນດ້ວຍ pk.)..." style="width:100%;padding:8px;border:1px solid var(--line);border-radius:6px;font-family:monospace;font-size:12px"/>
+      </div>
+
+      <div style="background:var(--bg);padding:12px;border-radius:8px;border-left:4px solid #F59E0B">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <strong style="color:#92400E">🚚 Thunderforest</strong>
+          <button class="btn sm outline" onclick="window.open('https://www.thunderforest.com/pricing/','_blank')">📋 ສະໝັກ</button>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:6px">ຟຣີ 150K req/ເດືອນ — Transport (ດີສຳລັບເສັ້ນທາງ), Landscape, Outdoors</div>
+        <input type="text" id="apikey_thunderforest" value="${escapeHtml(keys.thunderforest)}" placeholder="ປ້ອນ API Key ທີ່ນີ້..." style="width:100%;padding:8px;border:1px solid var(--line);border-radius:6px;font-family:monospace;font-size:12px"/>
+      </div>
+
+      <div style="background:#FEF3C7;padding:12px;border-radius:8px;border-left:4px solid #F97316">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <strong style="color:#92400E">🛣 OpenRouteService — ສຳລັບ Road Routing</strong>
+          <button class="btn sm outline" onclick="window.open('https://openrouteservice.org/dev/#/signup','_blank')">📋 ສະໝັກ</button>
+        </div>
+        <div style="font-size:11px;color:#78350F;margin-bottom:6px">ຟຣີ 2,000 req/ມື້ — ໄລ່ໄລຍະທາງຈິງ ໂດຍຖະໜົນ + ເວລາເດີນທາງ</div>
+        <input type="text" id="apikey_openrouteservice" value="${escapeHtml(keys.openrouteservice)}" placeholder="ປ້ອນ API Key..." style="width:100%;padding:8px;border:1px solid #FDBA74;border-radius:6px;font-family:monospace;font-size:12px"/>
+      </div>
+
+    </div>
+  `, `
+    <button class="btn outline" onclick="closeModal()">${t('cancel')}</button>
+    <button class="btn ok" onclick="saveMapApiKeys()">💾 ${t('save')}</button>
+  `, 'large');
+  window._mapApiKeysCallback = onChange;
+}
+
+function saveMapApiKeys() {
+  ['maptiler','stadia','mapbox','thunderforest','openrouteservice'].forEach(k => {
+    const v = document.getElementById('apikey_'+k)?.value?.trim() || '';
+    KALA_MAP.setApiKey(k, v);
+  });
+  closeModal();
+  toast('💾 ບັນທຶກ API Keys ສຳເລັດ', 'ok');
+  if (typeof window._mapApiKeysCallback === 'function') window._mapApiKeysCallback();
+}
+
+// 🛣 OpenRouteService Road Routing
+async function fetchRoadRoute(origin, destination, waypoints = []) {
+  const apiKey = KALA_MAP.getApiKey('openrouteservice');
+  if (!apiKey) {
+    // Fallback: Haversine × 1.4 road factor
+    const all = [origin, ...waypoints, destination];
+    let dist = 0;
+    for (let i = 0; i < all.length - 1; i++) dist += KALA_MAP.haversineKm(all[i], all[i+1]);
+    const roadDist = dist * 1.4;
+    return {
+      ok: true,
+      method: 'straight',
+      distance_km: roadDist,
+      duration_min: roadDist / 50 * 60, // assume 50 km/h average
+      coordinates: all.map(p => [p.lng, p.lat]),
+    };
+  }
+  try {
+    const coords = [[origin.lng, origin.lat], ...waypoints.map(w => [w.lng, w.lat]), [destination.lng, destination.lat]];
+    const res = await fetch('https://api.openrouteservice.org/v2/directions/driving-car/geojson', {
+      method: 'POST',
+      headers: {
+        'Authorization': apiKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ coordinates: coords }),
+    });
+    if (!res.ok) throw new Error('Routing failed: ' + res.status);
+    const data = await res.json();
+    const feature = data.features[0];
+    return {
+      ok: true,
+      method: 'road',
+      distance_km: feature.properties.summary.distance / 1000,
+      duration_min: feature.properties.summary.duration / 60,
+      coordinates: feature.geometry.coordinates,
+    };
+  } catch (e) {
+    console.warn('Road routing failed, using straight-line:', e);
+    return fetchRoadRoute(origin, destination, waypoints); // recurse without key → straight-line
+  }
+}
+
+window._locView = window._locView || 'table'; // 'table' | 'map'
+
 pages.locations = async () => {
-  const all = (await db.locations.toArray()).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  const el = document.getElementById('content') || document.querySelector('main') || document.body;
+  if (el) el.innerHTML = '<div style="padding:40px;text-align:center;color:#64748b">'
+    + '<h2 style="margin-bottom:8px">ຄຸນສົມບັດນີ້ຖືກປິດໄວ້ຊົ່ວຄາວ</h2>'
+    + '<p>ໂມດູນຂົນສົ່ງ / ຕິດຕາມ (logistics &amp; tracking) ຖືກປິດໃນສະບັບນີ້.</p>'
+    + '</div>';
+};
+
+// 🗺 Render Leaflet map for Locations page
+let _locMapInstance = null;
+let _locMapLayers = { pins:null, lines:null, heat:null };
+async function renderLocationsMap() {
+  const all = await db.locations.toArray();
   const matrix = await db.distance_matrix.toArray();
   const f = window._locFilter;
   let filtered = all;
@@ -20103,174 +20889,77 @@ pages.locations = async () => {
     filtered = filtered.filter(l => (l.name||'').toLowerCase().includes(q) || (l.village||'').toLowerCase().includes(q) || (l.district||'').toLowerCase().includes(q));
   }
 
-  // ນັບຕາມປະເພດ
-  const typeCounts = {};
-  LOCATION_TYPES.forEach(t => { typeCounts[t.key] = all.filter(l => l.type === t.key).length; });
-
-  // ໃຫ້ນ້ຳໜັກລຳດັບເມືອງພາຍໃນແຂວງ: ແຂວງ → ສຳນັກງານປົກຄອງ (capital) → ສາຂາ KALA → ເມືອງອື່ນ → ບ້ານ → ອື່ນໆ
-  const TYPE_RANK = { province: 0, branch: 1, district: 2, town: 3, village: 4, market: 5, construction_site: 6, customer_site: 7, landmark: 8, poi: 9 };
-  const sortInProvince = (a, b) => {
-    const ra = TYPE_RANK[a.type] ?? 99;
-    const rb = TYPE_RANK[b.type] ?? 99;
-    if (ra !== rb) return ra - rb;
-    return (a.name||'').localeCompare(b.name||'');
-  };
-
-  // ສ້າງຕາຕະລາງ groups by province
-  const grouped = {};
-  filtered.forEach(l => {
-    const p = l.province || '— ບໍ່ລະບຸແຂວງ —';
-    (grouped[p] = grouped[p] || []).push(l);
-  });
-  // ຈັດລຽງລຳດັບແຂວງ
-  const sortedProvinces = Object.keys(grouped).sort((a, b) => {
-    const ia = PROVINCE_ORDER.indexOf(a);
-    const ib = PROVINCE_ORDER.indexOf(b);
-    if (ia !== -1 && ib !== -1) return ia - ib;
-    if (ia !== -1) return -1;
-    if (ib !== -1) return 1;
-    return a.localeCompare(b);
-  });
-
-  const renderLocationRow = (l) => {
-    const lt = LOCATION_TYPES.find(t => t.key === l.type);
-    const distancesCount = matrix.filter(d => d.from_id === l.id || d.to_id === l.id).length;
-    const hasGPS = l.lat != null && l.lng != null;
-    const role = l.usage_role || (l.type === 'branch' ? 'both' : 'destination');
-    const roleIcon = role === 'origin' ? '🚩' : role === 'destination' ? '🎯' : '🔄';
-    const roleTitle = role === 'origin' ? 'ຕົ້ນທາງເທົ່ານັ້ນ' : role === 'destination' ? 'ປາຍທາງເທົ່ານັ້ນ' : 'ທັງສອງ';
-    return `<tr>
-      <td><strong style="font-family:monospace;font-size:11px">${l.location_id||l.id}</strong></td>
-      <td><span class="pill" style="background:${lt?.color||'#888'};color:#fff;font-size:10px">${lt?.label||l.type}</span></td>
-      <td><strong>${escapeHtml(l.name||'-')}</strong> <span title="${roleTitle}" style="font-size:11px">${roleIcon}</span>${l.notes==='ສຳນັກງານປົກຄອງແຂວງ'?' <span class="pill warn" style="font-size:9px">⭐ ປົກຄອງ</span>':''}</td>
-      <td>${escapeHtml(l.village||'-')}</td>
-      <td>${escapeHtml(l.district||'-')}</td>
-      <td>${escapeHtml(l.province||'-')}</td>
-      <td style="text-align:center">${hasGPS?`<span title="${l.lat.toFixed(4)},${l.lng.toFixed(4)}" style="color:var(--ok);font-size:14px">🌐</span>`:'<span style="color:var(--muted);font-size:14px" title="ບໍ່ມີ GPS">—</span>'}</td>
-      <td style="text-align:right"><span class="pill ${distancesCount>0?'ok':'gray'}">${distancesCount}</span></td>
-      <td class="actions">
-        <button class="btn sm outline" onclick="openLocationDistances(${l.id})" title="ຈັດການໄລຍະ">🛣</button>
-        <button class="btn sm outline" onclick="openLocationModal(${l.id})">${t('edit')}</button>
-        ${isAdmin()?`<button class="btn sm danger" onclick="delLocation(${l.id})">${t('delete')}</button>`:''}
-      </td>
-    </tr>`;
-  };
-
-  // ສ້າງ tab ແຂວງດ້ານເທິງ (Quick filter)
-  const provinceTabs = `
-    <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px">
-      <button class="btn sm ${!f.province?'':'outline'}" onclick="window._locFilter.province='';pages.locations()">🌏 ທຸກແຂວງ (${all.length})</button>
-      ${PROVINCE_ORDER.filter(p => all.some(l => l.province === p)).map(p => {
-        const cnt = all.filter(l => l.province === p).length;
-        return `<button class="btn sm ${f.province===p?'':'outline'}" onclick="window._locFilter.province='${p}';pages.locations()">${escapeHtml(p)} (${cnt})</button>`;
-      }).join('')}
-    </div>
-  `;
-
-  // ສ້າງເນື້ອຫາ — Grouped 3-level (ແຂວງ → ເມືອງ → ບ້ານ) ຫຼື Flat
-  let tableContent;
-  if (filtered.length === 0) {
-    tableContent = '<div class="empty" style="padding:30px"><div class="icon">📍</div><p>ຍັງບໍ່ມີສະຖານທີ່ — ກົດ "+ ເພີ່ມສະຖານທີ່" ຫຼື "🎯 Expert Data"</p></div>';
-  } else if (f.groupBy) {
-    // 🆕 Grouped 3-level: ແຂວງ → ເມືອງ → ບ້ານ/POI
-    tableContent = `<table style="font-size:12.5px;width:100%">
-      <thead><tr><th>ID</th><th>ປະເພດ</th><th>ຊື່ສະຖານທີ່</th><th>ບ້ານ</th><th>ເມືອງ</th><th>ແຂວງ</th><th style="text-align:center">GPS</th><th style="text-align:right">ໄລຍະ</th><th></th></tr></thead>
-      <tbody>
-      ${sortedProvinces.map(prov => {
-        const items = grouped[prov].sort(sortInProvince);
-        const isCollapsed = window._locCollapsed[prov] === true;
-        const withGPS = items.filter(l => l.lat && l.lng).length;
-        const provColor = PROVINCE_ORDER.indexOf(prov) < 4 ? '#7C3AED' : PROVINCE_ORDER.indexOf(prov) < 8 ? '#3B82F6' : '#6B7280';
-        // 🆕 ແບ່ງເປັນ 2 ກຸ່ມພາຍໃນແຂວງ:
-        //   1. ລະດັບແຂວງ/ສາຂາ (ບໍ່ມີ district ຊັດເຈນ)
-        //   2. ກຸ່ມຕາມເມືອງ (ມີ district)
-        const provLevel = items.filter(l => !l.district || l.type === 'province' || l.type === 'branch');
-        const byDistrict = {};
-        items.filter(l => l.district && l.type !== 'province' && l.type !== 'branch').forEach(l => {
-          (byDistrict[l.district] = byDistrict[l.district] || []).push(l);
-        });
-        const districtNames = Object.keys(byDistrict).sort();
-
-        return `
-          <tr style="background:linear-gradient(90deg,${provColor}33,${provColor}11);cursor:pointer;border-top:2px solid ${provColor}" onclick="toggleProvinceGroup('${escapeHtml(prov)}')">
-            <td colspan="9" style="padding:12px 14px;font-weight:700;color:${provColor};font-size:14px">
-              <span style="display:inline-block;width:20px">${isCollapsed?'▶':'▼'}</span>
-              🌏 ${escapeHtml(prov)}
-              <small style="font-weight:500;color:var(--muted);margin-left:8px">— ${items.length} ສະຖານທີ່ • ${districtNames.length} ເມືອງ • 🌐 ${withGPS} GPS</small>
-            </td>
-          </tr>
-          ${isCollapsed ? '' : `
-            ${provLevel.length > 0 ? provLevel.map(renderLocationRow).join('') : ''}
-            ${districtNames.map(distName => {
-              const distItems = byDistrict[distName];
-              const distKey = prov + '||' + distName;
-              const distCollapsed = window._locCollapsed[distKey] === true;
-              const distWithGPS = distItems.filter(l => l.lat && l.lng).length;
-              // ດຶງສະຖານທີ່ "ເມືອງ" ນຳ (ມີ type=district)
-              const districtMaster = distItems.find(l => l.type === 'district');
-              return `
-                <tr style="background:${provColor}0A;cursor:pointer" onclick="toggleProvinceGroup('${escapeHtml(distKey)}')">
-                  <td colspan="9" style="padding:8px 14px 8px 36px;font-weight:600;color:#374151;font-size:12.5px">
-                    <span style="display:inline-block;width:18px">${distCollapsed?'▶':'▼'}</span>
-                    🏛 ເມືອງ ${escapeHtml(distName)}
-                    <small style="font-weight:500;color:var(--muted);margin-left:6px">— ${distItems.length} ຈຸດ • 🌐 ${distWithGPS} GPS</small>
-                  </td>
-                </tr>
-                ${distCollapsed ? '' : distItems.map(renderLocationRow).join('')}
-              `;
-            }).join('')}
-          `}
-        `;
-      }).join('')}
-      </tbody>
-    </table>`;
+  // Init or reset map
+  if (_locMapInstance) {
+    Object.values(_locMapLayers).forEach(l => l && _locMapInstance.removeLayer(l));
+    _locMapLayers = { pins:null, lines:null, heat:null };
   } else {
-    // Flat view
-    tableContent = `<table style="font-size:12.5px">
-      <tr><th>ID</th><th>ປະເພດ</th><th>ຊື່ສະຖານທີ່</th><th>ບ້ານ</th><th>ເມືອງ</th><th>ແຂວງ</th><th style="text-align:center">GPS</th><th style="text-align:right">ໄລຍະ</th><th></th></tr>
-      ${filtered.map(renderLocationRow).join('')}
-    </table>`;
+    _locMapInstance = KALA_MAP.init('kala_loc_map');
+    // Right-click → ສ້າງສະຖານທີ່ໃໝ່
+    _locMapInstance.on('contextmenu', (e) => {
+      if (confirm(`ສ້າງສະຖານທີ່ໃໝ່ທີ່ນີ້?\nGPS: ${e.latlng.lat.toFixed(5)}, ${e.latlng.lng.toFixed(5)}`)) {
+        openLocationModalAtGPS(e.latlng.lat, e.latlng.lng);
+      }
+    });
   }
 
-  $('#main').innerHTML = `
-    <div class="crumbs">ການປະຕິບັດງານ › ສະຖານທີ່ + ໄລຍະທາງ</div>
-    <div class="page-title">📍 Locations Master + Distance Matrix <small style="font-weight:400;color:var(--muted);font-size:13px">— ${filtered.length}/${all.length} ສະຖານທີ່ • ${matrix.length} ໄລຍະທາງ</small></div>
-    <div class="alert info" style="font-size:12px">💡 ບັນທຶກສະຖານທີ່ສຳຄັນ (ບ້ານ, ຕົວເມືອງ, ໂຄງການ, ລູກຄ້າປະຈຳ) + ກຳນົດໄລຍະທາງລະຫວ່າງຈຸດ → ໃຊ້ສຳລັບການຄຳນວນຄ່າຂົນສົ່ງອັດຕະໂນມັດໃນ "ບັນທຶກໃຊ້ລົດ"</div>
+  const showBranches = document.getElementById('map_show_branches')?.checked !== false;
+  const showOthers = document.getElementById('map_show_others')?.checked !== false;
+  const showDistances = document.getElementById('map_show_distances')?.checked === true;
+  const showHeat = document.getElementById('map_show_heatmap')?.checked === true;
+  const useCluster = document.getElementById('map_cluster')?.checked !== false;
 
-    <div class="kpi-grid">
-      <div class="kpi"><div class="label">📍 ສະຖານທີ່</div><div class="val">${all.length}</div></div>
-      <div class="kpi"><div class="label">🌐 ມີ GPS</div><div class="val" style="color:var(--ok)">${all.filter(l => l.lat && l.lng).length}</div><div class="muted">${all.length>0?Math.round(all.filter(l => l.lat && l.lng).length/all.length*100):0}%</div></div>
-      <div class="kpi"><div class="label">🛣 ໄລຍະປ້ອນເອງ</div><div class="val" style="color:var(--accent)">${matrix.length}</div><div class="muted">ຄູ່</div></div>
-      <div class="kpi"><div class="label">🗺 ແຂວງ</div><div class="val">${new Set(all.map(l => l.province).filter(Boolean)).size}</div><div class="muted">/18</div></div>
-    </div>
+  // Filter by branch/other toggle
+  let visible = filtered.filter(l => l.lat && l.lng);
+  if (!showBranches) visible = visible.filter(l => l.type !== 'branch');
+  if (!showOthers) visible = visible.filter(l => l.type === 'branch');
 
-    ${provinceTabs}
+  // Pin all visible locations
+  if (visible.length > 0) {
+    _locMapLayers.pins = KALA_MAP.pinLocations(_locMapInstance, visible, { cluster: useCluster });
+  }
 
-    <div class="toolbar" style="flex-wrap:wrap;gap:8px">
-      <select onchange="window._locFilter.type=this.value;pages.locations()" style="padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px">
-        <option value="">📂 ທຸກປະເພດ (${all.length})</option>
-        ${LOCATION_TYPES.map(t => `<option value="${t.key}" ${f.type===t.key?'selected':''}>${t.label} (${typeCounts[t.key]||0})</option>`).join('')}
-      </select>
-      <input type="search" placeholder="🔍 ຄົ້ນຫາ ຊື່/ບ້ານ/ເມືອງ..." value="${escapeHtml(f.q)}"
-        oninput="window._locFilter.q=this.value;clearTimeout(window._lft);window._lft=setTimeout(()=>pages.locations(),300)"
-        style="padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;min-width:220px"/>
-      <button class="btn sm ${f.groupBy?'':'outline'}" onclick="window._locFilter.groupBy=!window._locFilter.groupBy;pages.locations()" title="ສະຫຼັບ Group by Province">📂 ກຸ່ມຕາມແຂວງ</button>
-      <button class="btn sm outline" onclick="expandAllProvinces()">⏬ ເປີດທຸກກຸ່ມ</button>
-      <button class="btn sm outline" onclick="collapseAllProvinces()">⏫ ປິດທຸກກຸ່ມ</button>
-      <button class="btn outline" onclick="window._locFilter={type:'',province:'',q:'',groupBy:true};pages.locations()">🔄 ລ້າງ</button>
-      <div style="flex:1"></div>
-      <button class="btn outline" onclick="openDistanceMatrix()">🛣 Matrix</button>
-      <button class="btn outline" onclick="openLocationsCSVImport()">📥 CSV</button>
-      <button class="btn outline" onclick="seedKalaLocations()">🌏 ໂຫລດ 18 ແຂວງ</button>
-      <button class="btn outline" style="background:#7C3AED;color:#fff" onclick="seedDetailedSouthLogistics()">🎯 Expert Data</button>
-      <button class="btn ok" onclick="openLocationModal()">+ ເພີ່ມສະຖານທີ່</button>
-    </div>
+  // Distance lines (only if asked + manageable count)
+  if (showDistances && matrix.length > 0 && matrix.length < 100) {
+    const idToLoc = {};
+    visible.forEach(l => { idToLoc[l.id] = l; });
+    const lines = [];
+    matrix.forEach(d => {
+      const from = idToLoc[d.from_id];
+      const to = idToLoc[d.to_id];
+      if (from && to) {
+        const line = L.polyline([[from.lat,from.lng],[to.lat,to.lng]], {
+          color: '#94A3B8', weight: 2, opacity: 0.6, dashArray: '5,5'
+        }).bindTooltip(`${d.distance_km} km`, { sticky: true });
+        lines.push(line);
+      }
+    });
+    if (lines.length > 0) {
+      _locMapLayers.lines = L.layerGroup(lines).addTo(_locMapInstance);
+    }
+  }
 
-    <div class="card" style="padding:0;overflow-x:auto">
-      ${tableContent}
-    </div>
-  `;
-};
+  // Heatmap
+  if (showHeat && visible.length > 0) {
+    _locMapLayers.heat = KALA_MAP.addHeatmap(_locMapInstance, visible.map(v => ({ lat:v.lat, lng:v.lng, weight: v.type==='branch'?3:1 })));
+  }
+
+  // Fit bounds
+  if (visible.length > 0) {
+    KALA_MAP.fitBounds(_locMapInstance, visible);
+  }
+}
+
+// Open location modal with pre-filled GPS (from map right-click)
+function openLocationModalAtGPS(lat, lng) {
+  setTimeout(() => {
+    const latEl = document.getElementById('loc_lat');
+    const lngEl = document.getElementById('loc_lng');
+    if (latEl) latEl.value = lat.toFixed(6);
+    if (lngEl) lngEl.value = lng.toFixed(6);
+  }, 100);
+  openLocationModal();
+}
 
 function toggleProvinceGroup(prov) {
   window._locCollapsed[prov] = !window._locCollapsed[prov];
